@@ -16,7 +16,8 @@ type selection struct {
 
 var allFields = &selection{all: true}
 var transcriptFields = &selection{children: map[string]*selection{
-	"type": allFields, "timestamp": allFields, "costUSD": allFields, "sessionId": allFields, "requestId": allFields,
+	"params": {children: map[string]*selection{"sessionId": allFields, "_meta": {children: map[string]*selection{"agentTimestampMs": allFields}}, "update": {children: map[string]*selection{"sessionUpdate": allFields, "prompt_id": allFields, "usage": allFields}}}},
+	"type":   allFields, "timestamp": allFields, "costUSD": allFields, "sessionId": allFields, "requestId": allFields,
 	"message": {children: map[string]*selection{"id": allFields, "model": allFields, "usage": allFields}},
 	"payload": {children: map[string]*selection{"type": allFields, "id": allFields, "session_id": allFields, "forked_from_id": allFields, "source": {children: map[string]*selection{"subagent": {children: map[string]*selection{"thread_spawn": {children: map[string]*selection{"parent_thread_id": allFields}}}}}}, "model": allFields, "thread_settings": {children: map[string]*selection{"service_tier": allFields}}, "info": {children: map[string]*selection{"last_token_usage": allFields}}}},
 }}

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"yousage/internal/domain"
+	"yousage/internal/history/grok"
 )
 
 const ParserVersion = 1
@@ -38,7 +39,7 @@ func guard(file *os.File, offset int64, length int) (string, error) {
 // ReadTranscript streams selected facts, replaying incomplete EOF independently of committed state.
 func ReadTranscript(ctx context.Context, path string, provider domain.Provider, previous domain.Checkpoint) (FileRead, error) {
 	result := FileRead{Checkpoint: previous, Records: []domain.Record{}, Tail: []domain.Record{}}
-	if provider != domain.Codex && provider != domain.Claude {
+	if provider != domain.Codex && provider != domain.Claude && provider != domain.Grok {
 		return result, errors.New("unsupported transcript parser")
 	}
 	file, err := os.Open(path)
@@ -92,17 +93,23 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 		readBytes += stream.bytes
 		lineState := state
 		if parseError == nil {
+			parsedRecords := []domain.Record{}
 			var record *domain.Record
 			if provider == domain.Codex {
 				record = ParseCodex(projected, &lineState)
-			} else {
+			} else if provider == domain.Claude {
 				record = ParseClaude(projected)
+			} else {
+				parsedRecords = grok.Parse(projected)
 			}
 			if record != nil {
+				parsedRecords = append(parsedRecords, *record)
+			}
+			for _, record := range parsedRecords {
 				if stream.hasNewline {
-					result.Records = append(result.Records, *record)
+					result.Records = append(result.Records, record)
 				} else {
-					result.Tail = append(result.Tail, *record)
+					result.Tail = append(result.Tail, record)
 				}
 			}
 		}

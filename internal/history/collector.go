@@ -46,7 +46,11 @@ func DefaultRoots() ([]Root, error) {
 	if claude == "" {
 		claude = filepath.Join(home, ".claude")
 	}
-	return []Root{{domain.Codex, codex}, {domain.Claude, claude}}, nil
+	grok := strings.TrimSpace(os.Getenv("GROK_HOME"))
+	if grok == "" {
+		grok = filepath.Join(home, ".grok")
+	}
+	return []Root{{domain.Codex, codex}, {domain.Claude, claude}, {domain.Grok, grok}}, nil
 }
 func ExpandHome(path string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
@@ -68,7 +72,7 @@ func (collector Collector) Scan(ctx context.Context, roots []Root, now time.Time
 	results := []SourceResult{}
 	seen := map[string]bool{}
 	for _, root := range roots {
-		if root.Provider != domain.Codex && root.Provider != domain.Claude {
+		if root.Provider != domain.Codex && root.Provider != domain.Claude && root.Provider != domain.Grok {
 			return nil, errors.New("unsupported history root")
 		}
 		home, err := ExpandHome(root.Home)
@@ -176,6 +180,9 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 			return errors.New("history root is not a directory")
 		}
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			return nil
+		}
+		if fingerprint.Provider == domain.Grok && entry.Name() != "updates.jsonl" {
 			return nil
 		}
 		info, err := os.Stat(path)
@@ -291,6 +298,9 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 	if result.Status == "missing" && len(result.Records) > 0 {
 		result.Status = "ok"
 		result.Notice = "Original history removed; showing saved usage."
+	}
+	if fingerprint.Provider == domain.Grok && len(result.Records) == 0 && result.Status == "ok" {
+		result.Notice = "No compatible saved turn_completed usage. Grok Build must persist completed-turn usage in sessions/.../updates.jsonl; past usage cannot be reconstructed."
 	}
 	observation := domain.Observation{SourceId: id, Status: result.Status, AttemptedAt: now.UnixMilli(), Notice: result.Notice}
 	if result.Status == "ok" {
