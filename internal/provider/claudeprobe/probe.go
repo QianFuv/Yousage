@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -247,7 +248,10 @@ func validateUsage(data json.RawMessage) (string, error) {
 	if !*usage.Available {
 		return "unsupported", nil
 	}
-	for _, data := range usage.Limits {
+	for key, data := range usage.Limits {
+		if key != "five_hour" && key != "seven_day" {
+			continue
+		}
 		if string(data) == "null" {
 			continue
 		}
@@ -255,13 +259,8 @@ func validateUsage(data json.RawMessage) (string, error) {
 			Utilization *float64 `json:"utilization"`
 			ResetsAt    string   `json:"resets_at"`
 		}
-		if json.Unmarshal(data, &window) != nil || window.Utilization == nil || *window.Utilization < 0 || *window.Utilization > 100 {
+		if json.Unmarshal(data, &window) != nil || (window.Utilization != nil && (math.IsNaN(*window.Utilization) || math.IsInf(*window.Utilization, 0))) {
 			return "", errors.New("invalid usage window")
-		}
-		if window.ResetsAt != "" {
-			if _, err := time.Parse(time.RFC3339Nano, window.ResetsAt); err != nil {
-				return "", errors.New("invalid usage reset time")
-			}
 		}
 	}
 	return "available", nil

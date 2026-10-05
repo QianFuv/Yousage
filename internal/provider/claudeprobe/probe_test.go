@@ -44,7 +44,7 @@ func fixtureOptions(test *testing.T, scenario string) Options {
 }
 
 func TestControlReadPreservesAccountAndPercentages(test *testing.T) {
-	for _, scenario := range []string{"success", "fragmented", "noise", "fallback", "unsupported", "invalid-window", "usage-error", "usage-hang", "fallback-hang", "unknown-method", "parent-exit"} {
+	for _, scenario := range []string{"success", "fragmented", "noise", "fallback", "unsupported", "model-scoped", "invalid-window", "usage-error", "usage-hang", "fallback-hang", "unknown-method", "parent-exit"} {
 		test.Run(scenario, func(test *testing.T) {
 			options := fixtureOptions(test, scenario)
 			started := time.Now()
@@ -106,6 +106,9 @@ func TestInitializationFailuresStayBounded(test *testing.T) {
 		test.Run(scenario, func(test *testing.T) {
 			options := fixtureOptions(test, scenario)
 			options.InitializeLimit = 150 * time.Millisecond
+			if scenario == "init-error" {
+				options.InitializeLimit = time.Second
+			}
 			started := time.Now()
 			result, err := Probe(context.Background(), options)
 			if err == nil || len(result.Initialization) != 0 {

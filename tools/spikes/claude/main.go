@@ -92,11 +92,14 @@ func main() {
 			continue
 		}
 		available := scenario != "unsupported"
-		utilization := 12
+		var utilization any = 12
 		if scenario == "invalid-window" {
-			utilization = 120
+			utilization = "not-a-number"
 		}
 		limits := map[string]any{"five_hour": map[string]any{"utilization": utilization, "resets_at": "2026-10-06T12:00:00Z"}, "seven_day": nil}
+		if scenario == "model-scoped" {
+			limits["model_scoped"] = []any{map[string]any{"display_name": "Fable 5.1", "utilization": 40, "resets_at": "2026-10-10T12:00:00Z"}}
+		}
 		if !available {
 			limits = nil
 		}

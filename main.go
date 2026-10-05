@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"time"
+	"yousage/internal/quota"
+	"yousage/internal/secrets"
 	"yousage/internal/theme"
 )
 
@@ -19,6 +21,12 @@ var assets embed.FS
 var fixtureTheme []byte
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--quota-credential-helper" {
+		os.Exit(quota.RunCredentialHelper(os.Stdin, os.Stdout))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--credential-helper" {
+		os.Exit(secrets.RunHelper(os.Stdin, os.Stdout))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "theme" {
 		attachCommandConsole()
 		_, exitCode := theme.RunCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr)
