@@ -2,11 +2,14 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"log"
+	"os"
 	"time"
+	"yousage/internal/theme"
 )
 
 //go:embed all:frontend/dist
@@ -16,6 +19,11 @@ var assets embed.FS
 var fixtureTheme []byte
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "theme" {
+		attachCommandConsole()
+		_, exitCode := theme.RunCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr)
+		os.Exit(exitCode)
+	}
 	service, err := newApp()
 	if err != nil {
 		log.Fatal(err)
