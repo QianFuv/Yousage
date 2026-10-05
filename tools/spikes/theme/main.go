@@ -64,6 +64,15 @@ func main() {
 	if len(snapshot.Themes) != 1 || len(snapshot.Themes[0].Colors) != 57 || snapshot.DefaultTheme != "headless" {
 		panic("published palette did not resolve")
 	}
+	cssFixture := filepath.Join(directory, "css-literal.json")
+	if err := os.WriteFile(cssFixture, []byte(`{"version":1,"name":"CSS literal","appearance":"dark","colors":{"canvas":"rebeccapurple","accent":"color(display-p3 1 .2 .3 / .5)"}}`), 0600); err != nil {
+		panic(err)
+	}
+	run("theme", "set", cssFixture)
+	cssSnapshot := show()
+	if len(cssSnapshot.Themes) != 2 || cssSnapshot.DefaultTheme != "css-literal" || cssSnapshot.Themes[0].Colors["canvas"] != "oklch(0.440272 0.160296 303.373)" {
+		panic("full CSS literal or redirected native output contract failed")
+	}
 	before, err := os.ReadFile(filepath.Join(directory, "themes", "headless.json"))
 	if err != nil {
 		panic(err)

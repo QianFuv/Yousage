@@ -42,10 +42,12 @@ export function Reference({
   appearance = APPEARANCE,
   onAppearanceChange,
   view = "usage",
+  shouldManageTheme = true,
 }: {
   appearance?: "light" | "dark";
   onAppearanceChange?: (appearance: "light" | "dark") => void;
   view?: "usage" | "appearance";
+  shouldManageTheme?: boolean;
 }) {
   const [metric, setMetric] = useState<"cost" | "tokens">("cost");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -58,8 +60,8 @@ export function Reference({
     applyThemePalette(selectedTheme, appearance);
   }, [appearance, selectedTheme]);
   React.useEffect(() => {
-    applyThemePalette(selectedTheme, appearance);
-  }, [appearance, selectedTheme]);
+    if (shouldManageTheme) applyThemePalette(selectedTheme, appearance);
+  }, [appearance, selectedTheme, shouldManageTheme]);
   const cards = [
     ...STANDARD_THEME_CARDS,
     ...BUILT_IN_THEMES.map(getThemeCardDefinition),

@@ -12,6 +12,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as theme$0 from "./internal/theme/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -22,6 +26,13 @@ export function ExportFixture(): $CancellablePromise<string> {
 }
 
 /**
+ * ExportTheme uses the native save dialog for a portable validated version-one theme.
+ */
+export function ExportTheme(definition: theme$0.Definition): $CancellablePromise<boolean> {
+    return $Call.ByID(3294236452, definition);
+}
+
+/**
  * FrontendReady reveals the window after the frontend applies its theme.
  */
 export function FrontendReady(): $CancellablePromise<void> {
@@ -29,11 +40,20 @@ export function FrontendReady(): $CancellablePromise<void> {
 }
 
 /**
+ * GetAppearance returns saved authoritative state and current published palettes before first paint.
+ */
+export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
+    return $Call.ByID(3469612837).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * GetBootstrap returns reference metadata after native initialization.
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
     return $Call.ByID(2483192963).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
@@ -49,7 +69,34 @@ export function OpenDocumentation(): $CancellablePromise<void> {
  */
 export function PickFixtureFiles(): $CancellablePromise<string[]> {
     return $Call.ByID(577210012).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
+    });
+}
+
+/**
+ * PickThemeFiles opens the native picker; cancellation leaves the import draft untouched.
+ */
+export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
+    return $Call.ByID(1388571440).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+/**
+ * ReadThemeFiles reads only explicitly picked/dropped paths after checking size and type.
+ */
+export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
+    return $Call.ByID(3002950989, paths).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+/**
+ * SaveAppearance commits the complete intended library and selection atomically.
+ */
+export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $CancellablePromise<theme$0.LibrarySnapshot> {
+    return $Call.ByID(2592400194, revision, value).then(($result: any) => {
+        return $$createType0($result);
     });
 }
 
@@ -61,5 +108,8 @@ export function SyncAppearance(isDark: boolean, red: number, green: number, blue
 }
 
 // Private type creation functions
-const $$createType0 = $models.Bootstrap.createFrom;
-const $$createType1 = $Create.Array($Create.Any);
+const $$createType0 = theme$0.LibrarySnapshot.createFrom;
+const $$createType1 = $models.Bootstrap.createFrom;
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = $models.ThemeFileInput.createFrom;
+const $$createType4 = $Create.Array($$createType3);

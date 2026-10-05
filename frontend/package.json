@@ -6,26 +6,44 @@
   "scripts": {
     "dev": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js --host 127.0.0.1 --port 4175 --strictPort",
     "build": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js build",
-    "typecheck": "node ../tools/parity/node_modules/typescript/bin/tsc --noEmit",
-    "lint": "eslint src reference-adapter.tsx vite.config.ts",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "lint": "node node_modules/eslint/bin/eslint.js src reference-adapter.tsx vite.config.ts",
     "format:check": "prettier --check src reference-adapter.tsx vite.config.ts eslint.config.mjs",
     "test": "vitest run"
   },
   "dependencies": {
+    "@base-ui/react": "1.5.0",
+    "@noble/hashes": "2.2.0",
     "@wailsio/runtime": "3.0.0-beta.28",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "culori": "4.0.2",
+    "effect": "4.0.0-rc.115",
+    "jsonc-parser": "3.3.1",
+    "jszip": "3.10.1",
+    "lucide": "0.564.0",
+    "lucide-react": "0.564.0",
+    "morphicons": "1.7.1",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/culori": "4.0.1",
+    "@types/node": "24.12.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.2.3",
-    "@types/node": "24.12.4",
-    "typescript": "5.9.3",
-    "vitest": "5.0.1",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
     "eslint": "9.39.4",
-    "@eslint/js": "9.39.4",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3",
     "typescript-eslint": "8.57.1",
-    "prettier": "3.8.1"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "effect@4.0.0-rc.115": "../tools/parity/upstream/patches/effect@4.0.0-rc.115.patch"
+    }
   }
 }

@@ -52,6 +52,8 @@ func main() {
 		nativeApp.Event.Emit("system-appearance", event.Context().IsDarkMode())
 	})
 	service.window.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		paths := event.Context().DroppedFiles()
+		nativeApp.Event.Emit("theme-files-dropped", service.ReadThemeFiles(paths))
 		nativeApp.Event.Emit("fixture-files-dropped", fileNames(event.Context().DroppedFiles()))
 		service.record("file-drop")
 	})

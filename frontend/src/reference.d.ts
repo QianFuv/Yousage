@@ -3,5 +3,6 @@ import type { ComponentType } from "react";
 export const Reference: ComponentType<{
   appearance?: "light" | "dark";
   view?: "usage" | "appearance";
+  shouldManageTheme?: boolean;
   onAppearanceChange?: (appearance: "light" | "dark") => void;
 }>;

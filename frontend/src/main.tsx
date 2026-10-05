@@ -1,86 +1,48 @@
-/** Native fixture host; startup visibility is gated on theme application and the committed React frame. */
+/** Desktop routes share saved appearance and a root-mounted editor across navigation. */
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Reference } from "@reference";
 import * as nativeApi from "../bindings/yousage/app";
-import { Events } from "@wailsio/runtime";
+import { canvasBackground, type Bootstrap } from "./native";
 import {
-  canvasBackground,
-  droppedNames,
-  effectiveAppearance,
-  type Bootstrap,
-} from "./native";
+  AppearanceProvider,
+  applySavedAppearance,
+  useAppearance,
+} from "./theme/appearance";
+import { RootThemeEditor, ThemePanel } from "./theme/ThemePanel";
 import "./style.css";
 
-const API = nativeApi;
-const MEDIA = window.matchMedia("(prefers-color-scheme: dark)");
-
-/** Render bounded native demos around the unmodified upstream component graph. */
+/** Keep Usage and Settings independent while synchronizing actual CSS with the native window. */
 function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
+  const context = useAppearance();
   const [route, setRoute] = useState<"usage" | "settings">("usage");
-  const [settingsSection, setSettingsSection] = useState<
-    "appearance" | "diagnostics"
-  >("appearance");
-  const [density, setDensity] = useState<"comfortable" | "compact">(
-    "comfortable",
+  const [section, setSection] = useState<"appearance" | "diagnostics">(
+    "appearance",
   );
-  const [mode, setMode] = useState(bootstrap.appearanceMode);
-  const [isSystemDark, setIsSystemDark] = useState(bootstrap.isSystemDark);
-  const [status, setStatus] = useState(
-    "Synthetic fixtures only · Ctrl+Shift+R checks shortcut",
-  );
-  const appearance = effectiveAppearance(mode, isSystemDark);
-
-  /** Display a native action's settled result and expose failures in the reviewable app. */
-  async function runAction(action: () => Promise<string>) {
-    try {
-      setStatus(await action());
-    } catch (error) {
-      setStatus(String(error));
-    }
-  }
-
+  const [status, setStatus] = useState("");
   useEffect(() => {
-    /** Track OS events without changing explicit Light/Dark mode. */
-    const onChange = () => setIsSystemDark(MEDIA.matches);
-    /** Demonstrate shortcut handling while the native window owns focus. */
-    const onKey = (event: KeyboardEvent) => {
+    /** Offer the same settings shortcut in every application route. */
+    const changed = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === ",") {
         event.preventDefault();
         setRoute("settings");
       }
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        setStatus("Native shortcut received");
-      }
     };
-    MEDIA.addEventListener("change", onChange);
-    window.addEventListener("keydown", onKey);
-    const disposeDrop = Events.On("fixture-files-dropped", (event) => {
-      setStatus(`Dropped: ${droppedNames(event.data as string[]).join(", ")}`);
-    });
-    const disposeAppearance = Events.On("system-appearance", (event) => {
-      setIsSystemDark(Boolean(event.data));
-    });
-    return () => {
-      MEDIA.removeEventListener("change", onChange);
-      window.removeEventListener("keydown", onKey);
-      disposeDrop();
-      disposeAppearance();
-    };
+    window.addEventListener("keydown", changed);
+    return () => window.removeEventListener("keydown", changed);
   }, []);
-
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", appearance === "dark");
-    /** Synchronize the actual CSS palette with the opaque native background. */
+    /** Synchronize preview colors as well as saved themes without waiting on hidden WebView frames. */
     const synchronize = () => {
       const [red, green, blue] = canvasBackground();
-      void API.SyncAppearance(
-        document.documentElement.classList.contains("dark"),
-        red,
-        green,
-        blue,
-      ).catch((error) => setStatus(String(error)));
+      void nativeApi
+        .SyncAppearance(
+          document.documentElement.classList.contains("dark"),
+          red,
+          green,
+          blue,
+        )
+        .catch((cause) => setStatus(String(cause)));
     };
     synchronize();
     const observer = new MutationObserver(synchronize);
@@ -89,30 +51,33 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
       attributeFilter: ["class", "style", "data-theme-id"],
     });
     return () => observer.disconnect();
-  }, [appearance]);
-
+  }, []);
   useEffect(() => {
     let isDisposed = false;
-    /** Apply committed DOM colors before showing; hidden WebViews may suspend animation frames. */
-    async function revealCommittedView() {
+    /** Show only after the persisted palette and committed DOM background reach the native surface. */
+    async function reveal() {
       try {
         const [red, green, blue] = canvasBackground();
-        await API.SyncAppearance(appearance === "dark", red, green, blue);
-      } catch (error) {
-        setStatus(`Startup appearance failed: ${String(error)}`);
+        await nativeApi.SyncAppearance(
+          document.documentElement.classList.contains("dark"),
+          red,
+          green,
+          blue,
+        );
+      } catch (cause) {
+        setStatus(String(cause));
         setRoute("settings");
-        setSettingsSection("diagnostics");
+        setSection("diagnostics");
       }
-      if (!isDisposed) await API.FrontendReady();
+      if (!isDisposed) await nativeApi.FrontendReady();
     }
-    void revealCommittedView();
+    void reveal();
     return () => {
       isDisposed = true;
     };
   }, []);
-
   return (
-    <div className="desktop-layout" data-density={density}>
+    <div className="desktop-layout" data-density="comfortable">
       <nav className="app-navigation" aria-label="Application">
         <strong>Yousage</strong>
         <button
@@ -132,133 +97,66 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
         <section className="settings-controls" aria-label="Settings">
           <div className="settings-sections">
             <button
-              aria-pressed={settingsSection === "appearance"}
-              onClick={() => setSettingsSection("appearance")}
+              aria-pressed={section === "appearance"}
+              onClick={() => setSection("appearance")}
             >
               Appearance & display
             </button>
             <button
-              aria-pressed={settingsSection === "diagnostics"}
-              onClick={() => setSettingsSection("diagnostics")}
+              aria-pressed={section === "diagnostics"}
+              onClick={() => setSection("diagnostics")}
             >
               About & diagnostics
             </button>
           </div>
-          {settingsSection === "appearance" && (
-            <div className="display-controls">
-              <label>
-                Appearance
-                <select
-                  value={mode}
-                  onChange={(event) => setMode(event.target.value)}
-                >
-                  <option value="system">System</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
-              <label>
-                Density
-                <select
-                  value={density}
-                  onChange={(event) =>
-                    setDensity(event.target.value as "comfortable" | "compact")
-                  }
-                >
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact</option>
-                </select>
-              </label>
-              <p>
-                Density changes spacing. Text size and system scaling stay
-                independent.
-              </p>
-            </div>
-          )}
         </section>
       )}
-      {route === "settings" && settingsSection === "diagnostics" && (
-        <aside className="native-toolbar">
-          <strong>Windows native slice</strong>
-          <span>
-            {bootstrap.providers.length} providers · {bootstrap.roleCount} theme
-            roles · Wails {bootstrap.wailsVersion}
-          </span>
-          <select
-            aria-label="Appearance"
-            value={mode}
-            onChange={(event) => setMode(event.target.value)}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <button
-            onClick={() =>
-              void runAction(async () => {
-                const names = await API.PickFixtureFiles();
-                return names?.length
-                  ? `Selected: ${names.join(", ")}`
-                  : "Picker cancelled";
-              })
-            }
-          >
-            Native picker
-          </button>
-          <button
-            onClick={() =>
-              void runAction(async () => {
-                const name = await API.ExportFixture();
-                return name ? `Exported: ${name}` : "Export cancelled";
-              })
-            }
-          >
-            Export fixture
-          </button>
-          <button
-            onClick={() =>
-              void runAction(async () => {
-                await API.OpenDocumentation();
-                return "Official documentation opened";
-              })
-            }
-          >
-            Wails docs
-          </button>
-          <output role="status">{status}</output>
-          <small>
-            PID {bootstrap.pid} · Lifecycle: {bootstrap.lifecycleLog}
-          </small>
-        </aside>
-      )}
-      <div
-        className="native-drop-surface"
-        data-file-drop-target
-        hidden={route === "settings" && settingsSection === "diagnostics"}
-      >
-        <Reference
-          appearance={appearance}
-          onAppearanceChange={setMode}
-          view={route === "usage" ? "usage" : "appearance"}
-        />
-      </div>
+      <main data-file-drop-target>
+        {route === "usage" ? (
+          <Reference
+            appearance={context.appearance}
+            view="usage"
+            shouldManageTheme={false}
+          />
+        ) : section === "appearance" ? (
+          <ThemePanel />
+        ) : (
+          <aside className="native-toolbar">
+            <strong>Yousage · Wails {bootstrap.wailsVersion}</strong>
+            <span>
+              {bootstrap.providers.length} history providers ·{" "}
+              {bootstrap.roleCount} theme roles
+            </span>
+            <output role="status">
+              {status || "Themes are saved in the application database."}
+            </output>
+            <small>Lifecycle log: {bootstrap.lifecycleLog}</small>
+            <button onClick={() => void nativeApi.OpenDocumentation()}>
+              Wails documentation
+            </button>
+          </aside>
+        )}
+      </main>
+      <RootThemeEditor />
     </div>
   );
 }
 
-/** Bootstrap from Go before rendering; the native window remains hidden until React is ready. */
+/** Load authoritative Go state before rendering the first visible frame. */
 async function start() {
-  const bootstrap = await API.GetBootstrap();
-  document.documentElement.classList.toggle(
-    "dark",
-    effectiveAppearance(bootstrap.appearanceMode, bootstrap.isSystemDark) ===
-      "dark",
-  );
+  const bootstrap = await nativeApi.GetBootstrap();
+  const appearance = await nativeApi.GetAppearance();
+  applySavedAppearance(appearance, bootstrap.isSystemDark);
   createRoot(document.getElementById("root")!).render(
-    <Desktop bootstrap={bootstrap} />,
+    <AppearanceProvider
+      initial={appearance}
+      isSystemDark={bootstrap.isSystemDark}
+    >
+      <Desktop bootstrap={bootstrap} />
+    </AppearanceProvider>,
   );
 }
-void start().catch(async (error) => {
-  document.getElementById("root")!.textContent = String(error);
-  await API.FrontendReady();
+void start().catch(async (cause) => {
+  document.getElementById("root")!.textContent = String(cause);
+  await nativeApi.FrontendReady();
 });

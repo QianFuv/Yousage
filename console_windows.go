@@ -6,6 +6,12 @@ import (
 )
 
 func attachCommandConsole() {
+	for _, stream := range []*os.File{os.Stdout, os.Stderr} {
+		kind, err := windows.GetFileType(windows.Handle(stream.Fd()))
+		if err == nil && (kind == windows.FILE_TYPE_PIPE || kind == windows.FILE_TYPE_DISK) {
+			return
+		}
+	}
 	windows.NewLazySystemDLL("kernel32.dll").NewProc("AttachConsole").Call(uintptr(^uint32(0)))
 	for _, stream := range []struct {
 		kind        uint32

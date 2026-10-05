@@ -69,5 +69,35 @@ export class Bootstrap {
     }
 }
 
+export class ThemeFileInput {
+    "name": string;
+    "text": string;
+    "size": number;
+    "error"?: string;
+
+    /** Creates a new ThemeFileInput instance. */
+    constructor($$source: Partial<ThemeFileInput> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("size" in $$source)) {
+            this["size"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeFileInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeFileInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeFileInput($$parsedSource as Partial<ThemeFileInput>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);

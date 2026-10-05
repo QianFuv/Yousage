@@ -1,0 +1,86 @@
+[
+  {
+    "input": "rebeccapurple",
+    "expected": "oklch(0.440272 0.160296 303.373)"
+  },
+  {
+    "input": "gold",
+    "expected": "oklch(0.886771 0.182186 95.33)"
+  },
+  {
+    "input": "transparent",
+    "expected": "oklch(0 0 0 / 0)"
+  },
+  {
+    "input": "#abcd",
+    "expected": "oklch(0.784436 0.030669 248.218 / 0.8667)"
+  },
+  {
+    "input": "rgb(12 34 56 / 40%)",
+    "expected": "oklch(0.246717 0.050582 250.603 / 0.4)"
+  },
+  {
+    "input": "rgba(20,40,60,.8)",
+    "expected": "oklch(0.270523 0.045666 249.854 / 0.8)"
+  },
+  {
+    "input": "hsl(230 50% 40% / .5)",
+    "expected": "oklch(0.42318 0.139819 270.746 / 0.5)"
+  },
+  {
+    "input": "hwb(200 10% 20%)",
+    "expected": "oklch(0.622365 0.131235 237.91)"
+  },
+  {
+    "input": "lab(60% 30 -20 / .7)",
+    "expected": "oklch(0.667973 0.103925 328.29 / 0.7)"
+  },
+  {
+    "input": "lch(50% 40 270)",
+    "expected": "oklch(0.575039 0.113487 258.332)"
+  },
+  {
+    "input": "oklab(0.5 0.1 -0.1)",
+    "expected": "oklch(0.5 0.141421 315)"
+  },
+  {
+    "input": "oklch(none none none / none)",
+    "expected": "oklch(0 0 0 / 0)"
+  },
+  {
+    "input": "rgb(none 20 none / none)",
+    "expected": "oklch(0.165708 0.056386 142.495 / 0)"
+  },
+  {
+    "input": "color(srgb .1 .2 .3 / .4)",
+    "expected": "oklch(0.313834 0.05589 250.027 / 0.4)"
+  },
+  {
+    "input": "color(display-p3 1 .2 .3 / .5)",
+    "expected": "oklch(0.670942 0.275533 20.759 / 0.5)"
+  },
+  {
+    "input": "color(rec2020 .1 .5 .8)",
+    "expected": "oklch(0.590576 0.215751 222.797)"
+  },
+  {
+    "input": "oklch(6e-1 2e-1 -40)",
+    "expected": "oklch(0.6 0.2 320)"
+  },
+  {
+    "input": "not-a-color",
+    "expected": null
+  },
+  {
+    "input": "currentColor",
+    "expected": null
+  },
+  {
+    "input": "var(--accent)",
+    "expected": null
+  },
+  {
+    "input": "color-mix(in srgb,red,blue)",
+    "expected": null
+  }
+]

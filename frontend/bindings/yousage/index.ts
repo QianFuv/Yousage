@@ -7,5 +7,6 @@ export {
 };
 
 export {
-    Bootstrap
+    Bootstrap,
+    ThemeFileInput
 } from "./models.js";

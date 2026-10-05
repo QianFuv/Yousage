@@ -1,7 +1,30 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"], "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx", "strict": true, "noEmit": true, "skipLibCheck": true, "types": ["vite/client", "vitest/globals"],
-    "paths": { "@reference": ["./src/reference.d.ts"] }
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client", "vitest/globals"],
+    "paths": {
+      "@reference": ["./src/reference.d.ts"],
+      "@t3tools/shared/*": ["../tools/parity/upstream/packages/shared/src/*"],
+      "@t3tools/contracts": ["../tools/parity/src/bridges/contracts.tsx"],
+      "~/components/MorphIcon": [
+        "../tools/parity/upstream/apps/web/src/components/MorphIcon.tsx"
+      ],
+      "~/lib/color": ["../tools/parity/upstream/apps/web/src/lib/color.ts"],
+      "~/lib/utils": ["../tools/parity/src/bridges/utils.tsx"],
+      "~/components/ui/*": [
+        "../tools/parity/upstream/apps/web/src/components/ui/*"
+      ],
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"]
+    }
   },
   "include": ["src"]
 }

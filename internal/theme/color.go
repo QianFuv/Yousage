@@ -117,10 +117,9 @@ func formatColor(color oklch, alpha float64) string {
 func rgbColor(color rgb) string          { return formatColor(rgbToOklch(color), 1) }
 func perceptualColor(color oklch) string { return formatColor(mapGamut(color), 1) }
 
-// CanonicalColor converts hex/OKLCH colors to the pinned literal storage representation.
-// The preflight parser subset is expanded by the full import milestone.
+// CanonicalColor converts literal CSS colors through the pinned Culori parser.
 func CanonicalColor(value string) (string, error) {
-	color, alpha, err := parseColor(value)
+	color, alpha, err := parseCssColor(value)
 	if err != nil {
 		return "", err
 	}

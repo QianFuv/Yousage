@@ -5,6 +5,24 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   ...referenceConfig,
+  server: { fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] } },
+  plugins: [
+    {
+      name: "desktop-theme-mirror",
+      enforce: "pre",
+      /** Original UI primitives share the desktop's transient theme mirror. */
+      resolveId(source, importer) {
+        if (
+          source.endsWith("/themePalette") &&
+          importer?.includes("/upstream/")
+        )
+          return fileURLToPath(
+            new URL("./vendor/themePalette.tsx", import.meta.url),
+          );
+      },
+    },
+    ...(referenceConfig.plugins ?? []),
+  ],
   resolve: {
     ...referenceConfig.resolve,
     alias: {

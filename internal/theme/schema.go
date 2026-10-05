@@ -271,7 +271,10 @@ func ResolvePublished(identity string, file PublishedFile) Definition {
 	}
 	variants := map[string]Colors{}
 	for appearance, values := range file.Variants {
+		if appearance == file.Appearance {
+			continue
+		}
 		variants[appearance], _ = normalizeColors(values, appearance, false)
 	}
-	return Definition{Id: identity, Label: file.Name, Appearance: file.Appearance, Colors: colors, Variants: variants}
+	return Definition{Id: identity, Label: file.Name, Appearance: file.Appearance, Colors: colors, Variants: variants, Managed: file.Canvas != "" && file.Accent != "" && len(file.Colors) == 0}
 }

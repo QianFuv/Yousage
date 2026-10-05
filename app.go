@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+	"yousage/internal/storage"
+	"yousage/internal/theme"
 )
 
 // Bootstrap is the fixture-only native contract; it carries no account data.
@@ -27,12 +30,16 @@ type Bootstrap struct {
 
 // App exposes bounded fixture and native demonstration actions.
 type App struct {
-	context   context.Context
-	nativeApp *application.App
-	window    *application.WebviewWindow
-	logFile   *os.File
-	logMutex  sync.Mutex
-	logPath   string
+	context     context.Context
+	nativeApp   *application.App
+	window      *application.WebviewWindow
+	logFile     *os.File
+	logMutex    sync.Mutex
+	logPath     string
+	store       *storage.Store
+	themes      *theme.Library
+	themeCancel context.CancelFunc
+	themeDone   chan struct{}
 }
 
 func newApp() (*App, error) {
@@ -45,22 +52,138 @@ func newApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{logFile: logFile, logPath: logPath}, nil
+	config, err := os.UserConfigDir()
+	if err != nil {
+		logFile.Close()
+		return nil, err
+	}
+	database, err := storage.Open(filepath.Join(config, "Yousage", "yousage.sqlite"))
+	if err != nil {
+		logFile.Close()
+		return nil, err
+	}
+	return &App{logFile: logFile, logPath: logPath, store: database, themes: &theme.Library{Repository: database, PublishedStore: theme.Store{Directory: filepath.Join(config, "Yousage")}}}, nil
 }
 
 // ServiceStartup initializes lifecycle evidence before native windows are created.
 func (service *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	service.context = ctx
 	service.record("startup")
+	watcher, cancel := context.WithCancel(ctx)
+	service.themeCancel = cancel
+	service.themeDone = make(chan struct{})
+	go func() {
+		defer close(service.themeDone)
+		if err := service.themes.Watch(watcher, func(snapshot theme.LibrarySnapshot) { service.nativeApp.Event.Emit("appearance-snapshot", snapshot) }); err != nil && watcher.Err() == nil {
+			if snapshot, readError := service.themes.Read(watcher); readError == nil {
+				snapshot.Error = err.Error()
+				service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
+			}
+		}
+	}()
 	return nil
 }
 
 // ServiceShutdown flushes evidence after Wails cancels the application context.
 func (service *App) ServiceShutdown() error {
+	if service.themeCancel != nil {
+		service.themeCancel()
+		<-service.themeDone
+	}
+	if service.store != nil {
+		defer service.store.Close()
+	}
 	service.record("shutdown")
 	service.logMutex.Lock()
 	defer service.logMutex.Unlock()
 	return service.logFile.Close()
+}
+
+// GetAppearance returns saved authoritative state and current published palettes before first paint.
+func (service *App) GetAppearance() (theme.LibrarySnapshot, error) {
+	return service.themes.Read(service.context)
+}
+
+// SaveAppearance commits the complete intended library and selection atomically.
+func (service *App) SaveAppearance(revision int64, value theme.LibraryValue) (theme.LibrarySnapshot, error) {
+	snapshot, err := service.themes.Save(service.context, revision, value)
+	if err == nil {
+		service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
+	}
+	return snapshot, err
+}
+
+type ThemeFileInput struct {
+	Name  string `json:"name"`
+	Text  string `json:"text"`
+	Size  int64  `json:"size"`
+	Error string `json:"error,omitempty"`
+}
+
+// ReadThemeFiles reads only explicitly picked/dropped paths after checking size and type.
+func (service *App) ReadThemeFiles(paths []string) []ThemeFileInput {
+	files := []ThemeFileInput{}
+	for _, path := range paths {
+		entry := ThemeFileInput{Name: filepath.Base(path)}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			entry.Error = "The theme file could not be read."
+		} else if info.Size() > 256*1024 {
+			entry.Size = info.Size()
+			entry.Error = "Theme files must be no larger than 256 KiB."
+		} else {
+			file, err := os.Open(path)
+			if err == nil {
+				var data []byte
+				data, err = io.ReadAll(io.LimitReader(file, 256*1024+1))
+				file.Close()
+				if len(data) > 256*1024 {
+					err = errors.New("oversized file")
+				}
+				if err == nil {
+					entry.Text, entry.Size = string(data), int64(len(data))
+				}
+			}
+			if err != nil {
+				entry.Error = "The theme file could not be read."
+			}
+		}
+		files = append(files, entry)
+	}
+	return files
+}
+
+// PickThemeFiles opens the native picker; cancellation leaves the import draft untouched.
+func (service *App) PickThemeFiles() ([]ThemeFileInput, error) {
+	paths, err := service.nativeApp.Dialog.OpenFile().SetTitle("Import themes").AddFilter("Theme JSON", "*.json").AttachToWindow(service.window).PromptForMultipleSelection()
+	if err != nil && err.Error() == "cancelled by user" {
+		return []ThemeFileInput{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return service.ReadThemeFiles(paths), nil
+}
+
+// ExportTheme uses the native save dialog for a portable validated version-one theme.
+func (service *App) ExportTheme(definition theme.Definition) (bool, error) {
+	data, err := theme.SerializeFile(definition)
+	if err != nil {
+		return false, err
+	}
+	dialog := service.nativeApp.Dialog.SaveFile()
+	dialog.SetOptions(&application.SaveFileDialogOptions{Title: "Export theme", Filename: definition.Id + ".json", Filters: []application.FileFilter{{DisplayName: "Theme JSON", Pattern: "*.json"}}, Window: service.window})
+	path, err := dialog.PromptForSingleSelection()
+	if err != nil && err.Error() == "cancelled by user" {
+		return false, nil
+	}
+	if err != nil || path == "" {
+		return false, err
+	}
+	if err = os.WriteFile(path, data, 0600); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (service *App) record(event string) {
