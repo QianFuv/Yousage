@@ -1,0 +1,57 @@
+[
+  {
+    "file": "dialog.png",
+    "bytes": 75539,
+    "sha256": "8aeb386d0b88d59e15ce2e91f8cc87a204dcb9b17ef81263c9a651bb50472096"
+  },
+  {
+    "file": "editor-navigation.png",
+    "bytes": 79958,
+    "sha256": "0c3cedc1c82c3c2fc6371605b10148ec8a2c8e13ca039c5faf91bf4ec8370f06"
+  },
+  {
+    "file": "editor.png",
+    "bytes": 80433,
+    "sha256": "87a013d8ce56141217604f0305fe06e052f272a192b112fcd2e22ed2148da898"
+  },
+  {
+    "file": "light.png",
+    "bytes": 72601,
+    "sha256": "af3b131ade6b149bbdb6316fe645ee39b7caa49d93b398a84ae59a90729f6d55"
+  },
+  {
+    "file": "menu.png",
+    "bytes": 76321,
+    "sha256": "4eba232100fc5aa109775c73eb547abeb3cbfb271a5a152bd6dfc7ea22c838d9"
+  },
+  {
+    "file": "narrow-dialog.png",
+    "bytes": 46958,
+    "sha256": "ac849e1d058dc82565eadae4953cd0a42c27730e366dbf1b71ae818fb77ae1ee"
+  },
+  {
+    "file": "narrow.png",
+    "bytes": 47449,
+    "sha256": "3bd3f9610a74bed44121535a6deb36932d247b8d7dfc01c0b53cd6ef7ead5c06"
+  },
+  {
+    "file": "ocean-dark.png",
+    "bytes": 75378,
+    "sha256": "3564e0b97e7b60abd98558d65c5fb2667d1690caeea201dba8c014457589f37a"
+  },
+  {
+    "file": "theme-cards.png",
+    "bytes": 74652,
+    "sha256": "b2051bb33438ee5307c9313646f2d05200e4f0eb07743b7482f08d3ee46d6c8e"
+  },
+  {
+    "file": "tokens.png",
+    "bytes": 74652,
+    "sha256": "b2051bb33438ee5307c9313646f2d05200e4f0eb07743b7482f08d3ee46d6c8e"
+  },
+  {
+    "file": "tooltip.png",
+    "bytes": 77289,
+    "sha256": "eb6c059a20de8922b64b1bbb4b57884c2590771c34c75a6510ba3492232c16e9"
+  }
+]

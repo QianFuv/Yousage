@@ -1,0 +1,2 @@
+upstream/** -text
+upstream/patches/*.patch whitespace=-blank-at-eol

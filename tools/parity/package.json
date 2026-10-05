@@ -1,0 +1,42 @@
+{
+  "name": "yousage-parity-reference",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.0",
+  "scripts": {
+    "sync": "node scripts/sync-upstream.mjs",
+    "verify:sources": "node scripts/verify-sources.mjs",
+    "test": "pnpm verify:sources && vitest run",
+    "test:theme": "vitest run src/theme.test.tsx",
+    "reference": "node node_modules/vite/dist/vite/node/cli.js --host 127.0.0.1 --port 4174 --strictPort",
+    "build": "node node_modules/vite/dist/vite/node/cli.js build"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.5.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "culori": "4.0.2",
+    "effect": "4.0.0-rc.115",
+    "lucide-react": "0.564.0",
+    "lucide": "0.564.0",
+    "morphicons": "1.7.1",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "24.12.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "effect@4.0.0-rc.115": "upstream/patches/effect@4.0.0-rc.115.patch"
+    }
+  }
+}
