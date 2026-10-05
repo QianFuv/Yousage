@@ -1,0 +1,117 @@
+@import "../../tools/parity/upstream/apps/web/src/index.css";
+@source "../../tools/parity/upstream/apps/web/src/components";
+@source "../../tools/parity/src/workbench.tsx";
+@source "./";
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+[hidden] {
+  display: none !important;
+}
+.app-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--background);
+}
+.app-navigation strong {
+  margin-right: auto;
+}
+.app-navigation button,
+.settings-controls button {
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.app-navigation button[aria-current="page"],
+.settings-controls button[aria-pressed="true"] {
+  background: var(--secondary);
+}
+.settings-controls {
+  max-width: 1120px;
+  margin: auto;
+  padding: 20px 28px 0;
+}
+.settings-sections,
+.display-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+.display-controls {
+  margin-top: 20px;
+}
+.display-controls label {
+  display: grid;
+  gap: 6px;
+}
+.display-controls select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.display-controls p {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+[data-density="compact"] .reference-shell {
+  padding: 16px 24px;
+}
+[data-density="compact"] .theme-grid {
+  gap: 10px;
+  margin-top: 16px;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .app-navigation,
+  .settings-controls {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .reference-shell,
+  [data-density="compact"] .reference-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .theme-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.native-toolbar {
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  font: 12px var(--font-sans);
+}
+.native-toolbar button,
+.native-toolbar select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: var(--card);
+  color: var(--foreground);
+}
+.native-toolbar output,
+.native-toolbar small {
+  flex-basis: 100%;
+  color: var(--muted-foreground);
+}
+.file-drop-target-active {
+  outline: 2px dashed var(--ring);
+  outline-offset: -4px;
+}

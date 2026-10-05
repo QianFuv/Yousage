@@ -1,0 +1,31 @@
+{
+  "name": "yousage-desktop",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.0",
+  "scripts": {
+    "dev": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js --host 127.0.0.1 --port 4175 --strictPort",
+    "build": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js build",
+    "typecheck": "node ../tools/parity/node_modules/typescript/bin/tsc --noEmit",
+    "lint": "eslint src reference-adapter.tsx vite.config.ts",
+    "format:check": "prettier --check src reference-adapter.tsx vite.config.ts eslint.config.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "3.0.0-beta.28",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "@types/node": "24.12.4",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "eslint": "9.39.4",
+    "@eslint/js": "9.39.4",
+    "typescript-eslint": "8.57.1",
+    "prettier": "3.8.1"
+  }
+}

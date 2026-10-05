@@ -1,0 +1,18 @@
+version: '3'
+
+vars:
+  APP_NAME: yousage
+  BIN_DIR: bin
+  ARCH: amd64
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+
+tasks:
+  build:
+    cmds:
+      - task: windows:build
+  dev:
+    cmds:
+      - wails3 dev -config build/config.yml -port 4175

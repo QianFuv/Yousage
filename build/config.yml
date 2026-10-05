@@ -1,0 +1,27 @@
+version: '3'
+info:
+  companyName: Yousage
+  productName: Yousage
+  productIdentifier: app.yousage.desktop
+  description: Usage monitoring and themes
+  version: 0.1.0
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir: [.git, node_modules, frontend, tools, bin, artifacts, docs]
+    watched_extension: ['*.go']
+    git_ignore: true
+  executes:
+    - cmd: wails3 task windows:build
+      type: blocking
+    - cmd: pnpm --dir frontend dev
+      type: background
+      readiness:
+        http: http://127.0.0.1:4175/
+        timeout: 60s
+        interval: 200ms
+    - cmd: ./bin/yousage.exe
+      type: primary
+      exit_policy: shutdown

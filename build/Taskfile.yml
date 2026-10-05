@@ -1,0 +1,9 @@
+version: '3'
+
+tasks:
+  build:frontend:
+    cmds:
+      - pnpm --dir tools/parity install --frozen-lockfile
+      - pnpm --dir frontend install --frozen-lockfile
+      - wails3 generate bindings -ts -clean=true
+      - pnpm --dir frontend build
