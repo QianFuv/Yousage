@@ -83,6 +83,15 @@ func main() {
 			_ = encoder.Encode(map[string]any{"id": 9999, "result": map[string]bool{"unmatched": true}})
 			_ = encoder.Encode(map[string]any{"method": "account/rateLimits/updated", "params": map[string]any{"rateLimits": map[string]any{"limitId": "spark", "primary": map[string]any{"usedPercent": 99}}}})
 			result = map[string]any{"rateLimits": map[string]any{"limitId": "spark", "primary": map[string]any{"usedPercent": 90}}, "rateLimitsByLimitId": map[string]any{"codex": map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "resetsAt": 1800000000}}}, "rateLimitResetCredits": map[string]any{"availableCount": 2, "credits": []any{map[string]any{"status": "available", "expiresAt": 1800000300}}}}
+		case "account/rateLimitResetCredit/consume":
+			if scenario == "reset-hang" {
+				time.Sleep(time.Hour)
+				return
+			}
+			result = map[string]string{"outcome": "reset"}
+			if scenario == "reset-invalid" {
+				result = map[string]string{"outcome": "unexpected"}
+			}
 		default:
 			_ = encoder.Encode(map[string]any{"id": id, "error": map[string]any{"code": -32601}})
 			continue

@@ -15,12 +15,13 @@ import (
 )
 
 type NativeOptions struct {
-	Process         managedprocess.Options
-	IsEnabled       bool
-	IsManagedAuth   bool
-	Version         string
-	ProbeLimit      time.Duration
-	EnrichmentLimit time.Duration
+	Process              managedprocess.Options
+	IsEnabled            bool
+	IsManagedAuth        bool
+	ExpectedAccountEmail string
+	Version              string
+	ProbeLimit           time.Duration
+	EnrichmentLimit      time.Duration
 }
 type nativeFrame struct {
 	Id     json.RawMessage `json:"id"`

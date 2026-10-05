@@ -210,6 +210,29 @@ func TestCancelledRequestKeepsSharedConnectionUsable(t *testing.T) {
 	}
 }
 
+func TestRemoteResetUsesOwningEnvironmentAndWriteScope(t *testing.T) {
+	var calls atomic.Int32
+	fixture := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
+		if message.Tag != "Request" {
+			return
+		}
+		calls.Add(1)
+		if message.Method != "provider.consumeResetCredit" || !strings.Contains(string(message.Payload), `"sourceId":"hub"`) {
+			t.Error("reset target protocol")
+		}
+		writeFrame(t, ctx, socket, success(message.Id, map[string]string{"outcome": "reset", "warning": "fixture warning"}))
+	})
+	client := connectFixture(t, fixture)
+	result, err := client.ConsumeResetCredit(context.Background(), map[string]string{"sourceId": "hub", "accountId": "account", "creditId": "credit"})
+	if err != nil || result.Outcome != "reset" || result.Warning != "fixture warning" {
+		t.Fatal(result, err)
+	}
+	client.Authorization.Scopes = []string{"orchestration:read"}
+	if _, err = client.ConsumeResetCredit(context.Background(), map[string]string{"sourceId": "hub", "accountId": "account", "creditId": "credit"}); err == nil || calls.Load() != 1 {
+		t.Fatal("read-only redemption escaped gate", err)
+	}
+}
+
 func TestMalformedWriteReplyIsUnknown(t *testing.T) {
 	for _, tag := range []string{"Chunk", "invalid", "Success"} {
 		fixture := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {

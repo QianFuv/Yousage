@@ -270,3 +270,54 @@ func TestCodexNativeHandshakeDeadlineAndAccountIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeResetKeepsIdempotencyKeyAndStopsWholeTree(t *testing.T) {
+	for _, scenario := range []string{"success", "reset-invalid", "reset-hang", "quota-hang"} {
+		t.Run(scenario, func(t *testing.T) {
+			directory := t.TempDir()
+			pidFile := filepath.Join(directory, "pids")
+			requestFile := filepath.Join(directory, "requests")
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			result := ConsumeCodex(ctx, NativeOptions{IsEnabled: true, ExpectedAccountEmail: "fixture@example.invalid", Process: managedprocess.Options{Executable: codexExecutable, Directory: directory, Environment: append(os.Environ(), "YOUSAGE_CODEX_SCENARIO="+scenario, "YOUSAGE_PID_FILE="+pidFile, "YOUSAGE_REQUEST_FILE="+requestFile)}}, "stable-owned-operation")
+			if (scenario == "success" || scenario == "quota-hang") && result.Outcome != "reset" {
+				t.Fatal(result)
+			}
+			if (scenario == "reset-invalid" || scenario == "reset-hang") && result.Outcome != "unknown" {
+				t.Fatal(result)
+			}
+			if scenario == "quota-hang" && result.Warning == "" {
+				t.Fatal("applied reset lost confirmation warning")
+			}
+			requests, _ := os.ReadFile(requestFile)
+			if strings.Count(string(requests), "account/rateLimitResetCredit/consume") != 1 || !strings.Contains(string(requests), `"idempotencyKey":"stable-owned-operation"`) {
+				t.Fatal(string(requests))
+			}
+			pidsData, _ := os.ReadFile(pidFile)
+			pids := []int{}
+			for _, value := range strings.Fields(string(pidsData)) {
+				pid, _ := strconv.Atoi(value)
+				pids = append(pids, pid)
+			}
+			assertProcessTreeStopped(t, pids)
+		})
+	}
+}
+
+func TestNativeResetRejectsChangedSelectedAccount(t *testing.T) {
+	directory := t.TempDir()
+	requestFile := filepath.Join(directory, "requests")
+	pidFile := filepath.Join(directory, "pids")
+	result := ConsumeCodex(context.Background(), NativeOptions{IsEnabled: true, ExpectedAccountEmail: "different@example.invalid", Process: managedprocess.Options{Executable: codexExecutable, Environment: append(os.Environ(), "YOUSAGE_PID_FILE="+pidFile, "YOUSAGE_REQUEST_FILE="+requestFile)}}, "unchanged-operation")
+	requests, _ := os.ReadFile(requestFile)
+	if result.Outcome != "failed" || !strings.Contains(result.Warning, "account changed") || strings.Contains(string(requests), "/consume") {
+		t.Fatal(result, string(requests))
+	}
+	data, _ := os.ReadFile(pidFile)
+	pids := []int{}
+	for _, value := range strings.Fields(string(data)) {
+		pid, _ := strconv.Atoi(value)
+		pids = append(pids, pid)
+	}
+	assertProcessTreeStopped(t, pids)
+}
