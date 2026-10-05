@@ -22,7 +22,10 @@ export type EnvironmentUsageStatus = {
       usagePriceOverrides: UsagePriceOverrides;
       usageModelAliases: UsageModelAliases;
     };
-    environment: { capabilities: Record<string, boolean> };
+    environment: {
+      capabilities: Record<string, boolean>;
+      orchestrationProtocolVersion?: number;
+    };
   } | null;
   summary: UsageSummary | null;
   error?: string;

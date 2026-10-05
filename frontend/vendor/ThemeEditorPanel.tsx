@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp } from "lucide";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -297,6 +298,7 @@ export function ThemeEditorPanel({
   open,
   onOpenChange,
   onSaved,
+  onDraftStateChange,
   editingTheme,
   initialAppearance,
   seedTheme,
@@ -313,6 +315,7 @@ export function ThemeEditorPanel({
       mergedAppearance?: ThemeAppearance;
     },
   ) => boolean | Promise<boolean>;
+  onDraftStateChange?: (isDirty: boolean, isPending: boolean) => void;
   editingTheme: ThemeDefinition | null;
   initialAppearance: ThemeAppearance;
   /** The theme a new theme starts from, so tuning what you already use is a
@@ -377,11 +380,11 @@ export function ThemeEditorPanel({
       setSize((current) => {
         if (!current) return current;
         clampedWidth = Math.max(
-          280,
+          1,
           Math.min(current.width, window.innerWidth - margin * 2),
         );
         clampedHeight = Math.max(
-          220,
+          1,
           Math.min(current.height, window.innerHeight - margin * 2),
         );
         return { width: clampedWidth, height: clampedHeight };
@@ -409,6 +412,21 @@ export function ThemeEditorPanel({
   // previewing in the seeding commit would paint the previous session's
   // colors for a frame.
   const [isDraftSeeded, setIsDraftSeeded] = useState(false);
+  const baseline = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!isDraftSeeded) return;
+    const signature = JSON.stringify({ name, colorsByAppearance, isAdvanced });
+    if (baseline.current === null) baseline.current = signature;
+    onDraftStateChange?.(signature !== baseline.current, isSaving);
+  }, [
+    name,
+    colorsByAppearance,
+    isAdvanced,
+    isSaving,
+    isDraftSeeded,
+    onDraftStateChange,
+  ]);
+
   const previousOpenRef = useRef(false);
 
   useEffect(() => {
@@ -1279,14 +1297,8 @@ export function ThemeEditorPanel({
     // Grow only into the space right of and below the panel's own corner,
     // otherwise a panel parked away from the top-left pushes its far edges
     // (and this grip) off screen.
-    const maxWidth = Math.max(
-      MIN_WIDTH,
-      window.innerWidth - margin - start.left,
-    );
-    const maxHeight = Math.max(
-      MIN_HEIGHT,
-      window.innerHeight - margin - start.top,
-    );
+    const maxWidth = Math.max(1, window.innerWidth - margin - start.left);
+    const maxHeight = Math.max(1, window.innerHeight - margin - start.top);
     setSize({
       width: Math.min(
         Math.max(start.width + event.clientX - start.pointerX, MIN_WIDTH),
@@ -1325,7 +1337,7 @@ export function ThemeEditorPanel({
       }}
     >
       <div
-        className="flex cursor-grab touch-none select-none items-center gap-1 border-b border-border/70 px-3 py-2 active:cursor-grabbing"
+        className="theme-editor-header flex cursor-grab touch-none select-none items-center gap-1 border-b border-border/70 px-3 py-2 active:cursor-grabbing"
         onPointerCancel={endDrag}
         onPointerDown={handleDragPointerDown}
         onPointerMove={handleDragPointerMove}
@@ -1415,7 +1427,7 @@ export function ThemeEditorPanel({
               {renderColorFields()}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">
+          <div className="theme-editor-actions flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">
             <Button
               size="sm"
               variant="ghost"

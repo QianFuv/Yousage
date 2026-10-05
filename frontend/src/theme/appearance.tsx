@@ -49,6 +49,8 @@ type AppearanceContextValue = {
   patch: (patch: Partial<AppearancePreferences>) => Promise<void>;
   select: (identity: string, half?: "light" | "dark") => Promise<void>;
   editor: EditorSession | null;
+  editorState: { isDirty: boolean; isPending: boolean };
+  setEditorState: (isDirty: boolean, isPending: boolean) => void;
   openEditor: (session: EditorInput) => void;
   closeEditor: () => void;
   restore: () => void;
@@ -165,6 +167,15 @@ export function AppearanceProvider({
   const [isBusy, setIsBusy] = useState(false);
   const busy = useRef(false);
   const [error, setError] = useState("");
+  const [editorState, updateEditorState] = useState({
+    isDirty: false,
+    isPending: false,
+  });
+  const setEditorState = useCallback(
+    (isDirty: boolean, isPending: boolean) =>
+      updateEditorState({ isDirty, isPending }),
+    [],
+  );
   const [editor, setEditor] = useState<EditorSession | null>(null);
   const editorSequence = useRef(0);
   const patchQueue = useRef(Promise.resolve());
@@ -306,6 +317,7 @@ export function AppearanceProvider({
   /** End only the draft session and restore the actual saved appearance. */
   const closeEditor = useCallback(() => {
     setEditor(null);
+    updateEditorState({ isDirty: false, isPending: false });
     restore();
   }, [restore]);
   /** Create a distinct draft with its actual optimistic revision, even when an editor is already open. */
@@ -330,6 +342,8 @@ export function AppearanceProvider({
         patch,
         select,
         editor,
+        editorState,
+        setEditorState,
         openEditor,
         closeEditor,
         restore,

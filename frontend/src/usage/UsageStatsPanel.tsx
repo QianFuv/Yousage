@@ -1,4 +1,6 @@
 /** Complete controlled statistics content using the pinned chart, mixes and model-detail algorithms. */
+import { useData } from "./controller";
+import * as nativeApi from "../../bindings/yousage/app";
 import { useState } from "react";
 import { InfoIcon } from "lucide-react";
 import {
@@ -90,7 +92,11 @@ export function UsageStatsPanel({
   metric: "cost" | "tokens";
   onSetPrice: (model?: string) => void;
 }) {
-  const [breakdown, setBreakdown] = useState<"model" | "time">("model");
+  const [copyStatus, setCopyStatus] = useState("");
+  const data = useData();
+  const breakdown = data.display.value.breakdown;
+  const setBreakdown = (value: "model" | "time") =>
+    void data.patchDisplay({ breakdown: value }).catch(() => {});
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const activeProviders = providersWithUsage(merged.providers);
   const isPast24Hours = chartWindow.resolution === "hour";
@@ -112,6 +118,28 @@ export function UsageStatsPanel({
   );
   return (
     <div className="usage-statistics flex flex-col gap-8">
+      <button
+        className="exact-copy"
+        onClick={() =>
+          void nativeApi
+            .CopyText(
+              JSON.stringify(
+                {
+                  costUsd: merged.costUsd,
+                  totalTokens: merged.totalTokens,
+                  sessions: merged.sessions,
+                },
+                null,
+                2,
+              ),
+            )
+            .then(() => setCopyStatus("Exact values copied."))
+            .catch((cause) => setCopyStatus(String(cause)))
+        }
+      >
+        Copy exact values
+      </button>
+      {copyStatus && <output role="status">{copyStatus}</output>}
       <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -326,6 +354,18 @@ export function UsageStatsPanel({
                               className="size-3.5"
                             />
                             {model.model}
+                          </button>
+                          <button
+                            className="relative z-10 text-xs"
+                            aria-label={`Copy model ${model.model}`}
+                            onClick={() =>
+                              void nativeApi
+                                .CopyText(model.model)
+                                .then(() => setCopyStatus("Model ID copied."))
+                                .catch((cause) => setCopyStatus(String(cause)))
+                            }
+                          >
+                            Copy ID
                           </button>
                           <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
                             <div

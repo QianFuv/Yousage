@@ -1,7 +1,7 @@
 /** Settings price editor preserves the upstream per-environment draft and retry rules. */
 import type { EnvironmentId } from "@t3tools/contracts";
 import { ChevronDownIcon, PlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "~/lib/utils";
 import type { EnvironmentUsageStatus } from "../src/usage/data";
 import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
@@ -162,7 +162,7 @@ export function SettingsPriceEditor({
     ) ?? [];
   const locked = pending || failedDestinations.length > 0;
   const hasChanges = stagedDrafts.length > 0;
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDirtyChange(hasChanges || failedDestinations.length > 0, pending);
   }, [hasChanges, failedDestinations.length, pending, onDirtyChange]);
   useEffect(() => {

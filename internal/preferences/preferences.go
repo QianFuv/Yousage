@@ -21,17 +21,16 @@ type WindowBounds struct {
 	Maximized bool `json:"maximized"`
 }
 type Display struct {
-	Density           string        `json:"density"`
-	Zoom              float64       `json:"zoom"`
-	AppearanceMode    string        `json:"appearanceMode"`
-	ThemeId           string        `json:"themeId"`
-	LightThemeId      string        `json:"lightThemeId,omitempty"`
-	DarkThemeId       string        `json:"darkThemeId,omitempty"`
-	Metric            string        `json:"metric"`
-	WindowDays        int           `json:"windowDays"`
-	Window            *WindowBounds `json:"window,omitempty"`
-	ShouldAutoRefresh bool          `json:"shouldAutoRefresh"`
+	Density             string  `json:"density"`
+	Zoom                float64 `json:"zoom"`
+	Metric              string  `json:"metric"`
+	WindowDays          int     `json:"windowDays"`
+	ShouldAutoRefresh   bool    `json:"shouldAutoRefresh"`
+	ShouldRestoreWindow bool    `json:"shouldRestoreWindow"`
+	TimestampFormat     string  `json:"timestampFormat"`
+	Breakdown           string  `json:"breakdown"`
 }
+
 type Source struct {
 	Id        string          `json:"id"`
 	Provider  domain.Provider `json:"provider"`
@@ -58,30 +57,27 @@ type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }
 func Defaults() Display {
-	return Display{Density: "comfortable", Zoom: 1, AppearanceMode: "system", ThemeId: "t3-code", Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true}
+	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, TimestampFormat: "locale", Breakdown: "model"}
 }
 
 func (display Display) Validate() error {
 	if display.Density != "comfortable" && display.Density != "compact" {
 		return errors.New("invalid density")
 	}
-	if !domain.Finite(display.Zoom) || display.Zoom < 0.8 || display.Zoom > 2 {
-		return errors.New("zoom must be between 80% and 200%")
+	if !domain.Finite(display.Zoom) || display.Zoom < 1 || display.Zoom > 2 {
+		return errors.New("zoom must be between 100% and 200%")
 	}
-	if display.AppearanceMode != "system" && display.AppearanceMode != "light" && display.AppearanceMode != "dark" {
-		return errors.New("invalid appearance mode")
+	if display.TimestampFormat != "locale" && display.TimestampFormat != "24h" && display.TimestampFormat != "12h" {
+		return errors.New("invalid timestamp format")
 	}
-	if strings.TrimSpace(display.ThemeId) == "" {
-		return errors.New("missing theme selection")
+	if display.Breakdown != "model" && display.Breakdown != "time" {
+		return errors.New("invalid breakdown")
 	}
 	if display.Metric != "cost" && display.Metric != "tokens" && display.Metric != "limits" {
 		return errors.New("invalid usage metric")
 	}
 	if display.WindowDays != 1 && display.WindowDays != 7 && display.WindowDays != 30 && display.WindowDays != 90 {
 		return errors.New("invalid usage period")
-	}
-	if display.Window != nil && (display.Window.Width < 480 || display.Window.Height < 600) {
-		return errors.New("window is below minimum bounds")
 	}
 	return nil
 }
@@ -91,6 +87,9 @@ func (service *Service) Display(ctx context.Context) (SavedDisplay, error) {
 	saved.Revision = revision
 	if err != nil {
 		return saved, err
+	}
+	if saved.Value.Zoom > 0 && saved.Value.Zoom < 1 {
+		saved.Value.Zoom = 1
 	}
 	return saved, saved.Value.Validate()
 }
@@ -180,9 +179,12 @@ func (service *Service) Sources(ctx context.Context) ([]Source, int64, error) {
 	return sources, revision, err
 }
 func (service *Service) SaveSources(ctx context.Context, sources []Source, revision int64) (int64, error) {
+	if len(sources) > 64 {
+		return revision, errors.New("too many history sources")
+	}
 	seen := map[string]bool{}
 	for _, source := range sources {
-		if source.Id == "" || seen[source.Id] || !source.Provider.Valid() || strings.TrimSpace(source.Root) == "" {
+		if source.Id == "" || len(source.Id) > 96 || len(source.Root) > 4096 || seen[source.Id] || !source.Provider.Valid() || strings.TrimSpace(source.Root) == "" {
 			return revision, errors.New("invalid or duplicate source")
 		}
 		seen[source.Id] = true

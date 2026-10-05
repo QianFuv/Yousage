@@ -1,5 +1,5 @@
 /** Complete desktop theme library, bounded imports and root-mounted original editor. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { parse as parseJsonc } from "jsonc-parser";
 import { Events } from "@wailsio/runtime";
 import * as nativeApi from "../../bindings/yousage/app";
@@ -185,6 +185,7 @@ export function RootThemeEditor() {
       seedName={session.name}
       initialAppearance={context.appearance}
       restoreTheme={context.restore}
+      onDraftStateChange={context.setEditorState}
       onOpenChange={(isOpen) => {
         if (!isOpen) context.closeEditor();
       }}
@@ -226,7 +227,11 @@ export function RootThemeEditor() {
 }
 
 /** Show independent mode/half ownership, original palette previews, imports, collections, fonts and effects. */
-export function ThemePanel() {
+export function ThemePanel({
+  onDirtyChange,
+}: {
+  onDirtyChange?: (isDirty: boolean) => void;
+}) {
   const context = useAppearance();
   const preferences = context.snapshot.value.preferences;
   const [status, setStatus] = useState("");
@@ -246,6 +251,12 @@ export function ThemePanel() {
   >({});
   const [removal, setRemoval] = useState<ThemeDefinition[] | null>(null);
   const [removedIds, setRemovedIds] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    onDirtyChange?.(
+      Boolean(draft || paste) ||
+        JSON.stringify(fontDraft) !== JSON.stringify(preferences.typography),
+    );
+  }, [draft, paste, fontDraft, preferences.typography, onDirtyChange]);
   useEffect(
     () => setFontDraft(preferences.typography),
     [preferences.typography],

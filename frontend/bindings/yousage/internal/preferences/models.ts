@@ -12,14 +12,12 @@ import * as domain$0 from "../domain/models.js";
 export class Display {
     "density": string;
     "zoom": number;
-    "appearanceMode": string;
-    "themeId": string;
-    "lightThemeId"?: string;
-    "darkThemeId"?: string;
     "metric": string;
     "windowDays": number;
-    "window"?: WindowBounds | null;
     "shouldAutoRefresh": boolean;
+    "shouldRestoreWindow": boolean;
+    "timestampFormat": string;
+    "breakdown": string;
 
     /** Creates a new Display instance. */
     constructor($$source: Partial<Display> = {}) {
@@ -28,12 +26,6 @@ export class Display {
         }
         if (!("zoom" in $$source)) {
             this["zoom"] = 0;
-        }
-        if (!("appearanceMode" in $$source)) {
-            this["appearanceMode"] = "";
-        }
-        if (!("themeId" in $$source)) {
-            this["themeId"] = "";
         }
         if (!("metric" in $$source)) {
             this["metric"] = "";
@@ -44,6 +36,15 @@ export class Display {
         if (!("shouldAutoRefresh" in $$source)) {
             this["shouldAutoRefresh"] = false;
         }
+        if (!("shouldRestoreWindow" in $$source)) {
+            this["shouldRestoreWindow"] = false;
+        }
+        if (!("timestampFormat" in $$source)) {
+            this["timestampFormat"] = "";
+        }
+        if (!("breakdown" in $$source)) {
+            this["breakdown"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -52,11 +53,7 @@ export class Display {
      * Creates a new Display instance from a string or object.
      */
     static createFrom($$source: any = {}): Display {
-        const $$createField8_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("window" in $$parsedSource) {
-            $$parsedSource["window"] = $$createField8_0($$parsedSource["window"]);
-        }
         return new Display($$parsedSource as Partial<Display>);
     }
 }
@@ -81,8 +78,8 @@ export class PricingPatch {
      * Creates a new PricingPatch instance from a string or object.
      */
     static createFrom($$source: any = {}): PricingPatch {
-        const $$createField0_0 = $$createType4;
-        const $$createField1_0 = $$createType5;
+        const $$createField0_0 = $$createType2;
+        const $$createField1_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("overrides" in $$parsedSource) {
             $$parsedSource["overrides"] = $$createField0_0($$parsedSource["overrides"]);
@@ -114,7 +111,7 @@ export class SavedDisplay {
      * Creates a new SavedDisplay instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedDisplay {
-        const $$createField1_0 = $$createType6;
+        const $$createField1_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -156,48 +153,9 @@ export class Source {
     }
 }
 
-export class WindowBounds {
-    "x": number;
-    "y": number;
-    "width": number;
-    "height": number;
-    "maximized": boolean;
-
-    /** Creates a new WindowBounds instance. */
-    constructor($$source: Partial<WindowBounds> = {}) {
-        if (!("x" in $$source)) {
-            this["x"] = 0;
-        }
-        if (!("y" in $$source)) {
-            this["y"] = 0;
-        }
-        if (!("width" in $$source)) {
-            this["width"] = 0;
-        }
-        if (!("height" in $$source)) {
-            this["height"] = 0;
-        }
-        if (!("maximized" in $$source)) {
-            this["maximized"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new WindowBounds instance from a string or object.
-     */
-    static createFrom($$source: any = {}): WindowBounds {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new WindowBounds($$parsedSource as Partial<WindowBounds>);
-    }
-}
-
 // Private type creation functions
-const $$createType0 = WindowBounds.createFrom;
+const $$createType0 = domain$0.PriceOverride.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = domain$0.PriceOverride.createFrom;
-const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = $Create.Map($Create.Any, $$createType3);
-const $$createType5 = $Create.Map($Create.Any, $Create.Any);
-const $$createType6 = Display.createFrom;
+const $$createType2 = $Create.Map($Create.Any, $$createType1);
+const $$createType3 = $Create.Map($Create.Any, $Create.Any);
+const $$createType4 = Display.createFrom;

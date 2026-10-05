@@ -36,17 +36,23 @@ type Bootstrap struct {
 
 // App exposes bounded fixture and native demonstration actions.
 type App struct {
-	context     context.Context
-	nativeApp   *application.App
-	window      *application.WebviewWindow
-	logFile     *os.File
-	logMutex    sync.Mutex
-	logPath     string
-	store       *storage.Store
-	themes      *theme.Library
-	themeCancel context.CancelFunc
-	themeDone   chan struct{}
-	usage       *dataservice.Service
+	context             context.Context
+	nativeApp           *application.App
+	window              *application.WebviewWindow
+	logFile             *os.File
+	logMutex            sync.Mutex
+	logPath             string
+	store               *storage.Store
+	themes              *theme.Library
+	themeCancel         context.CancelFunc
+	themeDone           chan struct{}
+	usage               *dataservice.Service
+	windowMutex         sync.Mutex
+	normalBounds        preferences.WindowBounds
+	hasNormalBounds     bool
+	isShuttingDown      bool
+	isCloseBridgeActive bool
+	shouldAllowClose    bool
 }
 
 func newApp() (*App, error) {
@@ -100,6 +106,10 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 
 // ServiceShutdown flushes evidence after Wails cancels the application context.
 func (service *App) ServiceShutdown() error {
+	service.windowMutex.Lock()
+	service.isShuttingDown = true
+	service.windowMutex.Unlock()
+	service.persistBounds()
 	if service.usage != nil {
 		service.usage.Close()
 	}
@@ -148,12 +158,25 @@ func (service *App) ConsumeResetCredit(route quota.RedeemRoute, operationId stri
 
 // GetDisplay returns ordinary saved display preferences independently of theme drafts.
 func (service *App) GetDisplay() (preferences.SavedDisplay, error) {
-	return service.usage.Preferences.Display(service.context)
+	saved, err := service.usage.Preferences.Display(service.context)
+	if err == nil && service.window != nil {
+		service.window.SetZoom(saved.Value.Zoom)
+	}
+	return saved, err
 }
 
 // SaveDisplay atomically persists a validated ordinary preference update.
 func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.SavedDisplay, error) {
-	return service.usage.Preferences.SaveDisplay(service.context, saved)
+	ctx, release, err := service.usage.BeginWrite(service.context)
+	if err != nil {
+		return saved, err
+	}
+	defer release()
+	value, err := service.usage.Preferences.SaveDisplay(ctx, saved)
+	if err == nil {
+		service.window.SetZoom(value.Value.Zoom)
+	}
+	return value, err
 }
 
 // GetConfiguration returns connection metadata and native target references without credentials.
@@ -205,7 +228,12 @@ func (service *App) GetAppearance() (theme.LibrarySnapshot, error) {
 
 // SaveAppearance commits the complete intended library and selection atomically.
 func (service *App) SaveAppearance(revision int64, value theme.LibraryValue) (theme.LibrarySnapshot, error) {
-	snapshot, err := service.themes.Save(service.context, revision, value)
+	ctx, release, err := service.usage.BeginWrite(service.context)
+	if err != nil {
+		return theme.LibrarySnapshot{}, err
+	}
+	defer release()
+	snapshot, err := service.themes.Save(ctx, revision, value)
 	if err == nil {
 		service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
 	}
@@ -307,6 +335,7 @@ func (service *App) GetBootstrap() Bootstrap {
 // FrontendReady reveals the window after the frontend applies its theme.
 func (service *App) FrontendReady() {
 	service.record("frontend-ready")
+	service.restoreWindow()
 	service.window.Show()
 	if hasNativeSmokeArgument() {
 		time.AfterFunc(time.Second, service.nativeApp.Quit)

@@ -39,6 +39,7 @@ func TestRollingWindowRetainsRemoteCacheAcrossMinute(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
 	saved, _ := service.Configuration(ctx)
+	service.draftCredentials["fixture"] = draftCredential{Kind: "environment", Origin: "https://fixture.invalid", Target: "remote"}
 	saved.Value.Connections = []ConnectionPreference{{Connection: remote.Connection{EnvironmentId: "remote", Url: "https://fixture.invalid", CredentialId: "fixture"}, Label: "Remote", IsEnabled: false}}
 	if _, err := service.SaveConfiguration(ctx, saved); err != nil {
 		test.Fatal(err)

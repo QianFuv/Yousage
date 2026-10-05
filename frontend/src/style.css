@@ -3,8 +3,20 @@
 @source "../../tools/parity/src/workbench.tsx";
 @source "./";
 @source "../vendor";
+.desktop-layout {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.desktop-layout > nav,
+.desktop-layout > .settings-controls {
+  flex-shrink: 0;
+}
 .desktop-layout main {
   min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
 }
 .usage-page,
 .pricing-panel {
@@ -248,4 +260,206 @@ select:focus-visible {
 .file-drop-target-active {
   outline: 2px dashed var(--ring);
   outline-offset: -4px;
+}
+
+.settings-panel {
+  max-width: 1120px;
+  margin: auto;
+  padding: 28px;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.settings-panel h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+.settings-panel h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.settings-panel p,
+.settings-panel small {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.settings-panel label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.settings-panel input:not([type="checkbox"]),
+.settings-panel select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+}
+.settings-panel .check-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.settings-panel button,
+.close-dialog button,
+.exact-copy {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.settings-panel button:disabled,
+.close-dialog button:disabled {
+  opacity: 0.5;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+.settings-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.settings-card legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.source-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.diagnostic-preview {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.private-path {
+  overflow-wrap: anywhere;
+}
+.close-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: #0008;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+}
+.close-dialog {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  width: min(100%, 480px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  box-shadow: 0 20px 70px #0005;
+}
+[data-density="compact"] .settings-panel {
+  padding: 20px 24px;
+  gap: 14px;
+}
+[data-density="compact"] .settings-card {
+  padding: 14px;
+  gap: 12px;
+}
+[data-density="compact"] .source-row {
+  gap: 10px;
+  padding: 10px 0;
+}
+input:focus-visible,
+.settings-panel button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .settings-panel,
+  [data-density="compact"] .settings-panel {
+    padding: 16px;
+  }
+  .settings-sections {
+    gap: 6px;
+  }
+  .settings-card {
+    padding: 12px;
+  }
+  .app-navigation {
+    gap: 4px;
+  }
+  .app-navigation button {
+    padding: 8px;
+  }
+}
+@media (max-width: 320px) {
+  .settings-panel,
+  [data-density="compact"] .settings-panel,
+  .usage-page,
+  [data-density="compact"] .usage-page,
+  .pricing-panel {
+    padding: 10px;
+  }
+  .settings-controls {
+    padding: 10px 10px 0;
+  }
+  .app-navigation {
+    padding: 8px 10px;
+  }
+  .settings-card {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  [data-theme-editor-panel][role="dialog"] .theme-editor-header {
+    flex-wrap: wrap;
+  }
+  [data-theme-editor-panel][role="dialog"]
+    .theme-editor-header
+    > div:first-child {
+    flex-basis: 100%;
+  }
+  [data-theme-editor-panel][role="dialog"] .theme-editor-header h2 {
+    flex-shrink: 1;
+  }
+  .theme-editor-actions {
+    flex-wrap: wrap;
+  }
+  .theme-editor-actions button {
+    width: 100%;
+    white-space: normal;
+    min-width: 0;
+    height: auto;
+    min-height: 32px;
+  }
+  .appearance-panel .section-heading {
+    flex-wrap: wrap;
+  }
 }

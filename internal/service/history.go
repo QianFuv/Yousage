@@ -344,6 +344,7 @@ func (service *Service) Sources(ctx context.Context) ([]preferences.Source, int6
 }
 
 func (service *Service) SaveSources(ctx context.Context, sources []preferences.Source, revision int64) (int64, error) {
+ ctx, release, err := service.ownOperation(ctx);if err != nil {return revision,err};defer release()
 	for index := range sources {
 		absolute, err := history.ExpandHome(sources[index].Root)
 		if err != nil {
@@ -351,5 +352,9 @@ func (service *Service) SaveSources(ctx context.Context, sources []preferences.S
 		}
 		sources[index].Root = absolute
 	}
-	return service.Preferences.SaveSources(ctx, sources, revision)
+	next, err := service.Preferences.SaveSources(ctx, sources, revision)
+	if err == nil {
+		service.emit("usage-invalidated", nil)
+	}
+	return next, err
 }

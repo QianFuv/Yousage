@@ -94,6 +94,23 @@ func TestInvalidPreferencesAndWindowRecovery(t *testing.T) {
 	}
 }
 
+func TestLegacyDisplayKeepsNewDefaultsAndNormalizesNativeScale(test *testing.T) {
+	store, err := storage.Open(filepath.Join(test.TempDir(), "legacy.sqlite"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	legacy := map[string]any{"density": "compact", "zoom": 0.8, "appearanceMode": "dark", "themeId": "legacy", "metric": "tokens", "windowDays": 7, "shouldAutoRefresh": false}
+	if _, err := store.WriteSetting(ctx, "display", 0, legacy); err != nil {
+		test.Fatal(err)
+	}
+	saved, err := New(store).Display(ctx)
+	if err != nil || saved.Value.Zoom != 1 || !saved.Value.ShouldRestoreWindow || saved.Value.TimestampFormat != "locale" || saved.Value.Breakdown != "model" || saved.Value.ShouldAutoRefresh || saved.Value.Metric != "tokens" {
+		test.Fatal("legacy display overwrote independent defaults", saved, err)
+	}
+}
+
 func TestEmptySavedPricingCanBePatched(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "empty.sqlite"))
 	if err != nil {

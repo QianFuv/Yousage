@@ -43,6 +43,13 @@ export function ApplyPricing(identities: string[], patch: preferences$0.PricingP
 }
 
 /**
+ * ConfirmClose refuses exit while external writes are pending, then allows the native close hook once.
+ */
+export function ConfirmClose(): $CancellablePromise<void> {
+    return $Call.ByID(4181451325);
+}
+
+/**
  * ConsumeResetCredit uses an explicit caller operation identity and durable recovery before sending.
  */
 export function ConsumeResetCredit(route: quota$0.RedeemRoute, operationId: string, isExplicitRetry: boolean): $CancellablePromise<quota$0.ResetResult> {
@@ -52,12 +59,33 @@ export function ConsumeResetCredit(route: quota$0.RedeemRoute, operationId: stri
 }
 
 /**
+ * CopyText checks native clipboard success and bounds the explicit user-selected content.
+ */
+export function CopyText(value: string): $CancellablePromise<void> {
+    return $Call.ByID(2798394763, value);
+}
+
+/**
+ * DiscardDraftCredentials can delete only unsaved references created by this session.
+ */
+export function DiscardDraftCredentials(identities: string[]): $CancellablePromise<void> {
+    return $Call.ByID(3076200806, identities);
+}
+
+/**
  * EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
  */
 export function EnableCursorKeychain(identities: string[]): $CancellablePromise<remote$0.SaveOutcome[]> {
     return $Call.ByID(3128816296, identities).then(($result: any) => {
         return $$createType1($result);
     });
+}
+
+/**
+ * ExportDiagnostics writes only the same whitelisted report after an explicit native Save dialog.
+ */
+export function ExportDiagnostics(): $CancellablePromise<boolean> {
+    return $Call.ByID(4266831633);
 }
 
 /**
@@ -109,12 +137,26 @@ export function GetConfiguration(): $CancellablePromise<service$0.SavedConfigura
 }
 
 /**
+ * GetDiagnostics emits an explicit whitelist without credentials, URLs, account identities, paths or raw errors.
+ */
+export function GetDiagnostics(): $CancellablePromise<string> {
+    return $Call.ByID(2811458213);
+}
+
+/**
  * GetDisplay returns ordinary saved display preferences independently of theme drafts.
  */
 export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
     return $Call.ByID(2885542999).then(($result: any) => {
         return $$createType6($result);
     });
+}
+
+/**
+ * GetLocalEnvironmentId supplies stable local selection independently of summary availability.
+ */
+export function GetLocalEnvironmentId(): $CancellablePromise<string> {
+    return $Call.ByID(2299238358);
 }
 
 /**
@@ -168,6 +210,13 @@ export function PickFixtureFiles(): $CancellablePromise<string[]> {
 }
 
 /**
+ * PickSourcePath returns an explicitly selected path without inspecting account contents.
+ */
+export function PickSourcePath(kind: string): $CancellablePromise<string> {
+    return $Call.ByID(2023028566, kind);
+}
+
+/**
  * PickThemeFiles opens the native picker; cancellation leaves the import draft untouched.
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
@@ -183,6 +232,13 @@ export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.The
     return $Call.ByID(3002950989, paths).then(($result: any) => {
         return $$createType12($result);
     });
+}
+
+/**
+ * RecenterWindow recovers an offscreen window without changing saved scale or display preferences.
+ */
+export function RecenterWindow(): $CancellablePromise<void> {
+    return $Call.ByID(3259341121);
 }
 
 /**
@@ -233,6 +289,20 @@ export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$m
     return $Call.ByID(23962130, saved).then(($result: any) => {
         return $$createType7($result);
     });
+}
+
+/**
+ * SetCloseBridge activates only after a mounted frontend subscribes to closing requests.
+ */
+export function SetCloseBridge(isActive: boolean): $CancellablePromise<void> {
+    return $Call.ByID(909584628, isActive);
+}
+
+/**
+ * StageHubCredential stores a fresh native reference; the frontend never reads a saved key.
+ */
+export function StageHubCredential(origin: string, value: string): $CancellablePromise<string> {
+    return $Call.ByID(584700173, origin, value);
 }
 
 /**

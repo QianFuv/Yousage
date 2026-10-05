@@ -176,6 +176,18 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 				}
 				options := service.nativeOptions(target)
 				httpOptions := quota.HttpOptions{Environment: service.Environment, Home: service.Home, Platform: service.Platform, IsEnabled: true, IsKeychainAllowed: configuration.Value.IsCursorKeychainEnabled, KeychainToken: service.keychain.Read}
+				if target.Home != "" {
+					httpOptions.Home = target.Home
+					httpOptions.Environment = make(map[string]string, len(service.Environment))
+					for name, value := range service.Environment {
+						httpOptions.Environment[name] = value
+					}
+					httpOptions.Environment["HOME"], httpOptions.Environment["USERPROFILE"] = target.Home, target.Home
+					delete(httpOptions.Environment, "APPDATA")
+					delete(httpOptions.Environment, "XDG_CONFIG_HOME")
+					delete(httpOptions.Environment, "XDG_DATA_HOME")
+					delete(httpOptions.Environment, "GROK_HOME")
+				}
 				var account quota.Account
 				switch target.Driver {
 				case "codex":

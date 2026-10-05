@@ -1,17 +1,39 @@
 /** Desktop routes share saved appearance and a root-mounted editor across navigation. */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { Events } from "@wailsio/runtime";
+import { useRef } from "react";
+import { DisplayPanel } from "./settings/DisplayPanel";
+import { SourcesPanel } from "./settings/SourcesPanel";
+import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { createRoot } from "react-dom/client";
 import { DataProvider, useData } from "./usage/controller";
 import { UsagePage } from "./usage/UsagePage";
 import { PricingPanel } from "./usage/PricingPanel";
 import * as nativeApi from "../bindings/yousage/app";
-import { canvasBackground, type Bootstrap } from "./native";
-import { AppearanceProvider, applySavedAppearance } from "./theme/appearance";
+import { canvasBackground } from "./native";
+import {
+  AppearanceProvider,
+  applySavedAppearance,
+  useAppearance,
+} from "./theme/appearance";
 import { RootThemeEditor, ThemePanel } from "./theme/ThemePanel";
 import "./style.css";
 
 /** Keep Usage and Settings independent while synchronizing actual CSS with the native window. */
-function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
+function Desktop() {
+  const appearance = useAppearance();
+  const [sourcesState, setSourcesState] = useState({
+    isDirty: false,
+    isPending: false,
+  });
+  const changeSourcesState = useCallback(
+    (isDirty: boolean, isPending: boolean) =>
+      setSourcesState({ isDirty, isPending }),
+    [],
+  );
+  const [isThemeDirty, setIsThemeDirty] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [closeError, setCloseError] = useState("");
   const data = useData();
   const [priceModel, setPriceModel] = useState<string>();
   const [pricingState, setPricingState] = useState({
@@ -25,20 +47,109 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
   );
   const [route, setRoute] = useState<"usage" | "settings">("usage");
   const [section, setSection] = useState<
-    "appearance" | "diagnostics" | "pricing" | "sources"
+    "appearance" | "display" | "diagnostics" | "pricing" | "sources"
   >("appearance");
+  const positions = useRef<Record<string, number>>({});
+  const content = useRef<HTMLElement>(null);
+  /** Capture the current viewport before hiding its page, then select the destination. */
+  const navigate = useCallback(
+    (nextRoute: typeof route, nextSection = section) => {
+      const identity = route === "usage" ? "usage" : `settings:${section}`;
+      positions.current[identity] = content.current?.scrollTop ?? 0;
+      setSection(nextSection);
+      setRoute(nextRoute);
+    },
+    [route, section],
+  );
+  useLayoutEffect(() => {
+    const identity = route === "usage" ? "usage" : `settings:${section}`;
+    if (content.current)
+      content.current.scrollTop = positions.current[identity] ?? 0;
+  }, [route, section]);
   const [status, setStatus] = useState("");
+  const closeState = useRef({ isDirty: false, isPending: false });
+  closeState.current = {
+    isDirty:
+      pricingState.isDirty ||
+      sourcesState.isDirty ||
+      isThemeDirty ||
+      appearance.editorState.isDirty,
+    isPending:
+      data.isSavingDisplay ||
+      pricingState.isPending ||
+      sourcesState.isPending ||
+      appearance.isBusy ||
+      appearance.editorState.isPending,
+  };
+  useEffect(() => {
+    const dispose = Events.On("close-requested", () => {
+      if (closeState.current.isDirty || closeState.current.isPending) {
+        setIsClosing(true);
+        setCloseError("");
+      } else
+        void nativeApi.ConfirmClose().catch((cause) => {
+          setCloseError(String(cause));
+          setIsClosing(true);
+        });
+    });
+    void nativeApi
+      .SetCloseBridge(true)
+      .catch((cause) => setStatus(String(cause)));
+    return () => {
+      dispose();
+      void nativeApi.SetCloseBridge(false).catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isClosing) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = document.querySelector<HTMLElement>(".close-dialog");
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
+    /** Keep keyboard focus inside the blocking native close decision. */
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const buttons = [
+        ...(dialog?.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        ) ?? []),
+      ];
+      const first = buttons[0],
+        last = buttons.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    window.addEventListener("keydown", trap);
+    return () => {
+      window.removeEventListener("keydown", trap);
+      previous?.focus();
+    };
+  }, [isClosing]);
   useEffect(() => {
     /** Offer the same settings shortcut in every application route. */
     const changed = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === ",") {
         event.preventDefault();
-        setRoute("settings");
-      }
+        navigate("settings");
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "1") {
+        event.preventDefault();
+        navigate("usage");
+      } else if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "r"
+      ) {
+        event.preventDefault();
+        if (route === "usage") void data.refresh(true, true);
+      } else if (event.key === "Escape") setIsClosing(false);
     };
     window.addEventListener("keydown", changed);
     return () => window.removeEventListener("keydown", changed);
-  }, []);
+  }, [route, data.refresh, navigate]);
   useEffect(() => {
     /** Synchronize preview colors as well as saved themes without waiting on hidden WebView frames. */
     const synchronize = () => {
@@ -86,90 +197,123 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
   }, []);
   return (
     <div className="desktop-layout" data-density={data.display.value.density}>
-      <nav className="app-navigation" aria-label="Application">
+      <nav
+        inert={isClosing}
+        className="app-navigation"
+        aria-label="Application"
+      >
         <strong>Yousage</strong>
         <button
           aria-current={route === "usage" ? "page" : undefined}
-          onClick={() => setRoute("usage")}
+          onClick={() => navigate("usage")}
         >
           Usage
         </button>
         <button
           aria-current={route === "settings" ? "page" : undefined}
-          onClick={() => setRoute("settings")}
+          onClick={() => navigate("settings")}
         >
           Settings
         </button>
       </nav>
       {route === "settings" && (
-        <section className="settings-controls" aria-label="Settings">
-          <div className="settings-sections">
+        <section
+          inert={isClosing}
+          className="settings-controls"
+          aria-label="Settings"
+        >
+          <div className="settings-sections" aria-label="Settings sections">
+            <button
+              aria-pressed={section === "display"}
+              onClick={() => navigate("settings", "display")}
+            >
+              Display &amp; behavior
+            </button>
             <button
               aria-pressed={section === "appearance"}
-              onClick={() => setSection("appearance")}
+              onClick={() => navigate("settings", "appearance")}
             >
-              Appearance & display
+              Appearance
             </button>
             <button
               aria-pressed={section === "pricing"}
-              onClick={() => setSection("pricing")}
+              onClick={() => navigate("settings", "pricing")}
             >
               Prices &amp; mappings{pricingState.isDirty ? " · Unsaved" : ""}
             </button>
             <button
               aria-pressed={section === "sources"}
-              onClick={() => setSection("sources")}
+              onClick={() => navigate("settings", "sources")}
             >
-              Sources &amp; refresh
+              Sources &amp; connections
             </button>
             <button
               aria-pressed={section === "diagnostics"}
-              onClick={() => setSection("diagnostics")}
+              onClick={() => navigate("settings", "diagnostics")}
             >
               About & diagnostics
             </button>
           </div>
         </section>
       )}
-      <main data-file-drop-target>
+      <main ref={content} inert={isClosing} data-file-drop-target>
         <div hidden={route !== "usage"}>
           <UsagePage
             isActive={route === "usage"}
             onSettings={(next, model) => {
               if (model) setPriceModel(model);
-              setSection(next);
-              setRoute("settings");
+              navigate("settings", next);
             }}
           />
         </div>
         <div hidden={route !== "settings" || section !== "pricing"}>
           <PricingPanel model={priceModel} onDirtyChange={changePricingState} />
         </div>
-        {route === "settings" &&
-          (section === "appearance" ? (
-            <ThemePanel />
-          ) : section === "sources" ? (
-            <p className="usage-notice">
-              Data source controls are being integrated.
-            </p>
-          ) : section === "diagnostics" ? (
-            <aside className="native-toolbar">
-              <strong>Yousage · Wails {bootstrap.wailsVersion}</strong>
-              <span>
-                {bootstrap.providers.length} history providers ·{" "}
-                {bootstrap.roleCount} theme roles
-              </span>
-              <output role="status">
-                {status || "Themes are saved in the application database."}
-              </output>
-              <small>Lifecycle log: {bootstrap.lifecycleLog}</small>
-              <button onClick={() => void nativeApi.OpenDocumentation()}>
-                Wails documentation
-              </button>
-            </aside>
-          ) : null)}
+        <div hidden={route !== "settings" || section !== "appearance"}>
+          <ThemePanel onDirtyChange={setIsThemeDirty} />
+        </div>
+        <div hidden={route !== "settings" || section !== "display"}>
+          <DisplayPanel />
+        </div>
+        <div hidden={route !== "settings" || section !== "sources"}>
+          <SourcesPanel onDraftChange={changeSourcesState} />
+        </div>
+        <div hidden={route !== "settings" || section !== "diagnostics"}>
+          <DiagnosticsPanel nativeStatus={status} />
+        </div>
       </main>
       <RootThemeEditor />
+      {isClosing && (
+        <div className="close-backdrop">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="close-title"
+            className="close-dialog"
+          >
+            <h2 id="close-title">Close Yousage?</h2>
+            <p>
+              {closeState.current.isPending
+                ? "An account or settings change is running. Wait for the result before closing."
+                : "Unsaved source, price or theme drafts will be discarded."}
+            </p>
+            {closeError && <p role="status">{closeError}</p>}
+            <div className="settings-actions">
+              <button onClick={() => setIsClosing(false)}>Keep editing</button>
+              <button
+                disabled={closeState.current.isPending}
+                onClick={() =>
+                  void nativeApi
+                    .ConfirmClose()
+                    .catch((cause) => setCloseError(String(cause)))
+                }
+              >
+                Discard drafts and exit
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -186,7 +330,7 @@ async function start() {
       isSystemDark={bootstrap.isSystemDark}
     >
       <DataProvider initial={display}>
-        <Desktop bootstrap={bootstrap} />
+        <Desktop />
       </DataProvider>
     </AppearanceProvider>,
   );

@@ -22,6 +22,7 @@ type DataContextValue = {
   setSelected: (selected: Set<string> | null) => void;
   error: string;
   isBusy: boolean;
+  isSavingDisplay: boolean;
   reload: () => Promise<void>;
   patchDisplay: (patch: Partial<SavedDisplay["value"]>) => Promise<void>;
   refresh: (
@@ -46,9 +47,12 @@ export function DataProvider({
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [error, setError] = useState("");
+  const [isSavingDisplay, setIsSavingDisplay] = useState(false);
+  const preferenceWrites = useRef(0);
   const [isBusy, setIsBusy] = useState(false);
   const isRefreshing = useRef(false);
   const isUsageActive = useRef(true);
+  const isNativeVisible = useRef(false);
   const setUsageActive = useCallback((isActive: boolean) => {
     isUsageActive.current = isActive;
   }, []);
@@ -78,13 +82,21 @@ export function DataProvider({
   useEffect(() => {
     void reload();
     const dispose = Events.On("usage-invalidated", () => void reload());
+    const disposeVisibility = Events.On("window-visibility", (event) => {
+      isNativeVisible.current = event.data === true;
+      if (isNativeVisible.current)
+        void currentRefresh.current(false, isUsageActive.current, true);
+    });
     return () => {
       dispose();
+      disposeVisibility();
       sequence.current++;
     };
   }, [reload, display.value.windowDays]);
   /** Serialize ordinary preferences using the latest acknowledged revision. */
   const patchDisplay = useCallback((patch: Partial<SavedDisplay["value"]>) => {
+    preferenceWrites.current++;
+    setIsSavingDisplay(true);
     const operation = queue.current
       .catch(() => {})
       .then(async () => {
@@ -102,6 +114,9 @@ export function DataProvider({
         } catch (cause) {
           setError(String(cause));
           throw cause;
+        } finally {
+          preferenceWrites.current--;
+          setIsSavingDisplay(preferenceWrites.current > 0);
         }
       });
     queue.current = operation;
@@ -118,6 +133,7 @@ export function DataProvider({
       if (
         !isManual &&
         (document.visibilityState !== "visible" ||
+          !isNativeVisible.current ||
           !isUsagePage ||
           !isUsageActive.current ||
           !displayRef.current.value.shouldAutoRefresh)
@@ -134,7 +150,8 @@ export function DataProvider({
           : [...selected];
       const request = Request.createFrom({
         IsManual: isManual,
-        IsVisible: document.visibilityState === "visible",
+        IsVisible:
+          document.visibilityState === "visible" && isNativeVisible.current,
         IsUsagePage: isUsagePage,
         IsAutoEnabled: displayRef.current.value.shouldAutoRefresh,
         AfterPending: afterPending,
@@ -178,6 +195,7 @@ export function DataProvider({
         setSelected,
         error,
         isBusy,
+        isSavingDisplay,
         reload,
         patchDisplay,
         refresh,

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +11,6 @@ import (
 	"sync"
 	"time"
 	"yousage/internal/accounting"
-	"yousage/internal/domain"
 	"yousage/internal/preferences"
 	"yousage/internal/refresh"
 	"yousage/internal/remote"
@@ -164,6 +165,13 @@ func (service *Service) syncPrimaryTheme() {
 
 // Pair exchanges a transient explicit bootstrap credential and returns a saved-secret reference only.
 func (service *Service) Pair(ctx context.Context, origin, label, bootstrap string, isReadOnly bool) (ConnectionPreference, error) {
+	ctx, release, err := service.ownOperation(ctx)
+	if err != nil {
+		return ConnectionPreference{}, err
+	}
+	defer release()
+	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
+	defer cancel()
 	if len(label) > 128 {
 		return ConnectionPreference{}, errors.New("Environment label is too long.")
 	}
@@ -171,10 +179,17 @@ func (service *Service) Pair(ctx context.Context, origin, label, bootstrap strin
 	if err != nil {
 		return ConnectionPreference{}, err
 	}
-	connection := remote.Connection{Url: origin, EnvironmentId: descriptor.Id, CredentialId: "environment-" + domain.SourceFingerprint{HostId: descriptor.Id, Provider: domain.Codex, ResolvedHomePath: origin}.Id()[:32]}
+	credential, err := service.newDraftCredential("environment")
+	if err != nil {
+		return ConnectionPreference{}, err
+	}
+	connection := remote.Connection{Url: origin, EnvironmentId: descriptor.Id, CredentialId: credential}
 	if _, err = service.Connector.Pair(ctx, connection, bootstrap, isReadOnly); err != nil {
 		return ConnectionPreference{}, err
 	}
+	service.mutex.Lock()
+	service.draftCredentials[credential] = draftCredential{Kind: "environment", Origin: origin, Target: descriptor.Id}
+	service.mutex.Unlock()
 	if strings.TrimSpace(label) == "" {
 		label = descriptor.Label
 	}
@@ -397,4 +412,61 @@ func (service *Service) viewWindow(days int, zone string, shouldAdvance bool) (a
 		service.viewWindows[key] = window
 	}
 	return window, err
+}
+
+// newDraftCredential isolates uncommitted authentication from saved live connections.
+func (service *Service) newDraftCredential(prefix string) (string, error) {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return prefix + "-" + hex.EncodeToString(value), nil
+}
+
+// StageHubCredential saves a fresh native credential without replacing a saved account.
+func (service *Service) StageHubCredential(ctx context.Context, origin, value string) (string, error) {
+	ctx, release, err := service.ownOperation(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	if err := remote.ValidateOrigin(origin); err != nil {
+		return "", err
+	}
+	identity, err := service.newDraftCredential("hub")
+	if err != nil {
+		return "", err
+	}
+	if err := service.Secrets.Put(ctx, identity, value); err != nil {
+		return "", err
+	}
+	service.mutex.Lock()
+	service.draftCredentials[identity] = draftCredential{Kind: "hub", Origin: origin}
+	service.mutex.Unlock()
+	return identity, nil
+}
+
+// DiscardDraftCredentials removes only this running session's unused draft references.
+func (service *Service) DiscardDraftCredentials(ctx context.Context, identities []string) error {
+	ctx, release, err := service.ownOperation(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	service.credentialMutex.Lock()
+	defer service.credentialMutex.Unlock()
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	var failures []error
+	for _, identity := range identities {
+		if _, exists := service.draftCredentials[identity]; !exists {
+			continue
+		}
+		if err := service.Secrets.Delete(ctx, identity); err != nil {
+			failures = append(failures, err)
+		} else {
+			delete(service.draftCredentials, identity)
+		}
+	}
+	return errors.Join(failures...)
 }

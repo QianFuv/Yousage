@@ -282,3 +282,6 @@ func (connector Connector) Connect(ctx context.Context, connection Connection) (
 	endpoint.RawQuery = url.Values{"wsTicket": {ticket.Ticket}, "orchestrationProtocol": {"2"}}.Encode()
 	return dial(ctx, endpoint.String(), connector.client(), environment, authorization)
 }
+
+// ValidateOrigin exposes the same strict origin rules used for discovery and pairing.
+func ValidateOrigin(raw string) error { _, err := origin(raw); return err }

@@ -1,4 +1,6 @@
 /** Native action adapters for original quota renderers without app atoms or browser credentials. */
+import { formatUpcomingTimestamp as upstreamUpcomingTimestamp } from "../../vendor/timestampFormat";
+import { useData } from "./controller";
 import { useRef, useState } from "react";
 import * as nativeApi from "../../bindings/yousage/app";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
@@ -11,22 +13,17 @@ export function formatUpcomingTimestamp(
   format: string,
   now: number,
 ): string {
-  const value = new Date(instant);
-  return (
-    new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: format === "12h",
-    }).format(value) + (value.getTime() < now ? " (past)" : "")
+  return upstreamUpcomingTimestamp(
+    instant,
+    format === "12h" ? "12-hour" : format === "24h" ? "24-hour" : "locale",
+    now,
   );
 }
 /** Supply the desktop timestamp preference to original renderer selectors. */
 export function usePrimarySettings<T>(
   select: (settings: { timestampFormat: string }) => T,
 ): T {
-  return select({ timestampFormat: "24h" });
+  return select({ timestampFormat: useData().display.value.timestampFormat });
 }
 /** Open only an explicit user-selected account destination through the native shell. */
 export function ensureLocalApi() {

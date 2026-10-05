@@ -5,6 +5,5 @@ export {
     Display,
     PricingPatch,
     SavedDisplay,
-    Source,
-    WindowBounds
+    Source
 } from "./models.js";

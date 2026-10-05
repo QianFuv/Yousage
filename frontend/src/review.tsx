@@ -12,11 +12,33 @@ let display = {
   value: {
     density: "comfortable",
     zoom: 1,
-    appearanceMode: "system",
-    themeId: "t3-code",
+    shouldRestoreWindow: true,
+    timestampFormat: "locale",
+    breakdown: "model",
     metric: "limits",
     windowDays: 30,
     shouldAutoRefresh: false,
+  },
+};
+let sourceSettings = {
+  revision: 1,
+  value: [
+    {
+      id: "fixture-history",
+      provider: "codex",
+      root: "C:/Fixture/history",
+      isEnabled: true,
+    },
+  ],
+};
+let configuration = {
+  revision: 1,
+  value: {
+    connections: [],
+    providers: [],
+    hubs: [],
+    primaryEnvironmentId: "local-fixture",
+    cursorKeychainEnabled: false,
   },
 };
 const ENVIRONMENTS = ["local-fixture", "remote-fixture"];
@@ -201,6 +223,54 @@ setTransport({
     if (object !== 0) return null;
     const request = args as { methodID: number; args: unknown[] };
     switch (request.methodID) {
+      case 2299238358:
+        return "local-fixture";
+      case 3791071355:
+        return structuredClone(sourceSettings);
+      case 23962130:
+        sourceSettings = JSON.parse(JSON.stringify(request.args[0]));
+        sourceSettings.revision++;
+        return structuredClone(sourceSettings);
+      case 1089004527:
+        return structuredClone(configuration);
+      case 2212158658:
+        configuration = JSON.parse(JSON.stringify(request.args[0]));
+        configuration.revision++;
+        return structuredClone(configuration);
+      case 2811458213:
+        return JSON.stringify(
+          {
+            application: "Yousage",
+            wails: "3.0.0-beta.28",
+            platform: "browser-fixture",
+            historySources: sourceSettings.value.length,
+          },
+          null,
+          2,
+        );
+      case 4266831633:
+        return false;
+      case 2023028566:
+        return "";
+      case 584700173:
+        return "hub-fixture-" + crypto.randomUUID();
+      case 1066918238:
+        return {
+          connection: {
+            url: request.args[0],
+            environmentId: "remote-fixture",
+            credentialId: "environment-fixture-" + crypto.randomUUID(),
+          },
+          label: request.args[1] || "Remote fixture",
+          enabled: true,
+        };
+      case 909584628:
+      case 4181451325:
+      case 2798394763:
+      case 3259341121:
+      case 3076200806:
+        return null;
+
       case 2885542999:
         return JSON.parse(JSON.stringify(display));
       case 920552350:
@@ -294,3 +364,17 @@ setTransport({
   },
 });
 await import("./main");
+
+/** Simulate native close requests only in the development review harness. */
+window.addEventListener("keydown", (event) => {
+  if (event.key === "F8") {
+    event.preventDefault();
+    (
+      window as unknown as {
+        _wails: {
+          dispatchWailsEvent: (event: { name: string; data: null }) => void;
+        };
+      }
+    )._wails.dispatchWailsEvent({ name: "close-requested", data: null });
+  }
+});

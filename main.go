@@ -48,6 +48,7 @@ func main() {
 		Hidden: true, EnableFileDrop: true, BackgroundColour: application.NewRGBA(10, 10, 10, 255),
 		Windows: application.WindowsWindow{Theme: application.Light},
 	})
+	service.installDesktopHooks()
 	nativeApp.Event.OnApplicationEvent(events.Common.ThemeChanged, func(event *application.ApplicationEvent) {
 		nativeApp.Event.Emit("system-appearance", event.Context().IsDarkMode())
 	})
