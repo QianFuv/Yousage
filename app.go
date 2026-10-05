@@ -6,10 +6,16 @@ import (
 	"errors"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+	"yousage/internal/preferences"
+	"yousage/internal/quota"
+	"yousage/internal/refresh"
+	"yousage/internal/remote"
+	dataservice "yousage/internal/service"
 	"yousage/internal/storage"
 	"yousage/internal/theme"
 )
@@ -40,6 +46,7 @@ type App struct {
 	themes      *theme.Library
 	themeCancel context.CancelFunc
 	themeDone   chan struct{}
+	usage       *dataservice.Service
 }
 
 func newApp() (*App, error) {
@@ -69,6 +76,13 @@ func newApp() (*App, error) {
 func (service *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	service.context = ctx
 	service.record("startup")
+	usage, err := dataservice.New(ctx, service.store, service.themes)
+	if err != nil {
+		return err
+	}
+	service.usage = usage
+	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
+	usage.ReconcileConnections()
 	watcher, cancel := context.WithCancel(ctx)
 	service.themeCancel = cancel
 	service.themeDone = make(chan struct{})
@@ -86,6 +100,9 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 
 // ServiceShutdown flushes evidence after Wails cancels the application context.
 func (service *App) ServiceShutdown() error {
+	if service.usage != nil {
+		service.usage.Close()
+	}
 	if service.themeCancel != nil {
 		service.themeCancel()
 		<-service.themeDone
@@ -97,6 +114,88 @@ func (service *App) ServiceShutdown() error {
 	service.logMutex.Lock()
 	defer service.logMutex.Unlock()
 	return service.logFile.Close()
+}
+
+// GetUsage returns the requested live/cached environment aggregates.
+func (service *App) GetUsage(days int, timeZone string) (dataservice.Snapshot, error) {
+	return service.usage.Usage(service.context, days, timeZone)
+}
+
+// EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
+func (service *App) EnableCursorKeychain(identities []string) []remote.SaveOutcome {
+	return service.usage.EnableCursorKeychain(service.context, identities)
+}
+
+// RefreshUsage coalesces selected scans with foreground-only automatic refresh policy.
+func (service *App) RefreshUsage(days int, timeZone string, selected []string, request refresh.Request) error {
+	return service.usage.RefreshUsage(service.context, days, timeZone, selected, request)
+}
+
+// RefreshLimits refreshes quota observations without issuing model turns.
+func (service *App) RefreshLimits(selected []string, request refresh.Request) error {
+	return service.usage.RefreshLimits(service.context, selected, request)
+}
+
+// ApplyPricing saves each destination independently and reports ambiguous remote writes.
+func (service *App) ApplyPricing(identities []string, patch preferences.PricingPatch) []remote.SaveOutcome {
+	return service.usage.ApplyPricing(service.context, identities, patch)
+}
+
+// ConsumeResetCredit uses an explicit caller operation identity and durable recovery before sending.
+func (service *App) ConsumeResetCredit(route quota.RedeemRoute, operationId string, isExplicitRetry bool) (quota.ResetResult, error) {
+	return service.usage.ConsumeReset(service.context, route, operationId, isExplicitRetry)
+}
+
+// GetDisplay returns ordinary saved display preferences independently of theme drafts.
+func (service *App) GetDisplay() (preferences.SavedDisplay, error) {
+	return service.usage.Preferences.Display(service.context)
+}
+
+// SaveDisplay atomically persists a validated ordinary preference update.
+func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.SavedDisplay, error) {
+	return service.usage.Preferences.SaveDisplay(service.context, saved)
+}
+
+// GetConfiguration returns connection metadata and native target references without credentials.
+func (service *App) GetConfiguration() (dataservice.SavedConfiguration, error) {
+	return service.usage.Configuration(service.context)
+}
+
+// SaveConfiguration applies an explicit connection/provider draft.
+func (service *App) SaveConfiguration(saved dataservice.SavedConfiguration) (dataservice.SavedConfiguration, error) {
+	return service.usage.SaveConfiguration(service.context, saved)
+}
+
+// PairEnvironment stores only a native secret reference; the bootstrap is transient.
+func (service *App) PairEnvironment(origin, label, bootstrap string, isReadOnly bool) (dataservice.ConnectionPreference, error) {
+	return service.usage.Pair(service.context, origin, label, bootstrap, isReadOnly)
+}
+
+type SavedSources struct {
+	Revision int64                `json:"revision"`
+	Value    []preferences.Source `json:"value"`
+}
+
+// GetSources returns editable configured roots; quota enablement is independent.
+func (service *App) GetSources() (SavedSources, error) {
+	value, revision, err := service.usage.Sources(service.context)
+	return SavedSources{revision, value}, err
+}
+
+// SaveSources persists a complete explicitly applied roots draft.
+func (service *App) SaveSources(saved SavedSources) (SavedSources, error) {
+	revision, err := service.usage.SaveSources(service.context, saved.Value, saved.Revision)
+	saved.Revision = revision
+	return saved, err
+}
+
+// OpenExternal permits a user-selected public HTTP(S) account or documentation destination.
+func (service *App) OpenExternal(destination string) error {
+	parsed, err := url.Parse(destination)
+	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		return errors.New("Only public HTTP(S) links can be opened.")
+	}
+	return service.nativeApp.Browser.OpenURL(destination)
 }
 
 // GetAppearance returns saved authoritative state and current published palettes before first paint.

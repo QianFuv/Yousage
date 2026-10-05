@@ -1,24 +1,32 @@
 /** Desktop routes share saved appearance and a root-mounted editor across navigation. */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Reference } from "@reference";
+import { DataProvider, useData } from "./usage/controller";
+import { UsagePage } from "./usage/UsagePage";
+import { PricingPanel } from "./usage/PricingPanel";
 import * as nativeApi from "../bindings/yousage/app";
 import { canvasBackground, type Bootstrap } from "./native";
-import {
-  AppearanceProvider,
-  applySavedAppearance,
-  useAppearance,
-} from "./theme/appearance";
+import { AppearanceProvider, applySavedAppearance } from "./theme/appearance";
 import { RootThemeEditor, ThemePanel } from "./theme/ThemePanel";
 import "./style.css";
 
 /** Keep Usage and Settings independent while synchronizing actual CSS with the native window. */
 function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
-  const context = useAppearance();
-  const [route, setRoute] = useState<"usage" | "settings">("usage");
-  const [section, setSection] = useState<"appearance" | "diagnostics">(
-    "appearance",
+  const data = useData();
+  const [priceModel, setPriceModel] = useState<string>();
+  const [pricingState, setPricingState] = useState({
+    isDirty: false,
+    isPending: false,
+  });
+  const changePricingState = useCallback(
+    (isDirty: boolean, isPending: boolean) =>
+      setPricingState({ isDirty, isPending }),
+    [],
   );
+  const [route, setRoute] = useState<"usage" | "settings">("usage");
+  const [section, setSection] = useState<
+    "appearance" | "diagnostics" | "pricing" | "sources"
+  >("appearance");
   const [status, setStatus] = useState("");
   useEffect(() => {
     /** Offer the same settings shortcut in every application route. */
@@ -77,7 +85,7 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
     };
   }, []);
   return (
-    <div className="desktop-layout" data-density="comfortable">
+    <div className="desktop-layout" data-density={data.display.value.density}>
       <nav className="app-navigation" aria-label="Application">
         <strong>Yousage</strong>
         <button
@@ -103,6 +111,18 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
               Appearance & display
             </button>
             <button
+              aria-pressed={section === "pricing"}
+              onClick={() => setSection("pricing")}
+            >
+              Prices &amp; mappings{pricingState.isDirty ? " · Unsaved" : ""}
+            </button>
+            <button
+              aria-pressed={section === "sources"}
+              onClick={() => setSection("sources")}
+            >
+              Sources &amp; refresh
+            </button>
+            <button
               aria-pressed={section === "diagnostics"}
               onClick={() => setSection("diagnostics")}
             >
@@ -112,30 +132,42 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
         </section>
       )}
       <main data-file-drop-target>
-        {route === "usage" ? (
-          <Reference
-            appearance={context.appearance}
-            view="usage"
-            shouldManageTheme={false}
+        <div hidden={route !== "usage"}>
+          <UsagePage
+            isActive={route === "usage"}
+            onSettings={(next, model) => {
+              if (model) setPriceModel(model);
+              setSection(next);
+              setRoute("settings");
+            }}
           />
-        ) : section === "appearance" ? (
-          <ThemePanel />
-        ) : (
-          <aside className="native-toolbar">
-            <strong>Yousage · Wails {bootstrap.wailsVersion}</strong>
-            <span>
-              {bootstrap.providers.length} history providers ·{" "}
-              {bootstrap.roleCount} theme roles
-            </span>
-            <output role="status">
-              {status || "Themes are saved in the application database."}
-            </output>
-            <small>Lifecycle log: {bootstrap.lifecycleLog}</small>
-            <button onClick={() => void nativeApi.OpenDocumentation()}>
-              Wails documentation
-            </button>
-          </aside>
-        )}
+        </div>
+        <div hidden={route !== "settings" || section !== "pricing"}>
+          <PricingPanel model={priceModel} onDirtyChange={changePricingState} />
+        </div>
+        {route === "settings" &&
+          (section === "appearance" ? (
+            <ThemePanel />
+          ) : section === "sources" ? (
+            <p className="usage-notice">
+              Data source controls are being integrated.
+            </p>
+          ) : section === "diagnostics" ? (
+            <aside className="native-toolbar">
+              <strong>Yousage · Wails {bootstrap.wailsVersion}</strong>
+              <span>
+                {bootstrap.providers.length} history providers ·{" "}
+                {bootstrap.roleCount} theme roles
+              </span>
+              <output role="status">
+                {status || "Themes are saved in the application database."}
+              </output>
+              <small>Lifecycle log: {bootstrap.lifecycleLog}</small>
+              <button onClick={() => void nativeApi.OpenDocumentation()}>
+                Wails documentation
+              </button>
+            </aside>
+          ) : null)}
       </main>
       <RootThemeEditor />
     </div>
@@ -146,13 +178,16 @@ function Desktop({ bootstrap }: { bootstrap: Bootstrap }) {
 async function start() {
   const bootstrap = await nativeApi.GetBootstrap();
   const appearance = await nativeApi.GetAppearance();
+  const display = await nativeApi.GetDisplay();
   applySavedAppearance(appearance, bootstrap.isSystemDark);
   createRoot(document.getElementById("root")!).render(
     <AppearanceProvider
       initial={appearance}
       isSystemDark={bootstrap.isSystemDark}
     >
-      <Desktop bootstrap={bootstrap} />
+      <DataProvider initial={display}>
+        <Desktop bootstrap={bootstrap} />
+      </DataProvider>
     </AppearanceProvider>,
   );
 }

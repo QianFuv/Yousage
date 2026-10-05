@@ -8,5 +8,6 @@ export {
 
 export {
     Bootstrap,
+    SavedSources,
     ThemeFileInput
 } from "./models.js";

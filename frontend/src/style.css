@@ -3,6 +3,139 @@
 @source "../../tools/parity/src/workbench.tsx";
 @source "./";
 @source "../vendor";
+.desktop-layout main {
+  min-width: 0;
+}
+.usage-page,
+.pricing-panel {
+  max-width: 1120px;
+  margin: auto;
+  padding: 24px 28px;
+  min-width: 0;
+}
+.usage-page-header,
+.usage-controls,
+.pricing-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.usage-page-header {
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.usage-page h1,
+.pricing-panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.usage-controls select,
+.usage-controls button,
+.environment-filter summary {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--card);
+  font-size: 12px;
+}
+.view-selector {
+  display: flex;
+  gap: 2px;
+}
+.view-selector button[aria-pressed="true"] {
+  background: var(--secondary);
+}
+.environment-filter {
+  position: relative;
+}
+.environment-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: min(340px, 80vw);
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 8px;
+  z-index: 30;
+  box-shadow: 0 8px 24px #0002;
+}
+.environment-popup label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+.environment-popup small {
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+.usage-notice {
+  padding: 12px;
+  margin: 12px 0;
+  background: var(--muted);
+  border-radius: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.usage-notice button {
+  text-decoration: underline;
+}
+.usage-table-scroll {
+  overflow: auto;
+  min-width: 0;
+}
+.usage-table-scroll table {
+  width: 100%;
+  font-size: 12px;
+}
+.usage-table-scroll th,
+.usage-table-scroll td {
+  text-align: left;
+  padding: 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.pricing-content {
+  display: grid;
+  gap: 16px;
+  margin: 20px 0;
+  min-width: 0;
+}
+.pricing-footer {
+  justify-content: space-between;
+}
+.pricing-panel header p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 8px;
+}
+[data-density="compact"] .usage-page,
+[data-density="compact"] .pricing-panel {
+  padding: 16px 24px;
+}
+[data-density="compact"] .usage-table-scroll td,
+[data-density="compact"] .usage-table-scroll th {
+  padding: 5px 8px;
+}
+@media (max-width: 600px) {
+  .usage-page,
+  .pricing-panel,
+  [data-density="compact"] .usage-page,
+  [data-density="compact"] .pricing-panel {
+    padding: 16px;
+  }
+  .usage-controls {
+    width: 100%;
+  }
+  .usage-page-header {
+    align-items: flex-start;
+  }
+}
 body {
   background: var(--background);
   color: var(--foreground);

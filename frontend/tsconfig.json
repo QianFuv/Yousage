@@ -12,7 +12,8 @@
     "paths": {
       "@reference": ["./src/reference.d.ts"],
       "@t3tools/shared/*": ["../tools/parity/upstream/packages/shared/src/*"],
-      "@t3tools/contracts": ["../tools/parity/src/bridges/contracts.tsx"],
+      "@t3tools/contracts": ["./src/usage/contracts.tsx"],
+"@t3tools/client-runtime/state/provider-instance-display": ["../tools/parity/src/bridges/instance.tsx"],
       "~/components/MorphIcon": [
         "../tools/parity/upstream/apps/web/src/components/MorphIcon.tsx"
       ],

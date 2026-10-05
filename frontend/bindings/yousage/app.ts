@@ -12,11 +12,53 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as preferences$0 from "./internal/preferences/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as quota$0 from "./internal/quota/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as refresh$0 from "./internal/refresh/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as remote$0 from "./internal/remote/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as service$0 from "./internal/service/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as theme$0 from "./internal/theme/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+/**
+ * ApplyPricing saves each destination independently and reports ambiguous remote writes.
+ */
+export function ApplyPricing(identities: string[], patch: preferences$0.PricingPatch): $CancellablePromise<remote$0.SaveOutcome[]> {
+    return $Call.ByID(3520645103, identities, patch).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * ConsumeResetCredit uses an explicit caller operation identity and durable recovery before sending.
+ */
+export function ConsumeResetCredit(route: quota$0.RedeemRoute, operationId: string, isExplicitRetry: boolean): $CancellablePromise<quota$0.ResetResult> {
+    return $Call.ByID(529082913, route, operationId, isExplicitRetry).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
+ * EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
+ */
+export function EnableCursorKeychain(identities: string[]): $CancellablePromise<remote$0.SaveOutcome[]> {
+    return $Call.ByID(3128816296, identities).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
 
 /**
  * ExportFixture writes the fixed fixture after a native save-path choice.
@@ -44,7 +86,7 @@ export function FrontendReady(): $CancellablePromise<void> {
  */
 export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(3469612837).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType3($result);
     });
 }
 
@@ -53,7 +95,43 @@ export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
     return $Call.ByID(2483192963).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType4($result);
+    });
+}
+
+/**
+ * GetConfiguration returns connection metadata and native target references without credentials.
+ */
+export function GetConfiguration(): $CancellablePromise<service$0.SavedConfiguration> {
+    return $Call.ByID(1089004527).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
+ * GetDisplay returns ordinary saved display preferences independently of theme drafts.
+ */
+export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
+    return $Call.ByID(2885542999).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+/**
+ * GetSources returns editable configured roots; quota enablement is independent.
+ */
+export function GetSources(): $CancellablePromise<$models.SavedSources> {
+    return $Call.ByID(3791071355).then(($result: any) => {
+        return $$createType7($result);
+    });
+}
+
+/**
+ * GetUsage returns the requested live/cached environment aggregates.
+ */
+export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
+    return $Call.ByID(2234764926, days, timeZone).then(($result: any) => {
+        return $$createType8($result);
     });
 }
 
@@ -65,11 +143,27 @@ export function OpenDocumentation(): $CancellablePromise<void> {
 }
 
 /**
+ * OpenExternal permits a user-selected public HTTP(S) account or documentation destination.
+ */
+export function OpenExternal(destination: string): $CancellablePromise<void> {
+    return $Call.ByID(4238767710, destination);
+}
+
+/**
+ * PairEnvironment stores only a native secret reference; the bootstrap is transient.
+ */
+export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
+    return $Call.ByID(1066918238, origin, label, bootstrap, isReadOnly).then(($result: any) => {
+        return $$createType9($result);
+    });
+}
+
+/**
  * PickFixtureFiles selects public fixtures without reading selected contents.
  */
 export function PickFixtureFiles(): $CancellablePromise<string[]> {
     return $Call.ByID(577210012).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType10($result);
     });
 }
 
@@ -78,7 +172,7 @@ export function PickFixtureFiles(): $CancellablePromise<string[]> {
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(1388571440).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType12($result);
     });
 }
 
@@ -87,8 +181,22 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3002950989, paths).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType12($result);
     });
+}
+
+/**
+ * RefreshLimits refreshes quota observations without issuing model turns.
+ */
+export function RefreshLimits(selected: string[], request: refresh$0.Request): $CancellablePromise<void> {
+    return $Call.ByID(59860548, selected, request);
+}
+
+/**
+ * RefreshUsage coalesces selected scans with foreground-only automatic refresh policy.
+ */
+export function RefreshUsage(days: number, timeZone: string, selected: string[], request: refresh$0.Request): $CancellablePromise<void> {
+    return $Call.ByID(2450955827, days, timeZone, selected, request);
 }
 
 /**
@@ -96,7 +204,34 @@ export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.The
  */
 export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(2592400194, revision, value).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType3($result);
+    });
+}
+
+/**
+ * SaveConfiguration applies an explicit connection/provider draft.
+ */
+export function SaveConfiguration(saved: service$0.SavedConfiguration): $CancellablePromise<service$0.SavedConfiguration> {
+    return $Call.ByID(2212158658, saved).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
+ * SaveDisplay atomically persists a validated ordinary preference update.
+ */
+export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellablePromise<preferences$0.SavedDisplay> {
+    return $Call.ByID(920552350, saved).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+/**
+ * SaveSources persists a complete explicitly applied roots draft.
+ */
+export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
+    return $Call.ByID(23962130, saved).then(($result: any) => {
+        return $$createType7($result);
     });
 }
 
@@ -108,8 +243,16 @@ export function SyncAppearance(isDark: boolean, red: number, green: number, blue
 }
 
 // Private type creation functions
-const $$createType0 = theme$0.LibrarySnapshot.createFrom;
-const $$createType1 = $models.Bootstrap.createFrom;
-const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = $models.ThemeFileInput.createFrom;
-const $$createType4 = $Create.Array($$createType3);
+const $$createType0 = remote$0.SaveOutcome.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = quota$0.ResetResult.createFrom;
+const $$createType3 = theme$0.LibrarySnapshot.createFrom;
+const $$createType4 = $models.Bootstrap.createFrom;
+const $$createType5 = service$0.SavedConfiguration.createFrom;
+const $$createType6 = preferences$0.SavedDisplay.createFrom;
+const $$createType7 = $models.SavedSources.createFrom;
+const $$createType8 = service$0.Snapshot.createFrom;
+const $$createType9 = service$0.ConnectionPreference.createFrom;
+const $$createType10 = $Create.Array($Create.Any);
+const $$createType11 = $models.ThemeFileInput.createFrom;
+const $$createType12 = $Create.Array($$createType11);

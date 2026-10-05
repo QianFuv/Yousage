@@ -12,6 +12,10 @@ export default defineConfig({
       enforce: "pre",
       /** Original UI primitives share the desktop's transient theme mirror. */
       resolveId(source, importer) {
+        if (source === "@t3tools/contracts")
+          return fileURLToPath(
+            new URL("./src/usage/contracts.tsx", import.meta.url),
+          );
         if (
           source.endsWith("/themePalette") &&
           importer?.includes("/upstream/")

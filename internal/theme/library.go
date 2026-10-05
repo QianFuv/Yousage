@@ -55,10 +55,12 @@ type LibrarySnapshot struct {
 	Error     string       `json:"error,omitempty"`
 }
 type Library struct {
-	Repository     SettingsRepository
-	PublishedStore Store
-	mutex          sync.Mutex
-	lastPublished  Snapshot
+	Repository           SettingsRepository
+	PublishedStore       Store
+	mutex                sync.Mutex
+	lastPublished        Snapshot
+	externalPublished    *Snapshot
+	primaryEnvironmentId string
 }
 
 func defaultLibraryValue() LibraryValue {
@@ -137,6 +139,11 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 	}
 	result := LibrarySnapshot{Revision: revision, Value: value}
 	published, err := library.PublishedStore.Show(ctx)
+	environmentId := "local"
+	if library.externalPublished != nil {
+		published, err = *library.externalPublished, nil
+		environmentId = library.primaryEnvironmentId
+	}
 	if err != nil {
 		result.Published = library.lastPublished
 		result.Error = "Published themes could not be read. Last known themes are retained."
@@ -144,7 +151,11 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 		library.lastPublished = published
 		result.Published = published
 	}
-	if shouldAdopt && result.Error == "" && published.DefaultTheme != "" && value.Preferences.AppliedGenerations["local"] != published.DefaultTheme+"@"+published.Generation {
+	generation := published.DefaultTheme
+	if published.Generation != "" {
+		generation += "@" + published.Generation
+	}
+	if shouldAdopt && result.Error == "" && published.DefaultTheme != "" && value.Preferences.AppliedGenerations[environmentId] != generation {
 		var selected *Definition
 		for _, definition := range append(append(Builtins(), published.Themes...), value.CustomThemes...) {
 			if definition.Id == published.DefaultTheme {
@@ -158,7 +169,7 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 			if len(selected.Variants) == 0 {
 				value.Preferences.Mode = selected.Appearance
 			}
-			value.Preferences.AppliedGenerations["local"] = published.DefaultTheme + "@" + published.Generation
+			value.Preferences.AppliedGenerations[environmentId] = generation
 			revision, err = library.Repository.WriteSetting(ctx, "theme-library", revision, value)
 			if err != nil {
 				return result, err
@@ -167,6 +178,16 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 		}
 	}
 	return result, nil
+}
+
+// SetPrimaryPublished scopes published palettes and one-time adoption to the chosen primary environment.
+// A nil snapshot returns authority to the local CLI publisher.
+func (library *Library) SetPrimaryPublished(ctx context.Context, environmentId string, published *Snapshot) (LibrarySnapshot, error) {
+	library.mutex.Lock()
+	defer library.mutex.Unlock()
+	library.primaryEnvironmentId = environmentId
+	library.externalPublished = published
+	return library.snapshot(ctx, true)
 }
 
 // Read adopts each resolvable published default generation once, preserving later manual choices.

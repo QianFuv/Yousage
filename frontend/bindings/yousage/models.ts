@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as preferences$0 from "./internal/preferences/models.js";
+
 /**
  * Bootstrap is the fixture-only native contract; it carries no account data.
  */
@@ -69,6 +73,35 @@ export class Bootstrap {
     }
 }
 
+export class SavedSources {
+    "revision": number;
+    "value": preferences$0.Source[];
+
+    /** Creates a new SavedSources instance. */
+    constructor($$source: Partial<SavedSources> = {}) {
+        if (!("revision" in $$source)) {
+            this["revision"] = 0;
+        }
+        if (!("value" in $$source)) {
+            this["value"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SavedSources instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SavedSources {
+        const $$createField1_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("value" in $$parsedSource) {
+            $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
+        }
+        return new SavedSources($$parsedSource as Partial<SavedSources>);
+    }
+}
+
 export class ThemeFileInput {
     "name": string;
     "text": string;
@@ -101,3 +134,5 @@ export class ThemeFileInput {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = preferences$0.Source.createFrom;
+const $$createType2 = $Create.Array($$createType1);

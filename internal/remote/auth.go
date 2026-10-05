@@ -19,16 +19,39 @@ import (
 const protocolVersion = 2
 
 type Environment struct {
-	Id            string          `json:"environmentId"`
-	Label         string          `json:"label"`
-	ServerVersion string          `json:"serverVersion"`
-	Protocol      int             `json:"orchestrationProtocolVersion"`
-	Capabilities  map[string]bool `json:"capabilities"`
+	Id            string       `json:"environmentId"`
+	Label         string       `json:"label"`
+	ServerVersion string       `json:"serverVersion"`
+	Protocol      int          `json:"orchestrationProtocolVersion"`
+	Capabilities  Capabilities `json:"capabilities"`
 	Platform      struct {
 		Os   string `json:"os"`
 		Arch string `json:"arch"`
 	} `json:"platform"`
 }
+
+// Capabilities preserves boolean feature gates while ignoring unrelated structured capabilities.
+type Capabilities map[string]bool
+
+func (capabilities *Capabilities) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil || fields == nil {
+		return errors.New("invalid environment capabilities")
+	}
+	result := Capabilities{}
+	for name, raw := range fields {
+		var enabled bool
+		if string(raw) != "null" && json.Unmarshal(raw, &enabled) == nil {
+			result[name] = enabled
+		} else if name == "environmentThemes" || name == "usageLimitSources" || name == "usagePriceOverrides" || name == "usageModelAliases" {
+			return errors.New("invalid environment feature capability")
+		}
+
+	}
+	*capabilities = result
+	return nil
+}
+
 type Connection struct {
 	Url           string `json:"url"`
 	EnvironmentId string `json:"environmentId"`

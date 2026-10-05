@@ -34,6 +34,34 @@ func testLibrary(test *testing.T) (*Library, *failingRepository, string) {
 	return &Library{Repository: repository, PublishedStore: Store{Directory: directory}}, repository, directory
 }
 
+func TestPrimaryPublishedAdoptsOncePerEnvironmentAndWaitsForResolvableTheme(test *testing.T) {
+	library, _, _ := testLibrary(test)
+	ctx := context.Background()
+	first, err := library.SetPrimaryPublished(ctx, "remote-a", &Snapshot{DefaultTheme: "late", Generation: "one", Themes: []Definition{}})
+	if err != nil || first.Value.Preferences.AppliedGenerations["remote-a"] != "" {
+		test.Fatal("unresolved publication consumed adoption", err)
+	}
+	custom := Builtins()[0]
+	custom.Id = "late"
+	adopted, err := library.SetPrimaryPublished(ctx, "remote-a", &Snapshot{DefaultTheme: "late", Generation: "one", Themes: []Definition{custom}})
+	if err != nil || adopted.Value.Preferences.BaseThemeId != "late" {
+		test.Fatal("late publication not adopted", err)
+	}
+	adopted.Value.Preferences.BaseThemeId = "dark"
+	manual, err := library.Save(ctx, adopted.Revision, adopted.Value)
+	if err != nil {
+		test.Fatal(err)
+	}
+	unchanged, err := library.SetPrimaryPublished(ctx, "remote-a", &Snapshot{DefaultTheme: "late", Generation: "one", Themes: []Definition{custom}})
+	if err != nil || unchanged.Value.Preferences.BaseThemeId != manual.Value.Preferences.BaseThemeId {
+		test.Fatal("same generation replaced manual choice", err)
+	}
+	second, err := library.SetPrimaryPublished(ctx, "remote-b", &Snapshot{DefaultTheme: "late", Generation: "one", Themes: []Definition{custom}})
+	if err != nil || second.Value.Preferences.BaseThemeId != "late" || second.Value.Preferences.AppliedGenerations["remote-b"] != "late@one" {
+		test.Fatal("environment generations share authority", err)
+	}
+}
+
 func TestLibraryAtomicSaveConflictAndReopen(test *testing.T) {
 	library, repository, directory := testLibrary(test)
 	ctx := context.Background()

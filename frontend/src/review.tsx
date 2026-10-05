@@ -7,6 +7,168 @@ import type {
 
 if (!import.meta.env.DEV)
   throw new Error("Browser review fixtures are development-only.");
+let display = {
+  revision: 0,
+  value: {
+    density: "comfortable",
+    zoom: 1,
+    appearanceMode: "system",
+    themeId: "t3-code",
+    metric: "limits",
+    windowDays: 30,
+    shouldAutoRefresh: false,
+  },
+};
+const ENVIRONMENTS = ["local-fixture", "remote-fixture"];
+const PROVIDERS = [
+  "codex",
+  "claude",
+  "grok",
+  "cursor",
+  "opencode",
+  "antigravity",
+];
+const SETTINGS = Object.fromEntries(
+  ENVIRONMENTS.map((identity) => [
+    identity,
+    {
+      usagePriceOverrides: {
+        "fixture-model": {
+          inputCostPerMillionTokens: identity === "local-fixture" ? 1 : 3,
+          outputCostPerMillionTokens: 2,
+        },
+      },
+      usageModelAliases: {},
+    },
+  ]),
+);
+/** Return plain JSON so generated constructors cannot mutate shared fixture state. */
+function usageFixture(days: number, zone: string) {
+  const reference = Date.parse("2026-10-06T12:00:00Z");
+  return {
+    window: {
+      timeZone: zone,
+      sinceDay:
+        days === 1 ? "2026-10-05" : days === 7 ? "2026-09-30" : "2026-09-07",
+      untilDay: "2026-10-06",
+      resolution: days === 1 ? "hour" : "day",
+      ...(days === 1
+        ? { sinceTimeMs: reference - 86400000, untilTimeMs: reference }
+        : {}),
+    },
+    environments: ENVIRONMENTS.map((identity, environmentIndex) => ({
+      environmentId: identity,
+      label: environmentIndex === 0 ? "This device" : "Remote fixture",
+      local: environmentIndex === 0,
+      connected: true,
+      canOperate: true,
+      refreshing: false,
+      serverConfig: {
+        environment: {
+          environmentId: identity,
+          orchestrationProtocolVersion: 2,
+          capabilities: { usagePriceOverrides: true, usageModelAliases: true },
+        },
+        settings: SETTINGS[identity],
+        providers: [
+          {
+            instanceId: "codex-account",
+            driver: "codex",
+            displayName: "Codex",
+            enabled: true,
+            installed: true,
+            status: "ready",
+            auth: {
+              status: "authenticated",
+              email: "fixture@example.invalid",
+              subscriptionSharing: true,
+            },
+            slashCommands: [],
+            usageLimits: {
+              checkedAt: "2026-10-06T12:00:00Z",
+              windows: [
+                {
+                  id: "session",
+                  kind: "session",
+                  label: "Session",
+                  usedPercent: 37,
+                  resetsAt: "2026-10-06T15:00:00Z",
+                  windowDurationMins: 300,
+                },
+                {
+                  id: "weekly",
+                  kind: "weekly",
+                  label: "Weekly",
+                  usedPercent: 23,
+                  resetsAt: "2026-10-10T00:00:00Z",
+                  windowDurationMins: 10080,
+                },
+              ],
+            },
+          },
+        ],
+        usageLimitSources: [],
+      },
+      summary: {
+        contractVersion: 6,
+        readAt: "2026-10-06T12:00:00Z",
+        timeZone: zone,
+        sinceDay: "2026-09-07",
+        untilDay: "2026-10-06",
+        scanDurationMs: 10,
+        pricing: {
+          status: "cached",
+          source: "Fixture",
+          fetchedAt: "2026-10-05T12:00:00Z",
+          knownModels: 5,
+        },
+        sources: PROVIDERS.map((provider) => ({
+          fingerprint: {
+            hostId: identity,
+            provider,
+            resolvedHomePath: `/fixture/${provider}`,
+            volumeId: "fixture",
+          },
+          status: "ok",
+          scannedFiles: 2,
+          skippedFiles: 0,
+          malformedRecords: 0,
+          distinctSessions: 2,
+          message: null,
+        })),
+        buckets: PROVIDERS.map((provider, index) => ({
+          day: "2026-10-05",
+          ...(days === 1 ? { hourStart: "2026-10-05T18:00:00.000Z" } : {}),
+          provider,
+          model: index === 0 ? "fixture-model" : `${provider}-model`,
+          sourcePath: `/fixture/${provider}`,
+          totals: {
+            uncachedInputTokens: 10000 * (index + 1),
+            cachedInputTokens: 15000,
+            cacheCreationTokens: 1000,
+            outputTokens: 5000,
+            reasoningTokens: 1000,
+          },
+          costUsd: index === 5 ? 0 : (index + 1) * 0.3,
+          cacheSavingsUsd: 0.05,
+          categoryCostUsd: {
+            input: 0.1,
+            cacheRead: 0.03,
+            cacheWrite: 0.01,
+            output: 0.16,
+          },
+          fastCostUsd: 0.1,
+          ultrafastCostUsd: 0,
+          speedPremiumUsd: 0.03,
+          costSource: index === 5 ? "unpriced" : "modelPriced",
+          records: 5,
+          unpricedRecords: index === 5 ? 5 : 0,
+          sessions: 2,
+        })),
+      },
+    })),
+  };
+}
 let snapshot: LibrarySnapshot = {
   revision: 0,
   value: {
@@ -39,6 +201,40 @@ setTransport({
     if (object !== 0) return null;
     const request = args as { methodID: number; args: unknown[] };
     switch (request.methodID) {
+      case 2885542999:
+        return JSON.parse(JSON.stringify(display));
+      case 920552350:
+        display = JSON.parse(JSON.stringify(request.args[0])) as typeof display;
+        display.revision++;
+        return JSON.parse(JSON.stringify(display));
+      case 2234764926:
+        return JSON.parse(
+          JSON.stringify(
+            usageFixture(request.args[0] as number, request.args[1] as string),
+          ),
+        );
+      case 59860548:
+      case 2450955827:
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return null;
+      case 3520645103: {
+        const [ids, patch] = request.args as [
+          string[],
+          {
+            overrides: Record<string, unknown>;
+            aliases: Record<string, string>;
+          },
+        ];
+        for (const identity of ids) {
+          Object.assign(
+            SETTINGS[identity]!.usagePriceOverrides,
+            patch.overrides,
+          );
+          Object.assign(SETTINGS[identity]!.usageModelAliases, patch.aliases);
+        }
+        return ids.map((id) => ({ id, saved: true, outcomeUnknown: false }));
+      }
+
       case 2483192963:
         return {
           sourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b",
