@@ -1,0 +1,148 @@
+package service
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"yousage/internal/domain"
+	"yousage/internal/preferences"
+)
+
+func TestAutomaticSourcesFollowEnvironmentWithoutChangingLegacyRoots(test *testing.T) {
+	service := testService(test)
+	service.Home = test.TempDir()
+	first, second := test.TempDir(), test.TempDir()
+	service.Environment = map[string]string{"CODEX_HOME": first, "OPENCODE_DATA_DIR": first + "," + second + "," + first}
+	sources := []preferences.Source{{Id: "auto", Provider: domain.Codex, IsAutomatic: true}, {Id: "legacy", Provider: domain.Claude, Root: second}, {Id: "multi", Provider: domain.OpenCode, IsAutomatic: true}}
+	expanded := service.expandedSources(sources)
+	if len(expanded) != 4 || expanded[0].Root != first || expanded[1].Root != second || expanded[2].Id == expanded[3].Id {
+		test.Fatalf("automatic roots or legacy compatibility lost: %+v", expanded)
+	}
+	service.Environment["CODEX_HOME"] = second
+	if service.expandedSources(sources)[0].Root != second || sources[0].Root != "" {
+		test.Fatal("automatic resolution was frozen into saved configuration")
+	}
+	if _, err := service.SaveSources(context.Background(), []preferences.Source{{Id: "auto", Provider: domain.Codex, Root: first, IsAutomatic: true, IsEnabled: true}}, 1); err != nil {
+		test.Fatal(err)
+	}
+	saved, _, err := service.Sources(context.Background())
+	if err != nil || saved[0].Root != "" || !saved[0].IsAutomatic {
+		test.Fatal("automatic source persisted a concrete path", saved, err)
+	}
+}
+
+func TestWindowsDiscoveryUsesNativePayloadWithoutExecutingShims(test *testing.T) {
+	service := testService(test)
+	service.Platform = "windows"
+	service.Home = test.TempDir()
+	root := test.TempDir()
+	service.Environment = map[string]string{"Path": " \"" + root + "\" "}
+	write := func(path string) {
+		test.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			test.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("fixture"), 0700); err != nil {
+			test.Fatal(err)
+		}
+	}
+	write(filepath.Join(root, "codex.cmd"))
+	write(filepath.Join(root, "codex.ps1"))
+	if service.resolveExecutable("codex", "") != "" {
+		test.Fatal("script shim treated as a native executable")
+	}
+	architecture, triple := "x64", "x86_64-pc-windows-msvc"
+	if runtime.GOARCH == "arm64" {
+		architecture, triple = "arm64", "aarch64-pc-windows-msvc"
+	}
+	older := filepath.Join(root, "node_modules", "@openai", "codex-win32-"+architecture, "vendor", triple, "codex", "codex.exe")
+	current := filepath.Join(root, "node_modules", "@openai", "codex", "node_modules", "@openai", "codex-win32-"+architecture, "vendor", triple, "bin", "codex.exe")
+	write(older)
+	write(current)
+	if resolved := service.resolveExecutable("codex", ""); resolved != current {
+		test.Fatal("new native payload was not preferred", resolved)
+	}
+	if service.resolveExecutable("codex", filepath.Join(root, "missing.exe")) != "" {
+		test.Fatal("missing explicit installation silently switched account context")
+	}
+	if service.resolveExecutable("codex", older) != older {
+		test.Fatal("valid explicit installation was ignored")
+	}
+	if err := os.Remove(current); err != nil {
+		test.Fatal(err)
+	}
+	nestedLegacy := filepath.Join(filepath.Dir(filepath.Dir(current)), "codex", "codex.exe")
+	write(nestedLegacy)
+	newSibling := filepath.Join(filepath.Dir(filepath.Dir(older)), "bin", "codex.exe")
+	write(newSibling)
+	if resolved := service.resolveExecutable("codex", ""); resolved != nestedLegacy {
+		test.Fatal("another installation displaced the active package dependency", resolved)
+	}
+	detected, err := service.DetectProviders(context.Background())
+	if err != nil || !detected[0].IsInstalled || detected[0].HasHistory {
+		test.Fatal("installation and history availability were conflated", detected, err)
+	}
+}
+
+func TestAutomaticRootsRejectEmptyOverridesAndRelativeXdg(test *testing.T) {
+	service := testService(test)
+	service.Home = test.TempDir()
+	service.Platform = "linux"
+	service.Environment = map[string]string{"OPENCODE_DATA_DIR": ", ,", "ANTIGRAVITY_DATA_DIR": ",,", "XDG_DATA_HOME": "relative", "Path": "wrong", "PATH": "correct", "codex_home": "wrong"}
+	if service.environmentValue("PATH") != "correct" || service.environmentValue("CODEX_HOME") != "" {
+		test.Fatal("Unix environment keys became case-insensitive")
+	}
+	if roots := service.historyRoots(domain.OpenCode); len(roots) != 1 || roots[0] != filepath.Join(service.Home, ".local", "share", "opencode") {
+		test.Fatal("invalid overrides disabled default discovery", roots)
+	}
+	if len(service.historyRoots(domain.Antigravity)) != 5 {
+		test.Fatal("empty override disabled Antigravity defaults")
+	}
+}
+
+func TestWindowsDiscoveryRecognizesDesktopFallbackAndCanonicalPnpmDependency(test *testing.T) {
+	service := testService(test)
+	service.Platform = "windows"
+	service.Home = test.TempDir()
+	local := test.TempDir()
+	service.Environment = map[string]string{"LOCALAPPDATA": local}
+	claude := filepath.Join(local, "Volta", "bin", "claude.exe")
+	if err := os.MkdirAll(filepath.Dir(claude), 0700); err != nil {
+		test.Fatal(err)
+	}
+	if err := os.WriteFile(claude, []byte("fixture"), 0700); err != nil {
+		test.Fatal(err)
+	}
+	if service.resolveExecutable("claudeAgent", "") != claude {
+		test.Fatal("desktop fallback installation was missed")
+	}
+	shim := test.TempDir()
+	canonical := filepath.Join(test.TempDir(), "node_modules", "@openai", "codex")
+	if err := os.MkdirAll(canonical, 0700); err != nil {
+		test.Fatal(err)
+	}
+	link := filepath.Join(shim, "node_modules", "@openai", "codex")
+	if err := os.MkdirAll(filepath.Dir(link), 0700); err != nil {
+		test.Fatal(err)
+	}
+	if err := os.Symlink(canonical, link); err != nil {
+		test.Skip("directory symlinks unavailable: " + err.Error())
+	}
+	architecture, triple := "x64", "x86_64-pc-windows-msvc"
+	if runtime.GOARCH == "arm64" {
+		architecture, triple = "arm64", "aarch64-pc-windows-msvc"
+	}
+	payload := filepath.Join(filepath.Dir(canonical), "codex-win32-"+architecture, "vendor", triple, "bin", "codex.exe")
+	if err := os.MkdirAll(filepath.Dir(payload), 0700); err != nil {
+		test.Fatal(err)
+	}
+	if err := os.WriteFile(payload, []byte("fixture"), 0700); err != nil {
+		test.Fatal(err)
+	}
+	service.Environment["PATH"] = shim
+	if resolved := service.resolveExecutable("codex", ""); resolved != payload {
+		test.Fatal("canonical pnpm sibling dependency was missed", resolved)
+	}
+}

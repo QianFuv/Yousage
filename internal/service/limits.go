@@ -48,6 +48,9 @@ func (service *Service) localConfig(ctx context.Context) (remote.Config, error) 
 		provider := byId[target.Id]
 		provider.InstanceId, provider.Driver, provider.DisplayName = target.Id, target.Driver, target.Label
 		provider.IsEnabled, provider.IsInstalled = target.IsEnabled, true
+		if target.Driver == "codex" || target.Driver == "claudeAgent" {
+			provider.IsInstalled = service.resolveExecutable(target.Driver, target.Executable) != ""
+		}
 		if provider.SlashCommands == nil {
 			provider.SlashCommands = []remote.SlashCommand{}
 		}
@@ -70,7 +73,11 @@ func (service *Service) localConfig(ctx context.Context) (remote.Config, error) 
 func (service *Service) nativeOptions(target NativeProvider) quota.NativeOptions {
 	environment := []string{}
 	for name, value := range service.Environment {
-		if (target.Driver == "codex" && name == "CODEX_HOME" && target.Home != "") || (target.Driver == "claudeAgent" && name == "CLAUDE_CONFIG_DIR" && target.Home != "") {
+		key := name
+		if service.Platform == "windows" {
+			key = strings.ToUpper(name)
+		}
+		if (target.Driver == "codex" && key == "CODEX_HOME" && target.Home != "") || (target.Driver == "claudeAgent" && key == "CLAUDE_CONFIG_DIR" && target.Home != "") {
 			continue
 		}
 		environment = append(environment, name+"="+value)
@@ -82,7 +89,7 @@ func (service *Service) nativeOptions(target NativeProvider) quota.NativeOptions
 		}
 		environment = append(environment, name+"="+target.Home)
 	}
-	return quota.NativeOptions{Process: managedprocess.Options{Executable: target.Executable, Environment: environment}, IsEnabled: target.IsEnabled, Version: "0.1.0"}
+	return quota.NativeOptions{Process: managedprocess.Options{Executable: service.resolveExecutable(target.Driver, target.Executable), Environment: environment}, IsEnabled: target.IsEnabled, Version: "0.1.0"}
 }
 
 // RefreshLimits applies completion-based cooldown and serializes probes with credit redemption.
@@ -193,7 +200,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 				case "codex":
 					account = quota.ProbeCodex(ctx, options)
 				case "claudeAgent":
-					account = quota.ProbeClaude(ctx, claudeprobe.Options{Executable: target.Executable, Environment: options.Process.Environment, ConfigDirectory: target.Home}, true)
+					account = quota.ProbeClaude(ctx, claudeprobe.Options{Executable: service.resolveExecutable(target.Driver, target.Executable), Environment: options.Process.Environment, ConfigDirectory: target.Home}, true)
 				case "cursor":
 					account.Limits = quota.ReadCursor(ctx, httpOptions)
 				case "grok":

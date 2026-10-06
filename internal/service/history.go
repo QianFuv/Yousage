@@ -62,6 +62,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	sources = service.expandedSources(sources)
 	entries, revision, err := service.sourceIndex(ctx)
 	if err != nil {
 		return false, err
@@ -368,6 +369,10 @@ func (service *Service) SaveSources(ctx context.Context, sources []preferences.S
 	}
 	defer release()
 	for index := range sources {
+		if sources[index].IsAutomatic {
+			sources[index].Root = ""
+			continue
+		}
 		absolute, err := history.ExpandHome(sources[index].Root)
 		if err != nil {
 			return revision, err

@@ -15,10 +15,6 @@ import (
 	"time"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
-	"yousage/internal/history"
-	"yousage/internal/history/antigravity"
-	"yousage/internal/history/cursor"
-	"yousage/internal/history/opencode"
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
 	"yousage/internal/refresh"
@@ -153,36 +149,9 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 		return nil, err
 	}
 	if revision == 0 && len(sources) == 0 {
-		roots, err := history.DefaultRoots()
-		if err != nil {
-			service.Close()
-			return nil, err
+		for _, provider := range []domain.Provider{domain.Codex, domain.Claude, domain.Grok, domain.OpenCode, domain.Antigravity, domain.Cursor} {
+			sources = append(sources, preferences.Source{Id: string(provider) + "-auto", Provider: provider, IsEnabled: true, IsAutomatic: true})
 		}
-		for _, root := range roots {
-			sources = append(sources, preferences.Source{Id: string(root.Provider) + "-default", Provider: root.Provider, Root: root.Home, IsEnabled: true})
-		}
-		openRoots, err := opencode.DiscoverRoots(service.Home)
-		if err != nil {
-			service.Close()
-			return nil, err
-		}
-		for _, root := range openRoots {
-			sources = append(sources, preferences.Source{Id: "opencode-" + smallIdentity(root), Provider: domain.OpenCode, Root: root, IsEnabled: true})
-		}
-		gravityRoots, err := antigravity.DiscoverRoots(service.Home, nil)
-		if err != nil {
-			service.Close()
-			return nil, err
-		}
-		for _, root := range gravityRoots {
-			sources = append(sources, preferences.Source{Id: "antigravity-" + smallIdentity(root), Provider: domain.Antigravity, Root: root, IsEnabled: true})
-		}
-		credentials := cursor.DiscoverCredentials(service.Platform, service.Home, service.Environment, false)
-		root := credentials.Path
-		if root == "" {
-			root = filepath.Join(service.Home, ".cursor", "auth.json")
-		}
-		sources = append(sources, preferences.Source{Id: "cursor-default", Provider: domain.Cursor, Root: root, IsEnabled: true})
 		if _, err = service.Preferences.SaveSources(ctx, sources, revision); err != nil {
 			service.Close()
 			return nil, err
@@ -245,7 +214,7 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		if provider.Id == "" || len(provider.Id) > 96 || len(provider.Label) > 128 || len(provider.Home) > 4096 || (provider.Home != "" && !filepath.IsAbs(provider.Home)) || seen[provider.Id] || (provider.Driver != "codex" && provider.Driver != "claudeAgent" && provider.Driver != "cursor" && provider.Driver != "grok" && provider.Driver != "opencode" && provider.Driver != "antigravity") {
 			return saved, errors.New("invalid provider target")
 		}
-		if (provider.Driver == "codex" || provider.Driver == "claudeAgent") && !filepath.IsAbs(provider.Executable) {
+		if (provider.Driver == "codex" || provider.Driver == "claudeAgent") && provider.Executable != "" && !filepath.IsAbs(provider.Executable) {
 			return saved, errors.New("select an absolute native executable path")
 		}
 		seen[provider.Id] = true

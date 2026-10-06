@@ -10,6 +10,9 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as accounting$0 from "../accounting/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as domain$0 from "../domain/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as quota$0 from "../quota/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -193,6 +196,46 @@ export class NativeProvider {
     static createFrom($$source: any = {}): NativeProvider {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new NativeProvider($$parsedSource as Partial<NativeProvider>);
+    }
+}
+
+/**
+ * ProviderDetection separates filesystem availability from account authorization.
+ */
+export class ProviderDetection {
+    "driver": string;
+    "provider": domain$0.Provider;
+    "isInstalled": boolean;
+    "hasHistory": boolean;
+    "message": string;
+
+    /** Creates a new ProviderDetection instance. */
+    constructor($$source: Partial<ProviderDetection> = {}) {
+        if (!("driver" in $$source)) {
+            this["driver"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = domain$0.Provider.$zero;
+        }
+        if (!("isInstalled" in $$source)) {
+            this["isInstalled"] = false;
+        }
+        if (!("hasHistory" in $$source)) {
+            this["hasHistory"] = false;
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProviderDetection instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProviderDetection {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProviderDetection($$parsedSource as Partial<ProviderDetection>);
     }
 }
 

@@ -200,7 +200,12 @@ type SavedSources struct {
 	Value    []preferences.Source `json:"value"`
 }
 
-// GetSources returns editable configured roots; quota enablement is independent.
+// DetectProviders checks registered installation locations without executing account probes.
+func (service *App) DetectProviders() ([]dataservice.ProviderDetection, error) {
+	return service.usage.DetectProviders(service.context)
+}
+
+// GetSources returns saved source choices independently of quota enablement.
 func (service *App) GetSources() (SavedSources, error) {
 	value, revision, err := service.usage.Sources(service.context)
 	return SavedSources{revision, value}, err

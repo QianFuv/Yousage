@@ -7,7 +7,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 	"yousage/internal/preferences"
@@ -168,34 +167,6 @@ func (service *App) CopyText(value string) error {
 		return errors.New("clipboard is unavailable")
 	}
 	return nil
-}
-
-// PickSourcePath returns an explicitly selected path without inspecting account contents.
-func (service *App) PickSourcePath(kind string) (string, error) {
-	if kind != "directory" && kind != "executable" && kind != "file" {
-		return "", errors.New("invalid selection kind")
-	}
-	dialog := service.nativeApp.Dialog.OpenFile().SetTitle("Choose " + kind).AttachToWindow(service.window).CanChooseFiles(kind != "directory").CanChooseDirectories(kind == "directory")
-	if kind == "executable" && runtime.GOOS == "windows" {
-		dialog.AddFilter("Native executable", "*.exe")
-	}
-	path, err := dialog.PromptForSingleSelection()
-	if err != nil && err.Error() == "cancelled by user" {
-		return "", nil
-	}
-	if err != nil || path == "" {
-		return path, err
-	}
-	if !filepath.IsAbs(path) {
-		return "", errors.New("select an absolute path")
-	}
-	if kind == "executable" {
-		info, err := os.Stat(path)
-		if err != nil || !info.Mode().IsRegular() || (runtime.GOOS == "windows" && filepath.Ext(path) != ".exe") {
-			return "", errors.New("select a native executable")
-		}
-	}
-	return path, nil
 }
 
 // StageHubCredential stores a fresh native reference; the frontend never reads a saved key.

@@ -125,6 +125,7 @@ export class Source {
     "provider": domain$0.Provider;
     "root": string;
     "isEnabled": boolean;
+    "isAutomatic": boolean;
 
     /** Creates a new Source instance. */
     constructor($$source: Partial<Source> = {}) {
@@ -139,6 +140,9 @@ export class Source {
         }
         if (!("isEnabled" in $$source)) {
             this["isEnabled"] = false;
+        }
+        if (!("isAutomatic" in $$source)) {
+            this["isAutomatic"] = false;
         }
 
         Object.assign(this, $$source);

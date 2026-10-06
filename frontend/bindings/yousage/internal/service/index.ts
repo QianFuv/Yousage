@@ -6,6 +6,7 @@ export {
     ConnectionPreference,
     EnvironmentState,
     NativeProvider,
+    ProviderDetection,
     SavedConfiguration,
     Snapshot
 } from "./models.js";

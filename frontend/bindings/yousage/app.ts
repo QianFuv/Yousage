@@ -66,6 +66,15 @@ export function CopyText(value: string): $CancellablePromise<void> {
 }
 
 /**
+ * DetectProviders checks registered installation locations without executing account probes.
+ */
+export function DetectProviders(): $CancellablePromise<service$0.ProviderDetection[]> {
+    return $Call.ByID(2564077708).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+/**
  * DiscardDraftCredentials can delete only unsaved references created by this session.
  */
 export function DiscardDraftCredentials(identities: string[]): $CancellablePromise<void> {
@@ -114,7 +123,7 @@ export function FrontendReady(): $CancellablePromise<void> {
  */
 export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(3469612837).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -123,7 +132,7 @@ export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
     return $Call.ByID(2483192963).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -132,7 +141,7 @@ export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
  */
 export function GetConfiguration(): $CancellablePromise<service$0.SavedConfiguration> {
     return $Call.ByID(1089004527).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -148,7 +157,7 @@ export function GetDiagnostics(): $CancellablePromise<string> {
  */
 export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
     return $Call.ByID(2885542999).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType8($result);
     });
 }
 
@@ -160,11 +169,11 @@ export function GetLocalEnvironmentId(): $CancellablePromise<string> {
 }
 
 /**
- * GetSources returns editable configured roots; quota enablement is independent.
+ * GetSources returns saved source choices independently of quota enablement.
  */
 export function GetSources(): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(3791071355).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
@@ -173,7 +182,7 @@ export function GetSources(): $CancellablePromise<$models.SavedSources> {
  */
 export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
     return $Call.ByID(2234764926, days, timeZone).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType10($result);
     });
 }
 
@@ -196,7 +205,7 @@ export function OpenExternal(destination: string): $CancellablePromise<void> {
  */
 export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
     return $Call.ByID(1066918238, origin, label, bootstrap, isReadOnly).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     });
 }
 
@@ -205,15 +214,8 @@ export function PairEnvironment(origin: string, label: string, bootstrap: string
  */
 export function PickFixtureFiles(): $CancellablePromise<string[]> {
     return $Call.ByID(577210012).then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     });
-}
-
-/**
- * PickSourcePath returns an explicitly selected path without inspecting account contents.
- */
-export function PickSourcePath(kind: string): $CancellablePromise<string> {
-    return $Call.ByID(2023028566, kind);
 }
 
 /**
@@ -221,7 +223,7 @@ export function PickSourcePath(kind: string): $CancellablePromise<string> {
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(1388571440).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType14($result);
     });
 }
 
@@ -230,7 +232,7 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3002950989, paths).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType14($result);
     });
 }
 
@@ -260,7 +262,7 @@ export function RefreshUsage(days: number, timeZone: string, selected: string[],
  */
 export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(2592400194, revision, value).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -269,7 +271,7 @@ export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $
  */
 export function SaveConfiguration(saved: service$0.SavedConfiguration): $CancellablePromise<service$0.SavedConfiguration> {
     return $Call.ByID(2212158658, saved).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -278,7 +280,7 @@ export function SaveConfiguration(saved: service$0.SavedConfiguration): $Cancell
  */
 export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellablePromise<preferences$0.SavedDisplay> {
     return $Call.ByID(920552350, saved).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType8($result);
     });
 }
 
@@ -287,7 +289,7 @@ export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellableProm
  */
 export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(23962130, saved).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
@@ -316,13 +318,15 @@ export function SyncAppearance(isDark: boolean, red: number, green: number, blue
 const $$createType0 = remote$0.SaveOutcome.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = quota$0.ResetResult.createFrom;
-const $$createType3 = theme$0.LibrarySnapshot.createFrom;
-const $$createType4 = $models.Bootstrap.createFrom;
-const $$createType5 = service$0.SavedConfiguration.createFrom;
-const $$createType6 = preferences$0.SavedDisplay.createFrom;
-const $$createType7 = $models.SavedSources.createFrom;
-const $$createType8 = service$0.Snapshot.createFrom;
-const $$createType9 = service$0.ConnectionPreference.createFrom;
-const $$createType10 = $Create.Array($Create.Any);
-const $$createType11 = $models.ThemeFileInput.createFrom;
-const $$createType12 = $Create.Array($$createType11);
+const $$createType3 = service$0.ProviderDetection.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = theme$0.LibrarySnapshot.createFrom;
+const $$createType6 = $models.Bootstrap.createFrom;
+const $$createType7 = service$0.SavedConfiguration.createFrom;
+const $$createType8 = preferences$0.SavedDisplay.createFrom;
+const $$createType9 = $models.SavedSources.createFrom;
+const $$createType10 = service$0.Snapshot.createFrom;
+const $$createType11 = service$0.ConnectionPreference.createFrom;
+const $$createType12 = $Create.Array($Create.Any);
+const $$createType13 = $models.ThemeFileInput.createFrom;
+const $$createType14 = $Create.Array($$createType13);

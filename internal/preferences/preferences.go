@@ -32,10 +32,11 @@ type Display struct {
 }
 
 type Source struct {
-	Id        string          `json:"id"`
-	Provider  domain.Provider `json:"provider"`
-	Root      string          `json:"root"`
-	IsEnabled bool            `json:"isEnabled"`
+	Id          string          `json:"id"`
+	Provider    domain.Provider `json:"provider"`
+	Root        string          `json:"root"`
+	IsEnabled   bool            `json:"isEnabled"`
+	IsAutomatic bool            `json:"isAutomatic"`
 }
 type Pricing struct {
 	Overrides map[string]domain.PriceOverride `json:"overrides"`
@@ -184,7 +185,7 @@ func (service *Service) SaveSources(ctx context.Context, sources []Source, revis
 	}
 	seen := map[string]bool{}
 	for _, source := range sources {
-		if source.Id == "" || len(source.Id) > 96 || len(source.Root) > 4096 || seen[source.Id] || !source.Provider.Valid() || strings.TrimSpace(source.Root) == "" {
+		if source.Id == "" || len(source.Id) > 96 || len(source.Root) > 4096 || seen[source.Id] || !source.Provider.Valid() || (!source.IsAutomatic && strings.TrimSpace(source.Root) == "") {
 			return revision, errors.New("invalid or duplicate source")
 		}
 		seen[source.Id] = true
