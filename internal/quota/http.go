@@ -25,6 +25,7 @@ type HttpOptions struct {
 	KeychainToken     func(context.Context) (string, error)
 	IsKeychainAllowed bool
 	CursorEndpoint    string
+	ClaudeEndpoint    string
 	OpenCodeServerUrl string
 	IsEnabled         bool
 }

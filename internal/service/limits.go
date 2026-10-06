@@ -201,6 +201,9 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					account = quota.ProbeCodex(ctx, options)
 				case "claudeAgent":
 					account = quota.ProbeClaude(ctx, claudeprobe.Options{Executable: service.resolveExecutable(target.Driver, target.Executable), Environment: options.Process.Environment, ConfigDirectory: target.Home}, true)
+					if account.Limits.Unavailable != nil {
+						account.Limits = quota.PreferClaudeLogin(account.Limits, quota.ReadClaudeLogin(ctx, httpOptions, target.Home))
+					}
 				case "cursor":
 					account.Limits = quota.ReadCursor(ctx, httpOptions)
 				case "grok":
