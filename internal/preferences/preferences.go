@@ -29,6 +29,7 @@ type Display struct {
 	ShouldRestoreWindow bool    `json:"shouldRestoreWindow"`
 	TimestampFormat     string  `json:"timestampFormat"`
 	Breakdown           string  `json:"breakdown"`
+	Language            string  `json:"language"`
 }
 
 type Source struct {
@@ -58,7 +59,7 @@ type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }
 func Defaults() Display {
-	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, TimestampFormat: "locale", Breakdown: "model"}
+	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, TimestampFormat: "locale", Breakdown: "model", Language: "system"}
 }
 
 func (display Display) Validate() error {
@@ -70,6 +71,9 @@ func (display Display) Validate() error {
 	}
 	if display.TimestampFormat != "locale" && display.TimestampFormat != "24h" && display.TimestampFormat != "12h" {
 		return errors.New("invalid timestamp format")
+	}
+	if display.Language != "system" && display.Language != "zh-CN" && display.Language != "en" {
+		return errors.New("invalid language")
 	}
 	if display.Breakdown != "model" && display.Breakdown != "time" {
 		return errors.New("invalid breakdown")
@@ -91,6 +95,9 @@ func (service *Service) Display(ctx context.Context) (SavedDisplay, error) {
 	}
 	if saved.Value.Zoom > 0 && saved.Value.Zoom < 1 {
 		saved.Value.Zoom = 1
+	}
+	if saved.Value.Language == "" {
+		saved.Value.Language = "system"
 	}
 	return saved, saved.Value.Validate()
 }

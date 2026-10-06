@@ -18,6 +18,7 @@ export class Display {
     "shouldRestoreWindow": boolean;
     "timestampFormat": string;
     "breakdown": string;
+    "language": string;
 
     /** Creates a new Display instance. */
     constructor($$source: Partial<Display> = {}) {
@@ -44,6 +45,9 @@ export class Display {
         }
         if (!("breakdown" in $$source)) {
             this["breakdown"] = "";
+        }
+        if (!("language" in $$source)) {
+            this["language"] = "";
         }
 
         Object.assign(this, $$source);

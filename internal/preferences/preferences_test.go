@@ -106,8 +106,31 @@ func TestLegacyDisplayKeepsNewDefaultsAndNormalizesNativeScale(test *testing.T) 
 		test.Fatal(err)
 	}
 	saved, err := New(store).Display(ctx)
-	if err != nil || saved.Value.Zoom != 1 || !saved.Value.ShouldRestoreWindow || saved.Value.TimestampFormat != "locale" || saved.Value.Breakdown != "model" || saved.Value.ShouldAutoRefresh || saved.Value.Metric != "tokens" {
+	if err != nil || saved.Value.Zoom != 1 || !saved.Value.ShouldRestoreWindow || saved.Value.TimestampFormat != "locale" || saved.Value.Breakdown != "model" || saved.Value.ShouldAutoRefresh || saved.Value.Metric != "tokens" || saved.Value.Language != "system" {
 		test.Fatal("legacy display overwrote independent defaults", saved, err)
+	}
+}
+
+func TestDisplayLanguageIsValidated(test *testing.T) {
+	store, err := storage.Open(filepath.Join(test.TempDir(), "language.sqlite"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	service := New(store)
+	display := Defaults()
+	display.Language = "zh-CN"
+	saved, err := service.SaveDisplay(ctx, SavedDisplay{Value: display})
+	if err != nil {
+		test.Fatal(err)
+	}
+	if read, err := service.Display(ctx); err != nil || read.Value.Language != "zh-CN" {
+		test.Fatal("explicit language was not retained", read, err)
+	}
+	saved.Value.Language = "fr"
+	if _, err := service.SaveDisplay(ctx, saved); err == nil {
+		test.Fatal("unsupported language was saved")
 	}
 }
 
