@@ -292,10 +292,10 @@ export function StageHubCredential(origin: string, value: string): $CancellableP
 }
 
 /**
- * SyncAppearance updates an opaque background and the existing native frame.
+ * SyncAppearance updates an opaque background and the native frame caption, which matches the sidebar.
  */
-export function SyncAppearance(isDark: boolean, red: number, green: number, blue: number): $CancellablePromise<void> {
-    return $Call.ByID(757831160, isDark, red, green, blue);
+export function SyncAppearance(isDark: boolean, red: number, green: number, blue: number, captionRed: number, captionGreen: number, captionBlue: number): $CancellablePromise<void> {
+    return $Call.ByID(757831160, isDark, red, green, blue, captionRed, captionGreen, captionBlue);
 }
 
 // Private type creation functions

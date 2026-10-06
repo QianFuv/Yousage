@@ -360,16 +360,18 @@ func hasNativeSmokeArgument() bool {
 	return false
 }
 
-// SyncAppearance updates an opaque background and the existing native frame.
-func (service *App) SyncAppearance(isDark bool, red, green, blue int) error {
+// SyncAppearance updates an opaque background and the native frame caption, which matches the sidebar.
+func (service *App) SyncAppearance(isDark bool, red, green, blue, captionRed, captionGreen, captionBlue int) error {
 	if err := service.context.Err(); err != nil {
 		return err
 	}
-	if red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255 {
-		return errors.New("invalid background color")
+	for _, channel := range []int{red, green, blue, captionRed, captionGreen, captionBlue} {
+		if channel < 0 || channel > 255 {
+			return errors.New("invalid background color")
+		}
 	}
 	service.window.SetBackgroundColour(application.NewRGBA(uint8(red), uint8(green), uint8(blue), 255))
-	if err := setNativeAppearance(service.window, isDark, red, green, blue); err != nil {
+	if err := setNativeAppearance(service.window, isDark, captionRed, captionGreen, captionBlue); err != nil {
 		return err
 	}
 	service.record("appearance")
