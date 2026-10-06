@@ -1,10 +1,19 @@
+import { msg } from "../src/i18n";
 import type { UsageModelPriceOverride } from "@t3tools/contracts";
 
 export const USAGE_PRICE_FIELDS = [
-  { key: "inputCostPerMillionTokens", label: "Input", optional: false },
-  { key: "outputCostPerMillionTokens", label: "Output", optional: false },
-  { key: "cacheReadCostPerMillionTokens", label: "Cache read", optional: true },
-  { key: "cacheWriteCostPerMillionTokens", label: "Cache write", optional: true },
+  { key: "inputCostPerMillionTokens", label: msg("Input"), optional: false },
+  { key: "outputCostPerMillionTokens", label: msg("Output"), optional: false },
+  {
+    key: "cacheReadCostPerMillionTokens",
+    label: msg("Cache read"),
+    optional: true,
+  },
+  {
+    key: "cacheWriteCostPerMillionTokens",
+    label: msg("Cache write"),
+    optional: true,
+  },
 ] as const;
 
 export type UsagePriceForm = { model: string } & Record<
@@ -12,13 +21,20 @@ export type UsagePriceForm = { model: string } & Record<
   string
 >;
 
-export function usagePriceForm(model = "", price?: UsageModelPriceOverride): UsagePriceForm {
+export function usagePriceForm(
+  model = "",
+  price?: UsageModelPriceOverride,
+): UsagePriceForm {
   return {
     model,
-    inputCostPerMillionTokens: price?.inputCostPerMillionTokens.toString() ?? "",
-    outputCostPerMillionTokens: price?.outputCostPerMillionTokens.toString() ?? "",
-    cacheReadCostPerMillionTokens: price?.cacheReadCostPerMillionTokens?.toString() ?? "",
-    cacheWriteCostPerMillionTokens: price?.cacheWriteCostPerMillionTokens?.toString() ?? "",
+    inputCostPerMillionTokens:
+      price?.inputCostPerMillionTokens.toString() ?? "",
+    outputCostPerMillionTokens:
+      price?.outputCostPerMillionTokens.toString() ?? "",
+    cacheReadCostPerMillionTokens:
+      price?.cacheReadCostPerMillionTokens?.toString() ?? "",
+    cacheWriteCostPerMillionTokens:
+      price?.cacheWriteCostPerMillionTokens?.toString() ?? "",
   };
 }
 
@@ -28,7 +44,9 @@ export function parseUsagePriceForm(
 ): { model: string; price: UsageModelPriceOverride } | null {
   const model = form.model.trim();
   if (model.length === 0) return null;
-  const rates: Partial<Record<(typeof USAGE_PRICE_FIELDS)[number]["key"], number>> = {};
+  const rates: Partial<
+    Record<(typeof USAGE_PRICE_FIELDS)[number]["key"], number>
+  > = {};
   for (const field of USAGE_PRICE_FIELDS) {
     const raw = form[field.key].trim();
     if (raw === "") {
@@ -53,10 +71,15 @@ export function parseUsagePriceForm(
       outputCostPerMillionTokens: rates.outputCostPerMillionTokens,
       ...(rates.cacheReadCostPerMillionTokens === undefined
         ? {}
-        : { cacheReadCostPerMillionTokens: rates.cacheReadCostPerMillionTokens }),
+        : {
+            cacheReadCostPerMillionTokens: rates.cacheReadCostPerMillionTokens,
+          }),
       ...(rates.cacheWriteCostPerMillionTokens === undefined
         ? {}
-        : { cacheWriteCostPerMillionTokens: rates.cacheWriteCostPerMillionTokens }),
+        : {
+            cacheWriteCostPerMillionTokens:
+              rates.cacheWriteCostPerMillionTokens,
+          }),
     },
   };
 }

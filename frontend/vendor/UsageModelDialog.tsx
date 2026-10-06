@@ -1,8 +1,19 @@
-import { formatPercent, formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
-import { isModelCostUnknown, type ModelTotals } from "@t3tools/shared/usageMerge";
+import {
+  formatPercent,
+  formatTokens,
+  formatUsd,
+} from "@t3tools/shared/usageFormat";
+import {
+  isModelCostUnknown,
+  type ModelTotals,
+} from "@t3tools/shared/usageMerge";
 import { useMemo } from "react";
+import { t } from "../src/i18n";
 
-import { mergeAnsweredUsage, type EnvironmentUsageStatus } from "../src/usage/data";
+import {
+  mergeAnsweredUsage,
+  type EnvironmentUsageStatus,
+} from "../src/usage/data";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
@@ -14,7 +25,10 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../../tools/parity/upstream/apps/web/src/components/ui/dialog";
-import { UsageProviderChart, type UsageChartMetric } from "./UsageProviderChart";
+import {
+  UsageProviderChart,
+  type UsageChartMetric,
+} from "./UsageProviderChart";
 import { UsageShareBar } from "./UsageShareBar";
 import {
   cacheHitRate,
@@ -57,8 +71,23 @@ export function UsageModelDialog({
     () =>
       mergeAnsweredUsage(
         environments,
-        (bucket) => bucket.provider === model.provider && bucket.model === model.model,
+        (bucket) =>
+          bucket.provider === model.provider && bucket.model === model.model,
       ),
+    [environments, model.provider, model.model],
+  );
+  const comparisons = useMemo(
+    () =>
+      environments.map((environment) => ({
+        id: environment.environmentId,
+        label: environment.label,
+        hasSummary: environment.summary !== null,
+        usage: mergeAnsweredUsage(
+          [environment],
+          (bucket) =>
+            bucket.provider === model.provider && bucket.model === model.model,
+        ),
+      })),
     [environments, model.provider, model.model],
   );
   const providers = useMemo(() => [model.provider], [model.provider]);
@@ -67,10 +96,17 @@ export function UsageModelDialog({
   const hitRate = cacheHitRate(model);
   const perMillion = costPerMillionTokens(model);
   const stats = [
-    { label: "Cost", value: costUnknown ? "Unpriced" : formatUsd(model.costUsd) },
-    { label: "Tokens", value: formatTokens(model.totalTokens) },
-    perMillion === null ? null : { label: "Per 1M tokens", value: formatUsd(perMillion) },
-    hitRate === null ? null : { label: "Cache hit", value: formatPercent(hitRate) },
+    {
+      label: t("Cost"),
+      value: costUnknown ? t("Unpriced") : formatUsd(model.costUsd),
+    },
+    { label: t("Tokens"), value: formatTokens(model.totalTokens) },
+    perMillion === null
+      ? null
+      : { label: t("Per 1M tokens"), value: formatUsd(perMillion) },
+    hitRate === null
+      ? null
+      : { label: t("Cache hit"), value: formatPercent(hitRate) },
   ].filter((stat) => stat !== null);
 
   return (
@@ -92,7 +128,9 @@ export function UsageModelDialog({
           </div>
           <DialogDescription>
             {presentation.label}
-            {costUnknown ? "" : ` · ${formatPercent(model.costShare)} of cost`}
+            {costUnknown
+              ? ""
+              : ` · ${t("{share} of cost", { share: formatPercent(model.costShare) })}`}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -100,8 +138,12 @@ export function UsageModelDialog({
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
               {stats.map((stat) => (
                 <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-xs text-muted-foreground">{stat.label}</span>
-                  <span className="text-2xl font-semibold text-foreground">{stat.value}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {stat.label}
+                  </span>
+                  <span className="text-2xl font-semibold text-foreground">
+                    {stat.value}
+                  </span>
                 </div>
               ))}
             </div>
@@ -119,22 +161,69 @@ export function UsageModelDialog({
               timeZone={chartWindow.timeZone}
             />
 
+            <section className="model-environment-comparison">
+              <h3 className="text-sm font-medium">
+                {t("Environment comparison")}
+              </h3>
+              <div className="usage-table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("Environment")}</th>
+                      <th>{t("Cost")}</th>
+                      <th>{t("Tokens")}</th>
+                      <th>{t("Cached input")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisons.map((row) => (
+                      <tr key={row.id}>
+                        <td>{t(row.label)}</td>
+                        <td>
+                          {!row.hasSummary
+                            ? t("Unavailable")
+                            : row.usage.costQuality.unpricedShare > 0 &&
+                                row.usage.costUsd === 0
+                              ? t("Unpriced")
+                              : formatUsd(row.usage.costUsd)}
+                        </td>
+                        <td>
+                          {row.hasSummary
+                            ? formatTokens(row.usage.totalTokens)
+                            : "—"}
+                        </td>
+                        <td>
+                          {row.hasSummary
+                            ? formatTokens(row.usage.cachedInputTokens)
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {comparisons.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {t("Environment values can overlap when they share history.")}
+                </p>
+              )}
+            </section>
             <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
               {costUnknown ? null : (
                 <UsageShareBar
-                  label="Cost by type"
+                  label={t("Cost by type")}
                   segments={costTypeSegments(usage.categoryCost)}
                   format={formatUsd}
                 />
               )}
               <UsageShareBar
-                label="Tokens by type"
+                label={t("Tokens by type")}
                 segments={tokenTypeSegments(model.tokens)}
                 format={formatTokens}
               />
               {usage.speedCost.fast + usage.speedCost.ultrafast > 0 ? (
                 <UsageShareBar
-                  label="Cost by speed"
+                  label={t("Cost by speed")}
                   segments={speedCostSegments(usage.speedCost)}
                   format={formatUsd}
                   aside={<SpeedPremium premiumUsd={usage.speedCost.premium} />}
@@ -144,11 +233,16 @@ export function UsageModelDialog({
           </div>
         </DialogPanel>
         {model.unpricedTokens > 0 ? (
-          <DialogFooter variant="bare" className="items-center sm:justify-between">
+          <DialogFooter
+            variant="bare"
+            className="items-center sm:justify-between"
+          >
             <span className="text-xs text-muted-foreground">
-              {formatTokens(model.unpricedTokens)} tokens have no known price
+              {t("{tokens} tokens have no known price", {
+                tokens: formatTokens(model.unpricedTokens),
+              })}
             </span>
-            <Button onClick={onSetPrice}>Set price</Button>
+            <Button onClick={onSetPrice}>{t("Set price")}</Button>
           </DialogFooter>
         ) : null}
       </DialogPopup>
@@ -160,7 +254,10 @@ export function UsageModelDialog({
 export function SpeedPremium({ premiumUsd }: { readonly premiumUsd: number }) {
   return (
     <span className="text-xs text-muted-foreground">
-      Premium <span className="text-foreground tabular-nums">{formatUsd(premiumUsd)}</span>
+      {t("Premium")}{" "}
+      <span className="text-foreground tabular-nums">
+        {formatUsd(premiumUsd)}
+      </span>
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import { msg, t, useI18n } from "../src/i18n";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   isThemeColor,
@@ -24,26 +25,28 @@ import {
 } from "../../tools/parity/upstream/apps/web/src/components/ui/tooltip";
 export function getThemeRoleLabel(role: ThemeColorRole): string {
   const labels: Partial<Record<ThemeColorRole, string>> = {
-    canvas: "Background",
-    toolbar: "Toolbar background",
-    toolbarForeground: "Toolbar text",
-    toolbarBorder: "Toolbar border",
-    toolbarControl: "Toolbar control",
-    toolbarControlForeground: "Toolbar control text",
-    toolbarControlHover: "Toolbar control hover",
-    accent: "Accent color",
-    errorForeground: "Error text",
-    errorSurface: "Error background",
-    warningForeground: "Warning text",
-    warningSurface: "Warning background",
-    updateForeground: "Update text",
-    updateSurface: "Update background",
+    canvas: msg("Background"),
+    toolbar: msg("Toolbar background"),
+    toolbarForeground: msg("Toolbar text"),
+    toolbarBorder: msg("Toolbar border"),
+    toolbarControl: msg("Toolbar control"),
+    toolbarControlForeground: msg("Toolbar control text"),
+    toolbarControlHover: msg("Toolbar control hover"),
+    accent: msg("Accent color"),
+    errorForeground: msg("Error text"),
+    errorSurface: msg("Error background"),
+    warningForeground: msg("Warning text"),
+    warningSurface: msg("Warning background"),
+    updateForeground: msg("Update text"),
+    updateSurface: msg("Update background"),
   };
   const label = labels[role];
-  if (label) return label;
-  return role
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (character) => character.toUpperCase());
+  if (label) return t(label);
+  return t(
+    role
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (character) => character.toUpperCase()),
+  );
 }
 
 /**
@@ -226,7 +229,7 @@ function ThemeColorPickerPanel({
                 style={{ backgroundColor: currentColor }}
               />
               <input
-                aria-label={`${label} picker hex value`}
+                aria-label={t("{label} picker hex value", { label })}
                 className="h-8 min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none"
                 onBlur={() => {
                   isEditingTextRef.current = false;
@@ -248,7 +251,7 @@ function ThemeColorPickerPanel({
             </span>
             <span className="flex min-w-0 items-center rounded-lg border border-input bg-background px-2 focus-within:border-ring">
               <input
-                aria-label={`${label} picker RGB value`}
+                aria-label={t("{label} picker RGB value", { label })}
                 className="h-8 min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none"
                 onBlur={() => {
                   isEditingTextRef.current = false;
@@ -289,7 +292,7 @@ function ThemeColorPicker({
             <PopoverTrigger
               render={
                 <button
-                  aria-label={`Choose ${label} color`}
+                  aria-label={t("Choose {label} color", { label })}
                   className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-foreground/30 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onFocus={onInteract}
                   onPointerDown={onInteract}
@@ -340,6 +343,7 @@ export const ThemeColorField = memo(function ThemeColorField({
   selected?: boolean;
   label?: string;
 }) {
+  useI18n();
   const label = customLabel ?? getThemeRoleLabel(role);
   const isColorValue = isThemeColor(value);
   const swatchValue = isColorValue ? value : "#000000";
@@ -359,7 +363,11 @@ export const ThemeColorField = memo(function ThemeColorField({
         <TooltipTrigger
           render={
             <button
-              aria-label={`${selected ? "Hide" : "Show"} ${label} usage`}
+              aria-label={
+                selected
+                  ? t("Hide {label} usage", { label })
+                  : t("Show {label} usage", { label })
+              }
               aria-pressed={selected}
               className="flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => onToggleSelected?.(role)}
@@ -369,7 +377,11 @@ export const ThemeColorField = memo(function ThemeColorField({
             </button>
           }
         />
-        <TooltipPopup side="top">{`${selected ? "Hide" : "Show"} where ${label} is used`}</TooltipPopup>
+        <TooltipPopup side="top">
+          {selected
+            ? t("Hide where {label} is used", { label })
+            : t("Show where {label} is used", { label })}
+        </TooltipPopup>
       </Tooltip>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <ThemeColorPicker
@@ -380,7 +392,7 @@ export const ThemeColorField = memo(function ThemeColorField({
         />
         <Input
           aria-invalid={!isColorValue}
-          aria-label={`${label} hex value`}
+          aria-label={t("{label} hex value", { label })}
           className="w-28 shrink-0"
           font="mono"
           id={`${role}-hex`}

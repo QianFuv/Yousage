@@ -15,7 +15,10 @@ import { Request } from "../../bindings/yousage/internal/refresh/models";
 import type { UsageSnapshot } from "./data";
 
 type DataContextValue = {
-  setUsageActive: (isActive: boolean) => void;
+  setUsageActive: (
+    isActive: boolean,
+    metric: "cost" | "tokens" | "limits",
+  ) => void;
   snapshot: UsageSnapshot | null;
   display: SavedDisplay;
   selected: Set<string> | null;
@@ -53,9 +56,14 @@ export function DataProvider({
   const isRefreshing = useRef(false);
   const isUsageActive = useRef(true);
   const isNativeVisible = useRef(false);
-  const setUsageActive = useCallback((isActive: boolean) => {
-    isUsageActive.current = isActive;
-  }, []);
+  const usageMetric = useRef<"cost" | "tokens" | "limits">("limits");
+  const setUsageActive = useCallback(
+    (isActive: boolean, metric: "cost" | "tokens" | "limits") => {
+      isUsageActive.current = isActive;
+      if (isActive) usageMetric.current = metric;
+    },
+    [],
+  );
   const sequence = useRef(0);
   const pendingRefresh = useRef<null | {
     isManual: boolean;
@@ -65,19 +73,33 @@ export function DataProvider({
   const currentRefresh = useRef<DataContextValue["refresh"]>(async () => {});
   const queue = useRef(Promise.resolve());
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  /** Read cached aggregates without invoking probes or history network requests. */
-  const reload = useCallback(async () => {
-    const identity = ++sequence.current;
-    try {
-      const value = await nativeApi.GetUsage(
-        displayRef.current.value.windowDays,
-        zone,
-      );
-      if (identity === sequence.current)
-        setSnapshot(value as unknown as UsageSnapshot);
-    } catch (cause) {
-      if (identity === sequence.current) setError(String(cause));
-    }
+  const reloadFlight = useRef<Promise<void> | null>(null);
+  const shouldReload = useRef(false);
+  /** Serialize invalidations and read the latest window after changes during a pending read. */
+  const reload = useCallback(() => {
+    shouldReload.current = true;
+    if (reloadFlight.current) return reloadFlight.current;
+    const operation = (async () => {
+      while (shouldReload.current) {
+        shouldReload.current = false;
+        const identity = ++sequence.current;
+        const days = displayRef.current.value.windowDays;
+        try {
+          const value = await nativeApi.GetUsage(days, zone);
+          if (
+            identity === sequence.current &&
+            days === displayRef.current.value.windowDays
+          )
+            setSnapshot(value as unknown as UsageSnapshot);
+        } catch (cause) {
+          if (identity === sequence.current) setError(String(cause));
+        }
+      }
+    })().finally(() => {
+      reloadFlight.current = null;
+    });
+    reloadFlight.current = operation;
+    return operation;
   }, [zone]);
   useEffect(() => {
     void reload();
@@ -91,6 +113,7 @@ export function DataProvider({
       dispose();
       disposeVisibility();
       sequence.current++;
+      shouldReload.current = false;
     };
   }, [reload, display.value.windowDays]);
   /** Serialize ordinary preferences using the latest acknowledged revision. */
@@ -157,7 +180,7 @@ export function DataProvider({
         AfterPending: afterPending,
       });
       try {
-        if (displayRef.current.value.metric === "limits")
+        if (usageMetric.current === "limits")
           await nativeApi.RefreshLimits(targets, request);
         else
           await nativeApi.RefreshUsage(

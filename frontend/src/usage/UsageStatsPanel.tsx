@@ -1,12 +1,11 @@
 /** Complete controlled statistics content using the pinned chart, mixes and model-detail algorithms. */
 import { useData } from "./controller";
-import * as nativeApi from "../../bindings/yousage/app";
+import { formatDayShort, formatHourShort, msg, t } from "../i18n";
 import { useState } from "react";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, ChevronRightIcon } from "lucide-react";
+import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
   formatCount,
-  formatDayShort,
-  formatHourShort,
   formatPercent,
   formatTokens,
   formatUsd,
@@ -84,15 +83,18 @@ export function UsageStatsPanel({
   environments,
   chartWindow,
   metric,
+  hasChatGptSharing,
+  onManageChatGpt,
   onSetPrice,
 }: {
+  hasChatGptSharing: boolean;
+  onManageChatGpt: () => void;
   merged: MergedUsage;
   environments: readonly EnvironmentUsageStatus[];
   chartWindow: UsageChartWindow;
   metric: "cost" | "tokens";
   onSetPrice: (model?: string) => void;
 }) {
-  const [copyStatus, setCopyStatus] = useState("");
   const data = useData();
   const breakdown = data.display.value.breakdown;
   const setBreakdown = (value: "model" | "time") =>
@@ -117,56 +119,42 @@ export function UsageStatsPanel({
     (model) => `${model.provider}:${model.model}` === selectedModelKey,
   );
   return (
-    <div className="usage-statistics flex flex-col gap-8">
-      <button
-        className="exact-copy"
-        onClick={() =>
-          void nativeApi
-            .CopyText(
-              JSON.stringify(
-                {
-                  costUsd: merged.costUsd,
-                  totalTokens: merged.totalTokens,
-                  sessions: merged.sessions,
-                },
-                null,
-                2,
-              ),
-            )
-            .then(() => setCopyStatus("Exact values copied."))
-            .catch((cause) => setCopyStatus(String(cause)))
-        }
-      >
-        Copy exact values
-      </button>
-      {copyStatus && <output role="status">{copyStatus}</output>}
+    <div className="usage-statistics flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <span className="text-3xl font-medium text-foreground tabular-nums">
+            <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
               {metric === "cost"
                 ? formatUsd(merged.costUsd)
                 : formatTokens(merged.totalTokens)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {formatCount(merged.sessions)} sessions
+              {t(
+                merged.sessions === 1
+                  ? msg("{count} session")
+                  : msg("{count} sessions"),
+                {
+                  count: formatCount(merged.sessions),
+                },
+              )}
               {metric === "cost" && (
                 <>
-                  {" "}
-                  · API estimate
+                  {` · ${t("API estimate")}`}
                   {merged.costQuality.unpricedShare > 0 && (
                     <Popover>
                       <PopoverTrigger
                         openOnHover
                         render={<InlineButton tone="muted" />}
-                        aria-label="Unpriced usage details"
+                        aria-label={t("Unpriced usage details")}
                       >
                         <InfoIcon className="size-3" aria-hidden />
                       </PopoverTrigger>
                       <PopoverPopup side="top" tooltipStyle>
-                        API estimate excludes{" "}
-                        {formatPercent(merged.costQuality.unpricedShare)}{" "}
-                        unpriced records.
+                        {t("API estimate excludes {share} unpriced records.", {
+                          share: formatPercent(
+                            merged.costQuality.unpricedShare,
+                          ),
+                        })}
                       </PopoverPopup>
                     </Popover>
                   )}
@@ -174,6 +162,14 @@ export function UsageStatsPanel({
               )}
             </span>
           </div>
+          {hasChatGptSharing && (
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{t("ChatGPT shared usage")}</span>
+              <Button size="xs" variant="outline" onClick={onManageChatGpt}>
+                {t("Manage usage")}
+              </Button>
+            </div>
+          )}
           {activeProviders.map((provider) => {
             const totals = merged.providers.find(
               (value) => value.provider === provider,
@@ -195,8 +191,12 @@ export function UsageStatsPanel({
                     <span className="flex min-w-0 flex-wrap items-baseline gap-1.5">
                       <span>{PROVIDER_PRESENTATION[provider].label}</span>
                       <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
-                        {formatCount(totals.sessions)}{" "}
-                        {totals.sessions === 1 ? "session" : "sessions"}
+                        {t(
+                          totals.sessions === 1
+                            ? msg("{count} session")
+                            : msg("{count} sessions"),
+                          { count: formatCount(totals.sessions) },
+                        )}
                       </span>
                     </span>
                   </span>
@@ -208,8 +208,14 @@ export function UsageStatsPanel({
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {metric === "cost"
-                    ? `${formatPercent(share)} of cost · ${formatTokens(totals.totalTokens)} tokens`
-                    : `${formatPercent(share)} of tokens · ${formatUsd(totals.costUsd)}`}
+                    ? t("{share} of cost · {tokens} tokens", {
+                        share: formatPercent(share),
+                        tokens: formatTokens(totals.totalTokens),
+                      })
+                    : t("{share} of tokens · {cost}", {
+                        share: formatPercent(share),
+                        cost: formatUsd(totals.costUsd),
+                      })}
                 </span>
               </div>
             );
@@ -217,8 +223,13 @@ export function UsageStatsPanel({
         </div>
         <div className="flex min-w-0 flex-col gap-3">
           <h2 className="text-sm font-medium">
-            {isPast24Hours ? "Hourly" : "Daily"}{" "}
-            {metric === "tokens" ? "processed tokens" : "cost"}
+            {isPast24Hours
+              ? metric === "tokens"
+                ? t("Hourly processed tokens")
+                : t("Hourly cost")
+              : metric === "tokens"
+                ? t("Daily processed tokens")
+                : t("Daily cost")}
           </h2>
           <UsageProviderChart
             providers={activeProviders}
@@ -234,23 +245,26 @@ export function UsageStatsPanel({
         </div>
       </section>
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Totals</h2>
+        <h2 className="text-sm font-medium">{t("Totals")}</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-1 md:grid-cols-5">
           <Metric
-            label="Processed tokens"
+            label={t("Processed tokens")}
             value={formatTokens(merged.totalTokens)}
           />
           <Metric
-            label="Cached input"
+            label={t("Cached input")}
             value={formatTokens(merged.cachedInputTokens)}
           />
           <Metric
-            label="Uncached input"
+            label={t("Uncached input")}
             value={formatTokens(merged.uncachedInputTokens)}
           />
-          <Metric label="Output" value={formatTokens(merged.outputTokens)} />
           <Metric
-            label="Cache savings"
+            label={t("Output")}
+            value={formatTokens(merged.outputTokens)}
+          />
+          <Metric
+            label={t("Cache savings")}
             value={formatUsd(merged.costQuality.cacheSavingsUsd)}
           />
         </div>
@@ -259,20 +273,20 @@ export function UsageStatsPanel({
         <section className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
           {metric === "tokens" ? (
             <UsageShareBar
-              label="Tokens by type"
+              label={t("Tokens by type")}
               segments={tokenTypeSegments(merged)}
               format={formatTokens}
             />
           ) : (
             <>
               <UsageShareBar
-                label="Cost by type"
+                label={t("Cost by type")}
                 segments={costTypeSegments(merged.categoryCost)}
                 format={formatUsd}
               />
               {merged.speedCost.fast + merged.speedCost.ultrafast > 0 && (
                 <UsageShareBar
-                  label="Cost by speed"
+                  label={t("Cost by speed")}
                   segments={speedCostSegments(merged.speedCost)}
                   format={formatUsd}
                   aside={<SpeedPremium premiumUsd={merged.speedCost.premium} />}
@@ -284,9 +298,9 @@ export function UsageStatsPanel({
       )}
       <section className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">Breakdown</h2>
+          <h2 className="text-sm font-medium">{t("Breakdown")}</h2>
           <ToggleGroup
-            aria-label="Usage breakdown"
+            aria-label={t("Usage breakdown")}
             variant="segmented"
             value={[breakdown]}
             onValueChange={(values) => {
@@ -294,26 +308,28 @@ export function UsageStatsPanel({
               if (value === "model" || value === "time") setBreakdown(value);
             }}
           >
-            <Toggle value="model">Model</Toggle>
-            <Toggle value="time">{isPast24Hours ? "Hour" : "Day"}</Toggle>
+            <Toggle value="model">{t("Model")}</Toggle>
+            <Toggle value="time">{isPast24Hours ? t("Hour") : t("Day")}</Toggle>
           </ToggleGroup>
         </div>
         <div
           className="usage-table-scroll"
           tabIndex={0}
-          aria-label="Usage breakdown table"
+          aria-label={t("Usage breakdown table")}
         >
           {breakdown === "model" ? (
-            <table className="w-full text-sm">
+            <table data-breakdown="model" className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-right text-xs text-muted-foreground">
                   <th className="py-2 pr-3 text-left font-normal">#</th>
-                  <th className="w-full py-2 text-left font-normal">Model</th>
-                  <th className="py-2 pl-6 font-normal">Cost</th>
-                  <th className="hidden py-2 pl-6 font-normal sm:table-cell">
-                    Share
+                  <th className="w-full py-2 text-left font-normal">
+                    {t("Model")}
                   </th>
-                  <th className="py-2 pl-6 font-normal">Tokens</th>
+                  <th className="py-2 pl-6 font-normal">{t("Cost")}</th>
+                  <th className="hidden py-2 pl-6 font-normal sm:table-cell">
+                    {t("Share")}
+                  </th>
+                  <th className="py-2 pl-6 font-normal">{t("Tokens")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -323,7 +339,7 @@ export function UsageStatsPanel({
                       colSpan={5}
                       className="py-6 text-center text-muted-foreground"
                     >
-                      No activity in this window.
+                      {t("No activity in this window.")}
                     </td>
                   </tr>
                 ) : (
@@ -334,7 +350,7 @@ export function UsageStatsPanel({
                     return (
                       <tr
                         key={`${model.provider}:${model.model}`}
-                        className="relative border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50"
+                        className="group relative border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50"
                       >
                         <td className="py-2.5 pr-3 text-left text-xs">
                           {index + 1}
@@ -354,18 +370,10 @@ export function UsageStatsPanel({
                               className="size-3.5"
                             />
                             {model.model}
-                          </button>
-                          <button
-                            className="relative z-10 text-xs"
-                            aria-label={`Copy model ${model.model}`}
-                            onClick={() =>
-                              void nativeApi
-                                .CopyText(model.model)
-                                .then(() => setCopyStatus("Model ID copied."))
-                                .catch((cause) => setCopyStatus(String(cause)))
-                            }
-                          >
-                            Copy ID
+                            <ChevronRightIcon
+                              aria-hidden
+                              className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                            />
                           </button>
                           <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
                             <div
@@ -384,7 +392,7 @@ export function UsageStatsPanel({
                         <td className="py-2.5 pl-6 text-foreground">
                           {isModelCostUnknown(model) ? (
                             <span className="text-muted-foreground">
-                              Unpriced
+                              {t("Unpriced")}
                             </span>
                           ) : (
                             formatUsd(model.costUsd)
@@ -407,7 +415,7 @@ export function UsageStatsPanel({
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="py-2 font-normal">
-                    {isPast24Hours ? "Hour" : "Day"}
+                    {isPast24Hours ? t("Hour") : t("Day")}
                   </th>
                   {activeProviders.map((provider) => (
                     <th
@@ -417,8 +425,12 @@ export function UsageStatsPanel({
                       {PROVIDER_PRESENTATION[provider].label}
                     </th>
                   ))}
-                  <th className="py-2 pl-6 text-right font-normal">Total</th>
-                  <th className="py-2 pl-6 text-right font-normal">Tokens</th>
+                  <th className="py-2 pl-6 text-right font-normal">
+                    {t("Total")}
+                  </th>
+                  <th className="py-2 pl-6 text-right font-normal">
+                    {t("Tokens")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -428,7 +440,7 @@ export function UsageStatsPanel({
                       colSpan={activeProviders.length + 3}
                       className="py-6 text-center text-muted-foreground"
                     >
-                      No activity in this window.
+                      {t("No activity in this window.")}
                     </td>
                   </tr>
                 ) : (

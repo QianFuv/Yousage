@@ -3,13 +3,14 @@ import type { UsageProviderKind } from "@t3tools/contracts";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
+import { formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
 import {
   formatDayShort,
   formatHourShort,
   formatRelativeHourShort,
-  formatTokens,
-  formatUsd,
-} from "@t3tools/shared/usageFormat";
+  msg,
+  t,
+} from "../src/i18n";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
 
 const VIEW_WIDTH = 960;
@@ -156,17 +157,23 @@ function curvePath(segments: readonly CurveSegment[]): string {
  * peak leaves the tallest day drawn past the top of the plot, where it is
  * clipped.
  */
-export function niceScale(peak: number, count: number): { max: number; ticks: readonly number[] } {
+export function niceScale(
+  peak: number,
+  count: number,
+): { max: number; ticks: readonly number[] } {
   if (peak <= 0) return { max: 0, ticks: [0] };
 
   const rawStep = peak / count;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const normalized = rawStep / magnitude;
-  const step = (normalized > 5 ? 10 : normalized > 2 ? 5 : normalized > 1 ? 2 : 1) * magnitude;
+  const step =
+    (normalized > 5 ? 10 : normalized > 2 ? 5 : normalized > 1 ? 2 : 1) *
+    magnitude;
 
   const max = Math.ceil(peak / step) * step;
   const ticks: number[] = [];
-  for (let value = 0; value <= max + step * 1e-6; value += step) ticks.push(value);
+  for (let value = 0; value <= max + step * 1e-6; value += step)
+    ticks.push(value);
   return { max, ticks };
 }
 
@@ -210,7 +217,8 @@ export function UsageProviderChart({
     // layered series each measure from zero, so a combined peak would leave
     // the plot permanently half empty.
     const peak = columns.reduce(
-      (max, column) => column.bands.reduce((inner, band) => Math.max(inner, band.value), max),
+      (max, column) =>
+        column.bands.reduce((inner, band) => Math.max(inner, band.value), max),
       0,
     );
     const { max, ticks: tickValues } = niceScale(peak, TICK_COUNT);
@@ -218,7 +226,9 @@ export function UsageProviderChart({
     // Leave room above the top gridline so the constant-width stroke is not
     // clipped when a series reaches the peak.
     const toY = (value: number) =>
-      max === 0 ? VIEW_HEIGHT : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
+      max === 0
+        ? VIEW_HEIGHT
+        : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
 
     const built = providers.map((provider) => {
       const providerIndex = PROVIDER_ORDER.indexOf(provider);
@@ -232,8 +242,14 @@ export function UsageProviderChart({
       );
       return {
         provider,
-        total: columns.reduce((sum, column) => sum + (column.bands[providerIndex]?.value ?? 0), 0),
-        area: line === "" ? "" : `${line} L${VIEW_WIDTH},${VIEW_HEIGHT} L0,${VIEW_HEIGHT} Z`,
+        total: columns.reduce(
+          (sum, column) => sum + (column.bands[providerIndex]?.value ?? 0),
+          0,
+        ),
+        area:
+          line === ""
+            ? ""
+            : `${line} L${VIEW_WIDTH},${VIEW_HEIGHT} L0,${VIEW_HEIGHT} Z`,
         line,
       };
     });
@@ -269,8 +285,14 @@ export function UsageProviderChart({
       hoverPosition.y + gap + tooltipHeight <= plotHeight
         ? hoverPosition.y + gap
         : hoverPosition.y - gap - tooltipHeight;
-    const left = Math.min(Math.max(0, preferredLeft), Math.max(0, plotWidth - tooltipWidth));
-    const top = Math.min(Math.max(0, preferredTop), Math.max(0, plotHeight - tooltipHeight));
+    const left = Math.min(
+      Math.max(0, preferredLeft),
+      Math.max(0, plotWidth - tooltipWidth),
+    );
+    const top = Math.min(
+      Math.max(0, preferredTop),
+      Math.max(0, plotHeight - tooltipHeight),
+    );
     plot.style.setProperty("--usage-tooltip-left", `${left}px`);
     plot.style.setProperty("--usage-tooltip-top", `${top}px`);
   }, []);
@@ -281,7 +303,12 @@ export function UsageProviderChart({
 
     const plot = plotRef.current;
     const tooltip = tooltipRef.current;
-    if (plot === null || tooltip === null || typeof ResizeObserver === "undefined") return;
+    if (
+      plot === null ||
+      tooltip === null ||
+      typeof ResizeObserver === "undefined"
+    )
+      return;
 
     const observer = new ResizeObserver(positionTooltip);
     observer.observe(plot);
@@ -295,8 +322,14 @@ export function UsageProviderChart({
       if (plot === null || periods.length === 0) return;
       const bounds = plot.getBoundingClientRect();
       if (bounds.width === 0) return;
-      const localX = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left));
-      const localY = Math.min(bounds.height, Math.max(0, event.clientY - bounds.top));
+      const localX = Math.min(
+        bounds.width,
+        Math.max(0, event.clientX - bounds.left),
+      );
+      const localY = Math.min(
+        bounds.height,
+        Math.max(0, event.clientY - bounds.top),
+      );
       const fraction = localX / bounds.width;
       const index = Math.round(fraction * (periods.length - 1));
       hoverPositionRef.current = { x: localX, y: localY };
@@ -309,7 +342,9 @@ export function UsageProviderChart({
   const hoveredPeriod = hoverIndex === null ? undefined : periods[hoverIndex];
   const hoveredColumn = hoverIndex === null ? undefined : series[hoverIndex];
   const formatPeriod = (period: string) =>
-    resolution === "hour" ? formatHourShort(period, timeZone) : formatDayShort(period);
+    resolution === "hour"
+      ? formatHourShort(period, timeZone)
+      : formatDayShort(period);
   const formatTooltipPeriod = (period: string) =>
     resolution === "hour" && referenceTime !== undefined
       ? formatRelativeHourShort(period, referenceTime, timeZone)
@@ -345,7 +380,15 @@ export function UsageProviderChart({
             viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
             preserveAspectRatio="none"
             role="img"
-            aria-label={`${resolution === "hour" ? "Hourly" : "Daily"} ${metric === "tokens" ? "processed tokens" : "cost"} by provider`}
+            aria-label={t(
+              resolution === "hour"
+                ? metric === "tokens"
+                  ? msg("Hourly processed tokens by provider")
+                  : msg("Hourly cost by provider")
+                : metric === "tokens"
+                  ? msg("Daily processed tokens by provider")
+                  : msg("Daily cost by provider"),
+            )}
           >
             {ticks.map((tick) => {
               const y = toY(tick);
@@ -407,11 +450,16 @@ export function UsageProviderChart({
                 top: "var(--usage-tooltip-top, 0px)",
               }}
             >
-              <div className="mb-1 text-muted-foreground">{formatTooltipPeriod(hoveredPeriod)}</div>
+              <div className="mb-1 text-muted-foreground">
+                {formatTooltipPeriod(hoveredPeriod)}
+              </div>
               {providers.map((provider) => {
                 const { label, driverKind } = PROVIDER_PRESENTATION[provider];
                 return (
-                  <div key={provider} className="flex items-center justify-between gap-3">
+                  <div
+                    key={provider}
+                    className="flex items-center justify-between gap-3"
+                  >
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <ProviderInstanceIcon
                         driverKind={driverKind}
@@ -422,14 +470,16 @@ export function UsageProviderChart({
                     </span>
                     <span className="text-foreground tabular-nums">
                       {format(
-                        hoveredColumn?.bands.find((band) => band.provider === provider)?.value ?? 0,
+                        hoveredColumn?.bands.find(
+                          (band) => band.provider === provider,
+                        )?.value ?? 0,
                       )}
                     </span>
                   </div>
                 );
               })}
               <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-1">
-                <span className="text-muted-foreground">Total</span>
+                <span className="text-muted-foreground">{t("Total")}</span>
                 <span className="text-foreground tabular-nums">
                   {format(hoveredColumn?.total ?? 0)}
                 </span>

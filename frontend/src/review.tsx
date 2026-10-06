@@ -28,6 +28,7 @@ let sourceSettings = {
       provider: "codex",
       root: "C:/Fixture/history",
       isEnabled: true,
+      isAutomatic: false,
     },
   ],
 };
@@ -205,7 +206,7 @@ let snapshot: LibrarySnapshot = {
         sans: "",
         code: "",
         interfaceSize: 16,
-        codeSize: 13,
+        codeSize: 14,
         smoothing: false,
       },
       contrast: 100,
@@ -225,6 +226,14 @@ setTransport({
     if (object !== 0) return null;
     const request = args as { methodID: number; args: unknown[] };
     switch (request.methodID) {
+      case 2564077708:
+        return PROVIDERS.map((provider) => ({
+          provider,
+          driver: provider === "claude" ? "claudeAgent" : provider,
+          isInstalled: true,
+          hasHistory: true,
+          message: "Detected automatically.",
+        }));
       case 2299238358:
         return "local-fixture";
       case 3791071355:
@@ -252,8 +261,6 @@ setTransport({
         );
       case 4266831633:
         return false;
-      case 2023028566:
-        return "";
       case 584700173:
         return "hub-fixture-" + crypto.randomUUID();
       case 1066918238:
@@ -309,23 +316,8 @@ setTransport({
 
       case 2483192963:
         return {
-          sourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b",
-          wailsVersion: "3.0.0-beta.28",
-          referenceTime: "2026-10-06T00:00:00Z",
-          timeZone: "Asia/Shanghai",
-          appearanceMode: "system",
           isSystemDark: false,
-          providers: [
-            "codex",
-            "claude",
-            "grok",
-            "cursor",
-            "opencode",
-            "antigravity",
-          ],
-          roleCount: 57,
-          pid: 0,
-          lifecycleLog: "Browser transport fixture",
+          systemLocale: "en-US",
         };
       case 3469612837:
         return JSON.parse(JSON.stringify(snapshot));

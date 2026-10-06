@@ -16,14 +16,25 @@ export function effectiveAppearance(
     : "light";
 }
 
-/** Convert browser-rendered CSS colors to opaque sRGB channels for Wails. */
-export function canvasBackground(): [number, number, number] {
+/** Convert a browser-rendered CSS color to opaque sRGB channels for Wails. */
+function opaqueChannels(color: string): [number, number, number] {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 1;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas color conversion unavailable");
-  context.fillStyle = getComputedStyle(document.body).backgroundColor;
+  context.fillStyle = color;
   context.fillRect(0, 0, 1, 1);
   const channels = context.getImageData(0, 0, 1, 1).data;
   return [channels[0], channels[1], channels[2]];
+}
+
+/** Page canvas color, used for the native window background. */
+export function canvasBackground(): [number, number, number] {
+  return opaqueChannels(getComputedStyle(document.body).backgroundColor);
+}
+
+/** Sidebar color, used for the native title bar so it reads as one surface with the sidebar. */
+export function sidebarBackground(): [number, number, number] {
+  const sidebar = document.querySelector(".app-sidebar") ?? document.body;
+  return opaqueChannels(getComputedStyle(sidebar).backgroundColor);
 }

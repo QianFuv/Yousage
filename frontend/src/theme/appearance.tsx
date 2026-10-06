@@ -1,4 +1,5 @@
 /** Saved theme authority and transient editor state shared above every application route. */
+import { t } from "../i18n";
 import {
   createContext,
   useCallback,
@@ -236,7 +237,7 @@ export function AppearanceProvider({
     async (value: models.LibraryValue, expectedRevision?: number) => {
       if (busy.current)
         throw new Error(
-          "Appearance is already saving. Try again after it finishes.",
+          t("Appearance is already saving. Try again after it finishes."),
         );
       busy.current = true;
       setIsBusy(true);

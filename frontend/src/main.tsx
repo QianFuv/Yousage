@@ -1,26 +1,94 @@
 /** Desktop routes share saved appearance and a root-mounted editor across navigation. */
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  lazy,
+  Suspense,
+} from "react";
 import { Events } from "@wailsio/runtime";
 import { useRef } from "react";
-import { DisplayPanel } from "./settings/DisplayPanel";
-import { SourcesPanel } from "./settings/SourcesPanel";
-import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
+
 import { createRoot } from "react-dom/client";
 import { DataProvider, useData } from "./usage/controller";
 import { UsagePage } from "./usage/UsagePage";
-import { PricingPanel } from "./usage/PricingPanel";
+
 import * as nativeApi from "../bindings/yousage/app";
-import { canvasBackground } from "./native";
+import { canvasBackground, sidebarBackground } from "./native";
+import { configureTimestampLocale } from "../vendor/timestampFormat";
+import {
+  formattingLocale,
+  msg,
+  resolveLanguage,
+  setLanguage,
+  t,
+  useI18n,
+} from "./i18n";
 import {
   AppearanceProvider,
   applySavedAppearance,
   useAppearance,
 } from "./theme/appearance";
-import { RootThemeEditor, ThemePanel } from "./theme/ThemePanel";
+import type { ThemeFileInput } from "../bindings/yousage/models";
+import {
+  ArrowLeftIcon,
+  BarChart3Icon,
+  ChartNoAxesCombinedIcon,
+  GaugeIcon,
+  InfoIcon,
+  PaletteIcon,
+  PlugIcon,
+  SettingsIcon,
+  SlidersHorizontalIcon,
+  TagsIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "../vendor/ui/alert-dialog";
+
+const DisplayPanel = lazy(() =>
+  import("./settings/DisplayPanel").then((module) => ({
+    default: module.DisplayPanel,
+  })),
+);
+const SourcesPanel = lazy(() =>
+  import("./settings/SourcesPanel").then((module) => ({
+    default: module.SourcesPanel,
+  })),
+);
+const DiagnosticsPanel = lazy(() =>
+  import("./settings/DiagnosticsPanel").then((module) => ({
+    default: module.DiagnosticsPanel,
+  })),
+);
+const PricingPanel = lazy(() =>
+  import("./usage/PricingPanel").then((module) => ({
+    default: module.PricingPanel,
+  })),
+);
+const ThemePanel = lazy(() =>
+  import("./theme/ThemePanel").then((module) => ({
+    default: module.ThemePanel,
+  })),
+);
+const RootThemeEditor = lazy(() =>
+  import("./theme/ThemePanel").then((module) => ({
+    default: module.RootThemeEditor,
+  })),
+);
 import "./style.css";
 
 /** Keep Usage and Settings independent while synchronizing actual CSS with the native window. */
-function Desktop() {
+function Desktop({ systemLocale }: { systemLocale: string }) {
+  useI18n();
   const appearance = useAppearance();
   const [sourcesState, setSourcesState] = useState({
     isDirty: false,
@@ -35,6 +103,13 @@ function Desktop() {
   const [isClosing, setIsClosing] = useState(false);
   const [closeError, setCloseError] = useState("");
   const data = useData();
+  useLayoutEffect(() => {
+    document.documentElement.dataset.density = data.display.value.density;
+  }, [data.display.value.density]);
+  useLayoutEffect(
+    () => applyLanguage(data.display.value.language, systemLocale),
+    [data.display.value.language, systemLocale],
+  );
   const [priceModel, setPriceModel] = useState<string>();
   const [pricingState, setPricingState] = useState({
     isDirty: false,
@@ -45,27 +120,43 @@ function Desktop() {
       setPricingState({ isDirty, isPending }),
     [],
   );
-  const [route, setRoute] = useState<"usage" | "settings">("usage");
-  const [section, setSection] = useState<
-    "appearance" | "display" | "diagnostics" | "pricing" | "sources"
-  >("appearance");
+  const [route, setRoute] = useState<"quota" | "statistics" | "settings">(
+    "statistics",
+  );
+  const [section, setSection] = useState<SettingsSection>("appearance");
+  const usageRoute = useRef<"quota" | "statistics">("statistics");
+  const [visitedSections, setVisitedSections] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [droppedThemes, setDroppedThemes] = useState<ThemeFileInput[]>([]);
   const positions = useRef<Record<string, number>>({});
   const content = useRef<HTMLElement>(null);
   /** Capture the current viewport before hiding its page, then select the destination. */
   const navigate = useCallback(
     (nextRoute: typeof route, nextSection = section) => {
-      const identity = route === "usage" ? "usage" : `settings:${section}`;
+      const identity = route === "settings" ? `settings:${section}` : route;
       positions.current[identity] = content.current?.scrollTop ?? 0;
+      if (nextRoute !== "settings") usageRoute.current = nextRoute;
+      if (nextRoute === "settings")
+        setVisitedSections((current) => new Set([...current, nextSection]));
       setSection(nextSection);
       setRoute(nextRoute);
     },
     [route, section],
   );
   useLayoutEffect(() => {
-    const identity = route === "usage" ? "usage" : `settings:${section}`;
+    const identity = route === "settings" ? `settings:${section}` : route;
     if (content.current)
       content.current.scrollTop = positions.current[identity] ?? 0;
   }, [route, section]);
+  useEffect(
+    () =>
+      Events.On("theme-files-dropped", (event) => {
+        setDroppedThemes(event.data as ThemeFileInput[]);
+        navigate("settings", "appearance");
+      }),
+    [navigate],
+  );
   const [status, setStatus] = useState("");
   const closeState = useRef({ isDirty: false, isPending: false });
   closeState.current = {
@@ -102,35 +193,6 @@ function Desktop() {
   }, []);
 
   useEffect(() => {
-    if (!isClosing) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const dialog = document.querySelector<HTMLElement>(".close-dialog");
-    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
-    /** Keep keyboard focus inside the blocking native close decision. */
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      const buttons = [
-        ...(dialog?.querySelectorAll<HTMLButtonElement>(
-          "button:not(:disabled)",
-        ) ?? []),
-      ];
-      const first = buttons[0],
-        last = buttons.at(-1);
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-    window.addEventListener("keydown", trap);
-    return () => {
-      window.removeEventListener("keydown", trap);
-      previous?.focus();
-    };
-  }, [isClosing]);
-  useEffect(() => {
     /** Offer the same settings shortcut in every application route. */
     const changed = (event: KeyboardEvent) => {
       if (isClosing) return;
@@ -139,7 +201,10 @@ function Desktop() {
         navigate("settings");
       } else if ((event.ctrlKey || event.metaKey) && event.key === "1") {
         event.preventDefault();
-        navigate("usage");
+        navigate("statistics");
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "2") {
+        event.preventDefault();
+        navigate("quota");
       } else if (
         (event.ctrlKey || event.metaKey) &&
         event.altKey &&
@@ -158,7 +223,7 @@ function Desktop() {
         event.key.toLowerCase() === "r"
       ) {
         event.preventDefault();
-        if (route === "usage") void data.refresh(true, true);
+        if (route !== "settings") void data.refresh(true, true);
       } else if (event.key === "Escape") setIsClosing(false);
     };
     window.addEventListener("keydown", changed);
@@ -167,13 +232,11 @@ function Desktop() {
   useEffect(() => {
     /** Synchronize preview colors as well as saved themes without waiting on hidden WebView frames. */
     const synchronize = () => {
-      const [red, green, blue] = canvasBackground();
       void nativeApi
         .SyncAppearance(
           document.documentElement.classList.contains("dark"),
-          red,
-          green,
-          blue,
+          ...canvasBackground(),
+          ...sidebarBackground(),
         )
         .catch((cause) => setStatus(String(cause)));
     };
@@ -190,17 +253,16 @@ function Desktop() {
     /** Show only after the persisted palette and committed DOM background reach the native surface. */
     async function reveal() {
       try {
-        const [red, green, blue] = canvasBackground();
         await nativeApi.SyncAppearance(
           document.documentElement.classList.contains("dark"),
-          red,
-          green,
-          blue,
+          ...canvasBackground(),
+          ...sidebarBackground(),
         );
       } catch (cause) {
         setStatus(String(cause));
         setRoute("settings");
         setSection("diagnostics");
+        setVisitedSections((current) => new Set([...current, "diagnostics"]));
       }
       if (!isDisposed) await nativeApi.FrontendReady();
     }
@@ -209,134 +271,270 @@ function Desktop() {
       isDisposed = true;
     };
   }, []);
+  const sectionState: Partial<Record<SettingsSection, boolean>> = {
+    pricing: pricingState.isDirty,
+    sources: sourcesState.isDirty,
+    appearance: isThemeDirty || appearance.editorState.isDirty,
+  };
   return (
     <div className="desktop-layout" data-density={data.display.value.density}>
       <nav
         inert={isClosing}
-        className="app-navigation"
-        aria-label="Application"
+        className="app-sidebar"
+        aria-label={t("Application")}
       >
-        <strong>Yousage</strong>
-        <button
-          aria-current={route === "usage" ? "page" : undefined}
-          onClick={() => navigate("usage")}
-        >
-          Usage
-        </button>
-        <button
-          aria-current={route === "settings" ? "page" : undefined}
-          onClick={() => navigate("settings")}
-        >
-          Settings
-        </button>
+        <div className="sidebar-brand">
+          <span className="sidebar-logo" aria-hidden>
+            <BarChart3Icon />
+          </span>
+          <strong>Yousage</strong>
+        </div>
+        {route === "settings" ? (
+          <>
+            <NavItem
+              icon={ArrowLeftIcon}
+              label={t("Back")}
+              title={t("Back to usage")}
+              onClick={() => navigate(usageRoute.current)}
+            />
+            <div className="sidebar-group-label">{t("Settings")}</div>
+            <div className="sidebar-group">
+              {SETTINGS_SECTIONS.map((item) => (
+                <NavItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={t(item.label)}
+                  isCurrent={section === item.id}
+                  isDirty={sectionState[item.id]}
+                  onClick={() => navigate("settings", item.id)}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="sidebar-group">
+              <NavItem
+                icon={ChartNoAxesCombinedIcon}
+                label={t("Usage")}
+                title={`${t("Usage")} (Ctrl+1)`}
+                isCurrent={route === "statistics"}
+                onClick={() => navigate("statistics")}
+              />
+              <NavItem
+                icon={GaugeIcon}
+                label={t("Quota")}
+                title={`${t("Quota")} (Ctrl+2)`}
+                isCurrent={route === "quota"}
+                onClick={() => navigate("quota")}
+              />
+            </div>
+            <div className="sidebar-footer">
+              <NavItem
+                icon={SettingsIcon}
+                label={t("Settings")}
+                title={`${t("Settings")} (Ctrl+,)`}
+                onClick={() => navigate("settings")}
+              />
+            </div>
+          </>
+        )}
       </nav>
-      {route === "settings" && (
-        <section
-          inert={isClosing}
-          className="settings-controls"
-          aria-label="Settings"
-        >
-          <div className="settings-sections" aria-label="Settings sections">
-            <button
-              aria-pressed={section === "display"}
-              onClick={() => navigate("settings", "display")}
-            >
-              Display &amp; behavior
-            </button>
-            <button
-              aria-pressed={section === "appearance"}
-              onClick={() => navigate("settings", "appearance")}
-            >
-              Appearance
-            </button>
-            <button
-              aria-pressed={section === "pricing"}
-              onClick={() => navigate("settings", "pricing")}
-            >
-              Prices &amp; mappings{pricingState.isDirty ? " · Unsaved" : ""}
-            </button>
-            <button
-              aria-pressed={section === "sources"}
-              onClick={() => navigate("settings", "sources")}
-            >
-              Sources &amp; connections
-            </button>
-            <button
-              aria-pressed={section === "diagnostics"}
-              onClick={() => navigate("settings", "diagnostics")}
-            >
-              About & diagnostics
-            </button>
-          </div>
-        </section>
-      )}
-      <main ref={content} inert={isClosing} data-file-drop-target>
-        <div hidden={route !== "usage"}>
+      <main
+        ref={content}
+        inert={isClosing}
+        data-file-drop-target
+        tabIndex={-1}
+        aria-label={t("Page content")}
+      >
+        <div hidden={route === "settings"}>
           <UsagePage
-            isActive={route === "usage"}
+            isActive={route !== "settings"}
+            view={route === "statistics" ? "statistics" : "limits"}
             onSettings={(next, model) => {
               if (model) setPriceModel(model);
               navigate("settings", next);
             }}
           />
         </div>
-        <div hidden={route !== "settings" || section !== "pricing"}>
-          <PricingPanel model={priceModel} onDirtyChange={changePricingState} />
-        </div>
-        <div hidden={route !== "settings" || section !== "appearance"}>
-          <ThemePanel onDirtyChange={setIsThemeDirty} />
-        </div>
-        <div hidden={route !== "settings" || section !== "display"}>
-          <DisplayPanel />
-        </div>
-        <div hidden={route !== "settings" || section !== "sources"}>
-          <SourcesPanel onDraftChange={changeSourcesState} />
-        </div>
-        <div hidden={route !== "settings" || section !== "diagnostics"}>
-          <DiagnosticsPanel nativeStatus={status} />
-        </div>
-      </main>
-      <RootThemeEditor />
-      {isClosing && (
-        <div className="close-backdrop">
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="close-title"
-            className="close-dialog"
-          >
-            <h2 id="close-title">Close Yousage?</h2>
-            <p>
-              {closeState.current.isPending
-                ? "An account or settings change is running. Wait for the result before closing."
-                : "Unsaved source, price or theme drafts will be discarded."}
+        <Suspense
+          fallback={
+            <p className="p-6 text-sm text-muted-foreground" role="status">
+              {t("Loading settings…")}
             </p>
-            {closeError && <p role="status">{closeError}</p>}
-            <div className="settings-actions">
-              <button onClick={() => setIsClosing(false)}>Keep editing</button>
-              <button
-                disabled={closeState.current.isPending}
-                onClick={() =>
-                  void nativeApi
-                    .ConfirmClose()
-                    .catch((cause) => setCloseError(String(cause)))
-                }
-              >
-                Discard drafts and exit
-              </button>
+          }
+        >
+          {visitedSections.has("pricing") && (
+            <div hidden={route !== "settings" || section !== "pricing"}>
+              <PricingPanel
+                model={priceModel}
+                onDirtyChange={changePricingState}
+              />
             </div>
-          </section>
-        </div>
+          )}
+          {visitedSections.has("appearance") && (
+            <div hidden={route !== "settings" || section !== "appearance"}>
+              <ThemePanel
+                onDirtyChange={setIsThemeDirty}
+                isActive={route === "settings" && section === "appearance"}
+                droppedFiles={droppedThemes}
+              />
+            </div>
+          )}
+          {visitedSections.has("display") && (
+            <div hidden={route !== "settings" || section !== "display"}>
+              <DisplayPanel />
+            </div>
+          )}
+          {visitedSections.has("sources") && (
+            <div hidden={route !== "settings" || section !== "sources"}>
+              <SourcesPanel onDraftChange={changeSourcesState} />
+            </div>
+          )}
+          {visitedSections.has("diagnostics") && (
+            <div hidden={route !== "settings" || section !== "diagnostics"}>
+              <DiagnosticsPanel nativeStatus={status} />
+            </div>
+          )}
+        </Suspense>
+      </main>
+      {appearance.editor && (
+        <Suspense fallback={null}>
+          <RootThemeEditor />
+        </Suspense>
       )}
+      <AlertDialog
+        open={isClosing}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setIsClosing(false);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Close Yousage?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {closeState.current.isPending
+                ? t(
+                    "An account or settings change is running. Wait for the result before closing.",
+                  )
+                : t("Unsaved source, price or theme drafts will be discarded.")}
+            </AlertDialogDescription>
+            {closeError && (
+              <p role="status" className="text-sm text-destructive-foreground">
+                {closeError}
+              </p>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setIsClosing(false)}>
+              {t("Keep editing")}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={closeState.current.isPending}
+              onClick={() =>
+                void nativeApi
+                  .ConfirmClose()
+                  .catch((cause) => setCloseError(String(cause)))
+              }
+            >
+              {t("Discard drafts and exit")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </div>
+  );
+}
+
+/** Settings destinations in sidebar order. */
+type SettingsSection =
+  | "appearance"
+  | "display"
+  | "diagnostics"
+  | "pricing"
+  | "sources";
+
+const SETTINGS_SECTIONS: readonly {
+  id: SettingsSection;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "appearance", label: msg("Appearance"), icon: PaletteIcon },
+  {
+    id: "display",
+    label: msg("Display & behavior"),
+    icon: SlidersHorizontalIcon,
+  },
+  { id: "sources", label: msg("Sources & connections"), icon: PlugIcon },
+  { id: "pricing", label: msg("Prices & mappings"), icon: TagsIcon },
+  { id: "diagnostics", label: msg("About & diagnostics"), icon: InfoIcon },
+];
+
+/**
+ * Sidebar navigation row that collapses to its icon in narrow windows.
+ *
+ * @param props - Icon, label, current/dirty state and click handler.
+ * @returns The navigation button.
+ */
+function NavItem({
+  icon: Icon,
+  label,
+  title,
+  isCurrent,
+  isDirty,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  title?: string;
+  isCurrent?: boolean;
+  isDirty?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="sidebar-item"
+      aria-current={isCurrent ? "page" : undefined}
+      aria-label={isDirty ? t("{label} (unsaved)", { label }) : label}
+      title={title ?? label}
+      onClick={onClick}
+    >
+      <Icon aria-hidden />
+      <span className="sidebar-item-label">{label}</span>
+      {isDirty && <span className="sidebar-dirty" aria-hidden />}
+    </button>
+  );
+}
+
+/**
+ * Apply the saved language and match reset timestamps to it.
+ *
+ * Following the system keeps the regional locale for timestamps; an explicit
+ * language uses that language's own conventions.
+ *
+ * @param preference - Saved language preference.
+ * @param systemLocale - Operating system locale.
+ */
+function applyLanguage(preference: string, systemLocale: string) {
+  const language = resolveLanguage(preference, systemLocale);
+  setLanguage(language);
+  configureTimestampLocale(
+    language === resolveLanguage("system", systemLocale)
+      ? systemLocale
+      : formattingLocale(),
   );
 }
 
 /** Load authoritative Go state before rendering the first visible frame. */
 async function start() {
-  const bootstrap = await nativeApi.GetBootstrap();
-  const appearance = await nativeApi.GetAppearance();
-  const display = await nativeApi.GetDisplay();
+  const [bootstrap, appearance, display] = await Promise.all([
+    nativeApi.GetBootstrap(),
+    nativeApi.GetAppearance(),
+    nativeApi.GetDisplay(),
+  ]);
+  applyLanguage(display.value.language, bootstrap.systemLocale);
   applySavedAppearance(appearance, bootstrap.isSystemDark);
   createRoot(document.getElementById("root")!).render(
     <AppearanceProvider
@@ -344,7 +542,7 @@ async function start() {
       isSystemDark={bootstrap.isSystemDark}
     >
       <DataProvider initial={display}>
-        <Desktop />
+        <Desktop systemLocale={bootstrap.systemLocale} />
       </DataProvider>
     </AppearanceProvider>,
   );

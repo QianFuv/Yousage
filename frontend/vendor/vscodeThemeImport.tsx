@@ -1,3 +1,4 @@
+import { t } from "../src/i18n";
 import {
   createVividThemeColors,
   getStandardThemeColors,
@@ -226,7 +227,7 @@ function resolveName(value: Record<string, unknown>): string {
 
 export function parseVsCodeThemeFile(value: unknown): ThemeDefinition {
   if (!isRecord(value))
-    throw new Error("Theme files must contain a JSON object.");
+    throw new Error(t("Theme files must contain a JSON object."));
   const colors = isRecord(value.colors) ? value.colors : {};
 
   /** First key that carries a usable color, in priority order. */

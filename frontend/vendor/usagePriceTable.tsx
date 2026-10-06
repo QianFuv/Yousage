@@ -5,6 +5,7 @@ import {
   type UsagePriceForm,
 } from "./usagePriceForm";
 import type { UsagePriceChange, UsagePriceTarget } from "./usagePriceTargets";
+import { t } from "../src/i18n";
 
 export type UsagePriceField = (typeof USAGE_PRICE_FIELDS)[number]["key"];
 
@@ -28,19 +29,27 @@ export function isEmptyUsagePriceDraft(draft: UsagePriceDraft) {
 }
 
 function modelPrice(target: UsagePriceTarget, model: string) {
-  return target.prices && Object.hasOwn(target.prices, model) ? target.prices[model] : undefined;
+  return target.prices && Object.hasOwn(target.prices, model)
+    ? target.prices[model]
+    : undefined;
 }
 
 function modelAlias(target: UsagePriceTarget, model: string) {
-  return target.aliases && Object.hasOwn(target.aliases, model) ? target.aliases[model] : undefined;
+  return target.aliases && Object.hasOwn(target.aliases, model)
+    ? target.aliases[model]
+    : undefined;
 }
 
 /** The "Map to" cell across the selected environments, read like a price cell. */
-export function usageAliasCell(targets: readonly UsagePriceTarget[], model: string) {
+export function usageAliasCell(
+  targets: readonly UsagePriceTarget[],
+  model: string,
+) {
   if (targets.some((target) => target.aliases === null))
     return { value: "", placeholder: "Unavailable" };
   const values = targets.map((target) => modelAlias(target, model) ?? "");
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "Mixed" };
+  if (values.some((value) => value !== values[0]))
+    return { value: "", placeholder: "Mixed" };
   return { value: values[0] ?? "", placeholder: "None" };
 }
 
@@ -49,16 +58,22 @@ export function usagePriceCell(
   model: string,
   field: UsagePriceField,
 ) {
-  const optional = USAGE_PRICE_FIELDS.find((entry) => entry.key === field)!.optional;
+  const optional = USAGE_PRICE_FIELDS.find(
+    (entry) => entry.key === field,
+  )!.optional;
   const values = targets.map((target) =>
-    modelPrice(target, model) ? usagePriceForm(model, modelPrice(target, model))[field] : null,
+    modelPrice(target, model)
+      ? usagePriceForm(model, modelPrice(target, model))[field]
+      : null,
   );
   if (targets.some((target) => target.prices === null))
     return { value: "", placeholder: "Unavailable" };
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "Mixed" };
+  if (values.some((value) => value !== values[0]))
+    return { value: "", placeholder: "Mixed" };
   return {
     value: values[0] ?? "",
-    placeholder: values[0] === null ? "Automatic" : optional ? "Input rate" : "0.00",
+    placeholder:
+      values[0] === null ? "Automatic" : optional ? "Input rate" : "0.00",
   };
 }
 
@@ -81,8 +96,9 @@ export function usagePriceTableChanges(
     // A mapped model is priced as its target, so mapping it drops its own price.
     const alias = (draft.alias ?? currentAlias ?? "").trim();
     if (alias !== "") {
-      if (model === "") errors.set(draft.id, "Enter a model ID.");
-      else if (alias === model) errors.set(draft.id, "Map to a different model.");
+      if (model === "") errors.set(draft.id, t("Enter a model ID."));
+      else if (alias === model)
+        errors.set(draft.id, t("Map to a different model."));
       else {
         if (alias !== currentAlias) changes.push({ model, alias });
         if (modelPrice(target, model)) changes.push({ model, price: null });
@@ -108,15 +124,22 @@ export function usagePriceTableChanges(
       errors.set(
         draft.id,
         model === ""
-          ? "Enter a model ID."
+          ? t("Enter a model ID.")
           : missing
-            ? `${missing.label} is required on ${target.label}.`
-            : "Use non-negative numbers for prices.",
+            ? t("{field} is required on {environment}.", {
+                field: t(missing.label),
+                environment: target.label,
+              })
+            : t("Use non-negative numbers for prices."),
       );
       continue;
     }
     const next = usagePriceForm(model, parsed.price);
-    if (USAGE_PRICE_FIELDS.some((field) => original[field.key] !== next[field.key]))
+    if (
+      USAGE_PRICE_FIELDS.some(
+        (field) => original[field.key] !== next[field.key],
+      )
+    )
       changes.push(parsed);
   }
   return { changes, errors };

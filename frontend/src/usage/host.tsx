@@ -1,4 +1,5 @@
 /** Native action adapters for original quota renderers without app atoms or browser credentials. */
+import { msg, t } from "../i18n";
 import { formatUpcomingTimestamp as upstreamUpcomingTimestamp } from "../../vendor/timestampFormat";
 import { useData } from "./controller";
 import { useRef, useState } from "react";
@@ -77,12 +78,13 @@ export function RedactedSensitiveText({
 }
 const RESET_OPERATIONS = new Map<string, string>();
 const OUTCOMES: Record<string, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
-  unknown:
+  reset: msg("Reset applied. Your windows have cleared."),
+  nothingToReset: msg("Nothing to reset right now."),
+  noCredit: msg("No reset credit left."),
+  alreadyRedeemed: msg("That credit was already redeemed."),
+  unknown: msg(
     "The reset outcome is unknown. Refresh limits before deciding to retry explicitly.",
+  ),
 };
 
 /** Preserve a caller operation identity through ambiguous results and explicit retries. */
@@ -128,9 +130,11 @@ export function useResetCredit(
         )
         .catch(() => {});
       setStatus(
-        result.warning ||
-          OUTCOMES[result.outcome] ||
-          "Could not use the reset credit.",
+        t(
+          result.warning ||
+            OUTCOMES[result.outcome] ||
+            msg("Could not use the reset credit."),
+        ),
       );
     } catch (cause) {
       attempted.current = true;

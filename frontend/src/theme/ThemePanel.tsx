@@ -1,7 +1,34 @@
 /** Complete desktop theme library, bounded imports and root-mounted original editor. */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  MonitorIcon,
+  MoonIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  SunIcon,
+  UploadIcon,
+} from "lucide-react";
+import { ActionMenu, ActionMenuItem } from "../ActionMenu";
+import { msg, t } from "../i18n";
+import {
+  Notice,
+  OptionSelect,
+  PageBody,
+  PageHeader,
+  SectionHeading,
+  SettingsRow,
+  SettingsSection,
+} from "../ui";
+import { cn } from "../../../tools/parity/src/bridges/utils";
+import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
+import { Input } from "../../../tools/parity/upstream/apps/web/src/components/ui/input";
+import { Switch } from "../../../tools/parity/upstream/apps/web/src/components/ui/switch";
+import {
+  Toggle,
+  ToggleGroup,
+} from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { parse as parseJsonc } from "jsonc-parser";
-import { Events } from "@wailsio/runtime";
 import * as nativeApi from "../../bindings/yousage/app";
 import type { ThemeFileInput } from "../../bindings/yousage/models";
 import * as models from "../../bindings/yousage/internal/theme/models";
@@ -21,12 +48,10 @@ import {
   resolveThemeLabelCollisions,
 } from "../../vendor/vscodeThemeImport";
 import {
-  importOpenVsxThemeExtension,
-  searchOpenVsxThemes,
   type OpenVsxThemeExtension,
   type OpenVsxThemeSort,
 } from "../../vendor/openVsxThemes";
-import { BUILT_IN_THEMES } from "../../../tools/parity/upstream/packages/shared/src/themePalettes";
+import { CATPPUCCIN_MOCHA_THEME } from "./catppuccinMocha";
 import { ThemeWireframe } from "../../vendor/ThemeWireframe";
 import {
   getThemeCardDefinition,
@@ -42,6 +67,8 @@ import {
 } from "./appearance";
 import {
   Dialog,
+  DialogFooter,
+  DialogHeader,
   DialogPopup,
   DialogTitle,
   DialogDescription,
@@ -122,32 +149,35 @@ function EffectSlider({
     }
   }
   return (
-    <label className="preference-row">
-      {label}
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={draft}
-        disabled={isPending}
-        onChange={(event) => setDraft(Number(event.target.value))}
-        onPointerUp={() => void commit()}
-        onKeyUp={() => void commit()}
-        onBlur={() => void commit()}
-      />
-      <span>
-        {draft}
-        {unit}
-      </span>
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => void commit(defaultValue)}
-        aria-label={`Reset ${label}`}
-      >
-        Reset
-      </button>
-    </label>
+    <SettingsRow
+      title={label}
+      control={
+        <>
+          <input
+            type="range"
+            aria-label={label}
+            className="w-40 accent-primary"
+            min={min}
+            max={max}
+            value={draft}
+            disabled={isPending}
+            onChange={(event) => setDraft(Number(event.target.value))}
+            onPointerUp={() => void commit()}
+            onKeyUp={() => void commit()}
+            onBlur={() => void commit()}
+          />
+          <span className="w-14 text-right text-xs text-muted-foreground tabular-nums">
+            {draft}
+            {unit}
+          </span>
+          <ResetButton
+            label={t("Reset {label}", { label })}
+            disabled={isPending}
+            onClick={() => void commit(defaultValue)}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -156,19 +186,20 @@ export function parseThemeBatch(
   files: { name: string; text: string; size: number; error?: string }[],
 ): ThemeDefinition[] {
   const parsed = files.map((file) => {
-    if (file.error) throw new Error(`${file.name}: ${file.error}`);
+    if (file.error) throw new Error(`${file.name}: ${t(file.error)}`);
     if (
       file.size > 256 * 1024 ||
       new TextEncoder().encode(file.text).length > 256 * 1024
     )
       throw new Error(
-        `${file.name}: theme files must be no larger than 256 KiB.`,
+        `${file.name}: ${t("theme files must be no larger than 256 KiB.")}`,
       );
     const errors: import("jsonc-parser").ParseError[] = [];
     const value: unknown = parseJsonc(file.text, errors, {
       allowTrailingComma: true,
     });
-    if (errors.length) throw new Error(`${file.name}: invalid theme JSON.`);
+    if (errors.length)
+      throw new Error(`${file.name}: ${t("invalid theme JSON.")}`);
     return {
       theme: isVsCodeThemeFile(value)
         ? parseVsCodeThemeFile(value)
@@ -193,7 +224,9 @@ export function mergedImport(
     const position = result.findIndex((candidate) => candidate.id === theme.id);
     if (position >= 0 && collectionId)
       throw new Error(
-        "This collection conflicts with a theme outside the collection. No themes were changed.",
+        t(
+          "This collection conflicts with a theme outside the collection. No themes were changed.",
+        ),
       );
     if (position >= 0 && shouldReplace) {
       result[position] = {
@@ -253,7 +286,9 @@ export function RootThemeEditor() {
           ) {
             context.restore();
             throw new Error(
-              "This theme changed while the editor was open. Reopen the saved theme before replacing it.",
+              t(
+                "This theme changed while the editor was open. Reopen the saved theme before replacing it.",
+              ),
             );
           }
         }
@@ -282,8 +317,12 @@ export function RootThemeEditor() {
 /** Show independent mode/half ownership, original palette previews, imports, collections, fonts and effects. */
 export function ThemePanel({
   onDirtyChange,
+  isActive = true,
+  droppedFiles = [],
 }: {
   onDirtyChange?: (isDirty: boolean) => void;
+  isActive?: boolean;
+  droppedFiles?: ThemeFileInput[];
 }) {
   const context = useAppearance();
   const preferences = context.snapshot.value.preferences;
@@ -292,6 +331,7 @@ export function ThemePanel({
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [shouldReplace, setShouldReplace] = useState(true);
   const [query, setQuery] = useState("");
+  const [isMarketOpen, setIsMarketOpen] = useState(false);
   const [sort, setSort] = useState<OpenVsxThemeSort>("downloadCount");
   const [extensions, setExtensions] = useState<OpenVsxThemeExtension[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -319,7 +359,7 @@ export function ThemePanel({
     try {
       await execute();
     } catch (cause) {
-      setStatus(String(cause));
+      setStatus(cause instanceof Error ? cause.message : String(cause));
     }
   }
   /** Stage a selected or dropped batch with the revision used to resolve its collisions. */
@@ -333,28 +373,30 @@ export function ThemePanel({
         setStatus("");
       }
     } catch (cause) {
-      setStatus(String(cause));
+      setStatus(cause instanceof Error ? cause.message : String(cause));
     }
   }
   useEffect(() => {
-    const stop = Events.On("theme-files-dropped", (event) =>
-      prepare(event.data as ThemeFileInput[]),
-    );
-    return stop;
-  }, [context.snapshot.revision]);
+    if (droppedFiles.length) prepare(droppedFiles);
+  }, [droppedFiles]);
   useEffect(() => {
+    if (!isActive || !isMarketOpen) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setIsSearching(true);
-      void searchOpenVsxThemes(query, {
-        signal: controller.signal,
-        sortBy: sort,
-      })
+      void import("../../vendor/openVsxThemes")
+        .then((module) =>
+          module.searchOpenVsxThemes(query, {
+            signal: controller.signal,
+            sortBy: sort,
+          }),
+        )
         .then((value) => {
           if (!controller.signal.aborted) setExtensions([...value]);
         })
         .catch((cause) => {
-          if (!controller.signal.aborted) setStatus(String(cause));
+          if (!controller.signal.aborted)
+            setStatus(cause instanceof Error ? cause.message : String(cause));
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsSearching(false);
@@ -364,7 +406,7 @@ export function ThemePanel({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, sort]);
+  }, [query, sort, isActive, isMarketOpen]);
   useEffect(() => () => download.current?.abort(), []);
   /** Verify an extension and hold the complete collection as a draft before replacing anything. */
   async function downloadExtension(extension: OpenVsxThemeExtension) {
@@ -375,6 +417,8 @@ export function ThemePanel({
     const revision = context.snapshot.revision;
     const timer = setTimeout(() => controller.abort(), 60_000);
     try {
+      const { importOpenVsxThemeExtension } =
+        await import("../../vendor/openVsxThemes");
       const themes = await importOpenVsxThemeExtension(
         extension,
         controller.signal,
@@ -423,7 +467,7 @@ export function ThemePanel({
     );
     setDraft(null);
     setPaste("");
-    setStatus("Themes imported.");
+    setStatus(t("Themes imported."));
   }
   /** Delete only selected custom members, retaining missing raw owners for published themes that may return. */
   async function removeThemes(ids: string[]) {
@@ -448,7 +492,7 @@ export function ThemePanel({
       }),
       context.snapshot.revision,
     );
-    setStatus("Selected themes removed.");
+    setStatus(t("Selected themes removed."));
   }
   /** Request local-font access when supported; manual family input always remains available. */
   async function discoverFonts() {
@@ -459,7 +503,9 @@ export function ThemePanel({
     ).queryLocalFonts;
     if (!queryFonts) {
       setStatus(
-        "Local font discovery is unavailable here. Enter an installed font family manually.",
+        t(
+          "Local font discovery is unavailable here. Enter an installed font family manually.",
+        ),
       );
       return;
     }
@@ -470,7 +516,7 @@ export function ThemePanel({
   const published = context.snapshot.published.themes
     .map(frontendTheme)
     .filter((theme) => !customs.some((custom) => custom.id === theme.id));
-  const definitions = [...BUILT_IN_THEMES, ...customs, ...published];
+  const definitions = [CATPPUCCIN_MOCHA_THEME, ...customs, ...published];
   const cards = [
     ...STANDARD_THEME_CARDS,
     ...definitions.map(getThemeCardDefinition),
@@ -517,14 +563,54 @@ export function ThemePanel({
         .map((theme) => [theme.collection!.id, theme.collection!]),
     ).values(),
   ];
+  /** Persist the full typography draft after a field settles. */
+  function saveTypography() {
+    void action(() =>
+      context.patch({
+        typography: models.Typography.createFrom(fontDraft),
+      }),
+    );
+  }
+  /** Restore one typography field to its default. */
+  function resetTypography(patch: Partial<typeof preferences.typography>) {
+    void action(() =>
+      context.patch({
+        typography: models.Typography.createFrom({
+          ...preferences.typography,
+          ...patch,
+        }),
+      }),
+    );
+  }
+  const message = context.error || context.snapshot.error || status;
   return (
-    <section className="appearance-panel" aria-label="Appearance and themes">
-      <header className="section-heading">
-        <div>
-          <h1>Appearance</h1>
-          <p>Choose a palette for each mode, or tune your own.</p>
-        </div>
-        <button
+    <section aria-label={t("Appearance")}>
+      <PageHeader parent={t("Settings")} title={t("Appearance")}>
+        <ToggleGroup
+          aria-label={t("Appearance")}
+          variant="segmented"
+          disabled={context.isBusy}
+          value={[preferences.mode]}
+          onValueChange={(next) => {
+            const mode = next[0];
+            if (mode) void action(() => context.patch({ mode }));
+          }}
+        >
+          <Toggle value="system" aria-label={t("System")}>
+            <MonitorIcon aria-hidden />
+            {t("System")}
+          </Toggle>
+          <Toggle value="light" aria-label={t("Light")}>
+            <SunIcon aria-hidden />
+            {t("Light")}
+          </Toggle>
+          <Toggle value="dark" aria-label={t("Dark")}>
+            <MoonIcon aria-hidden />
+            {t("Dark")}
+          </Toggle>
+        </ToggleGroup>
+        <Button
+          size="sm"
           onClick={() =>
             context.openEditor({
               editing: null,
@@ -536,634 +622,806 @@ export function ThemePanel({
             })
           }
         >
-          Create theme
-        </button>
-      </header>
-      <div className="preference-row">
-        <label>
-          Appearance{" "}
-          <select
-            disabled={context.isBusy}
-            value={preferences.mode}
-            onChange={(event) =>
-              void action(() => context.patch({ mode: event.target.value }))
-            }
+          <PlusIcon aria-hidden />
+          {t("Create theme")}
+        </Button>
+      </PageHeader>
+      <PageBody>
+        {message && (
+          <Notice
+            tone={context.error || context.snapshot.error ? "error" : "default"}
           >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
-        <button
-          disabled={context.isBusy}
-          onClick={() =>
-            void action(() => context.patch({ lightOwner: "", darkOwner: "" }))
-          }
-        >
-          Clear mix
-        </button>
-        <span>Light and dark can use different themes.</span>
-      </div>
-      {(context.error || context.snapshot.error || status) && (
-        <p role="status" className="notice">
-          {context.error || context.snapshot.error || status}
-        </p>
-      )}
-      <div className="theme-library-grid">
-        {visibleCards.map((card) => {
-          const definition = definitions.find((theme) => theme.id === card.id);
-          const isCustom = customs.some((theme) => theme.id === card.id);
-          return (
-            <article className="theme-library-card" key={card.id}>
-              <h2>{definition?.collection?.label ?? card.label}</h2>
-              {definition?.collection && (
-                <label>
-                  Variant{" "}
-                  <select
-                    aria-label={`${definition.collection.label} variant`}
-                    value={card.id}
-                    onChange={(event) =>
-                      setCollectionVariants({
-                        ...collectionVariants,
-                        [definition.collection!.id]: event.target.value,
-                      })
-                    }
-                  >
-                    {definitions
-                      .filter(
+            {message}
+          </Notice>
+        )}
+        <section className="flex flex-col gap-2.5">
+          <SectionHeading
+            title={t("Themes")}
+            action={
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={context.isBusy}
+                onClick={() =>
+                  void action(() =>
+                    context.patch({ lightOwner: "", darkOwner: "" }),
+                  )
+                }
+              >
+                {t("Clear mix")}
+              </Button>
+            }
+          />
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-4">
+            {visibleCards.map((card) => {
+              const definition = definitions.find(
+                (theme) => theme.id === card.id,
+              );
+              const isCustom = customs.some((theme) => theme.id === card.id);
+              const activeModes = picked(card.id);
+              /** Apply the whole theme, or every variant of its collection. */
+              const applyTheme = () =>
+                void action(async () => {
+                  const members = definition?.collection
+                    ? definitions.filter(
                         (theme) =>
                           theme.collection?.id === definition.collection!.id,
                       )
-                      .map((theme) => (
-                        <option key={theme.id} value={theme.id}>
-                          {theme.label}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              )}
-              <ThemeWireframe
-                className="h-28"
-                panes={card.previews.map((preview) => ({
-                  colors: preview.colors,
-                  clip:
-                    card.previews.length === 2
-                      ? preview.mode === "light"
-                        ? "left"
-                        : "right"
-                      : undefined,
-                }))}
-              />
-              <ThemePreviewCircles
-                label={card.label}
-                previews={card.previews}
-                activeModes={picked(card.id)}
-                onSelectMode={(mode) => {
-                  if (mode !== "system")
-                    void action(() => context.select(card.id, mode));
-                }}
-              />
-              <div className="card-actions">
-                <button
-                  disabled={context.isBusy}
-                  onClick={() =>
-                    void action(async () => {
-                      const members = definition?.collection
-                        ? definitions.filter(
+                    : definition
+                      ? [definition]
+                      : [];
+                  const owners = collectionOwners(members);
+                  if (owners) await context.patch(owners);
+                  else
+                    await context.select(
+                      card.id === "default" ? preferences.mode : card.id,
+                    );
+                  if (definition?.collection)
+                    setCollectionVariants((current) => ({
+                      ...current,
+                      [definition.collection!.id]: members[0].id,
+                    }));
+                });
+              return (
+                <article
+                  key={card.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t("Use theme {name}", {
+                    name: definition?.collection?.label ?? card.label,
+                  })}
+                  aria-disabled={context.isBusy || undefined}
+                  className={cn(
+                    "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-card transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-wait",
+                    activeModes.length > 0
+                      ? "border-primary/50 ring-1 ring-primary/20"
+                      : "border-border hover:border-foreground/25 hover:bg-accent/30",
+                  )}
+                  onClick={(event) => {
+                    const target = event.target as Element;
+                    if (
+                      context.isBusy ||
+                      !event.currentTarget.contains(target) ||
+                      target.closest(
+                        "button, input, select, [role=combobox], [role=menuitem]",
+                      )
+                    )
+                      return;
+                    applyTheme();
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      !context.isBusy &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      applyTheme();
+                    }
+                  }}
+                >
+                  <div className="border-b border-border p-2">
+                    <ThemeWireframe
+                      className="h-24 overflow-hidden rounded-md"
+                      panes={card.previews.map((preview) => ({
+                        colors: preview.colors,
+                        clip:
+                          card.previews.length === 2
+                            ? preview.mode === "light"
+                              ? "left"
+                              : "right"
+                            : undefined,
+                      }))}
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-3 p-3">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <h3 className="truncate text-sm font-medium">
+                        {definition?.collection?.label ?? card.label}
+                      </h3>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {activeModes.map((mode) => (
+                          <span
+                            key={mode}
+                            className="rounded-full bg-primary/10 px-1.5 py-px text-2xs font-medium text-primary"
+                          >
+                            {mode === "light" ? t("Light") : t("Dark")}
+                          </span>
+                        ))}
+                        <ActionMenu
+                          label={t("More actions for {name}", {
+                            name: card.label,
+                          })}
+                        >
+                          <ActionMenuItem
+                            onClick={() =>
+                              context.openEditor({
+                                editing: null,
+                                seed: definition ?? null,
+                                name: t("{name} copy", {
+                                  name: card.label.slice(0, 40),
+                                }),
+                              })
+                            }
+                          >
+                            {t("Duplicate")}
+                          </ActionMenuItem>
+                          {isCustom && (
+                            <ActionMenuItem
+                              onClick={() =>
+                                context.openEditor({
+                                  editing: definition!,
+                                  seed: null,
+                                })
+                              }
+                            >
+                              {t("Edit")}
+                            </ActionMenuItem>
+                          )}
+                          {definition && (
+                            <ActionMenuItem
+                              onClick={() =>
+                                void action(async () => {
+                                  const wasSaved = await nativeApi.ExportTheme(
+                                    models.Definition.createFrom(
+                                      JSON.stringify(definition),
+                                    ),
+                                  );
+                                  setStatus(
+                                    wasSaved
+                                      ? t("Theme exported.")
+                                      : t("Export cancelled."),
+                                  );
+                                })
+                              }
+                            >
+                              {t("Export")}
+                            </ActionMenuItem>
+                          )}
+                          {definition && (
+                            <ActionMenuItem
+                              onClick={() =>
+                                void action(async () => {
+                                  await navigator.clipboard.writeText(
+                                    serializeThemeFile(definition),
+                                  );
+                                  setStatus(t("Theme JSON copied."));
+                                })
+                              }
+                            >
+                              {t("Copy JSON")}
+                            </ActionMenuItem>
+                          )}
+                          {isCustom && (
+                            <ActionMenuItem
+                              variant="destructive"
+                              onClick={() => requestRemoval([definition!])}
+                            >
+                              {t("Remove")}
+                            </ActionMenuItem>
+                          )}
+                        </ActionMenu>
+                      </div>
+                    </div>
+                    {definition?.collection && (
+                      <OptionSelect
+                        label={t("{name} variant", {
+                          name: definition.collection.label,
+                        })}
+                        className="w-full"
+                        value={card.id}
+                        options={definitions
+                          .filter(
                             (theme) =>
                               theme.collection?.id ===
                               definition.collection!.id,
                           )
-                        : definition
-                          ? [definition]
-                          : [];
-                      const owners = collectionOwners(members);
-                      if (owners) await context.patch(owners);
-                      else
-                        await context.select(
-                          card.id === "default" ? preferences.mode : card.id,
-                        );
-                      if (definition?.collection)
-                        setCollectionVariants((current) => ({
-                          ...current,
-                          [definition.collection!.id]: members[0].id,
-                        }));
-                    })
-                  }
-                >
-                  Use theme
-                </button>
-                <button
-                  onClick={() =>
-                    context.openEditor({
-                      editing: null,
-                      seed: definition ?? null,
-                      name: `${card.label.slice(0, 40)} copy`,
-                    })
-                  }
-                >
-                  Duplicate
-                </button>
-                {isCustom && (
-                  <button
-                    onClick={() =>
-                      context.openEditor({ editing: definition!, seed: null })
-                    }
-                  >
-                    Edit
-                  </button>
-                )}
-                {definition && (
-                  <button
-                    onClick={() =>
-                      void action(async () => {
-                        const wasSaved = await nativeApi.ExportTheme(
-                          models.Definition.createFrom(
-                            JSON.stringify(definition),
-                          ),
-                        );
-                        setStatus(
-                          wasSaved ? "Theme exported." : "Export cancelled.",
-                        );
-                      })
-                    }
-                  >
-                    Export
-                  </button>
-                )}
-                {definition && (
-                  <button
-                    onClick={() =>
-                      void action(async () => {
-                        await navigator.clipboard.writeText(
-                          serializeThemeFile(definition),
-                        );
-                        setStatus("Theme JSON copied.");
-                      })
-                    }
-                  >
-                    Copy JSON
-                  </button>
-                )}
-                {isCustom && (
-                  <button onClick={() => requestRemoval([definition!])}>
-                    Remove
-                  </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {collections.length > 0 && (
-        <section className="settings-block">
-          <h2>Collections</h2>
-          {collections.map((collection) => (
-            <div className="preference-row" key={collection.id}>
-              <span>
-                {collection.label} ·{" "}
-                {
-                  customs.filter(
-                    (theme) => theme.collection?.id === collection.id,
-                  ).length
-                }{" "}
-                variants
-              </span>
-              <button
-                onClick={() =>
-                  requestRemoval(
-                    customs.filter(
-                      (theme) => theme.collection?.id === collection.id,
-                    ),
-                  )
-                }
-              >
-                Remove variants…
-              </button>
-            </div>
-          ))}
+                          .map((theme) => ({
+                            value: theme.id,
+                            label: theme.label,
+                          }))}
+                        onChange={(identity) =>
+                          setCollectionVariants({
+                            ...collectionVariants,
+                            [definition.collection!.id]: identity,
+                          })
+                        }
+                      />
+                    )}
+                    <ThemePreviewCircles
+                      label={card.label}
+                      previews={card.previews}
+                      activeModes={activeModes}
+                      onSelectMode={(mode) => {
+                        if (mode !== "system")
+                          void action(() => context.select(card.id, mode));
+                      }}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </section>
-      )}
-      <Dialog
-        open={removal !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setRemoval(null);
-        }}
-      >
-        <DialogPopup>
-          <DialogTitle>Remove custom themes</DialogTitle>
-          <DialogDescription>
-            Choose the variants to remove. Selected owners will fall back to the
-            standard palette.
-          </DialogDescription>
-          {removal?.map((theme) => (
-            <label key={theme.id} className="preference-row">
-              <input
-                type="checkbox"
-                checked={removedIds.includes(theme.id)}
-                onChange={(event) =>
-                  setRemovedIds(
-                    event.target.checked
-                      ? [...removedIds, theme.id]
-                      : removedIds.filter((identity) => identity !== theme.id),
-                  )
+        {collections.length > 0 && (
+          <SettingsSection title={t("Collections")}>
+            {collections.map((collection) => (
+              <SettingsRow
+                key={collection.id}
+                title={collection.label}
+                description={t("{count} variants", {
+                  count: customs.filter(
+                    (theme) => theme.collection?.id === collection.id,
+                  ).length,
+                })}
+                control={
+                  <Button
+                    variant="destructive-outline"
+                    size="sm"
+                    onClick={() =>
+                      requestRemoval(
+                        customs.filter(
+                          (theme) => theme.collection?.id === collection.id,
+                        ),
+                      )
+                    }
+                  >
+                    {t("Remove variants…")}
+                  </Button>
                 }
               />
-              {theme.label}
-            </label>
-          ))}
-          <button onClick={() => setRemoval(null)}>Cancel</button>
-          <button
-            disabled={context.isBusy || removedIds.length === 0}
-            onClick={() =>
-              void action(async () => {
-                await removeThemes(removedIds);
-                setRemoval(null);
-              })
-            }
-          >
-            Remove selected themes
-          </button>
-        </DialogPopup>
-      </Dialog>
-      <section className="settings-block">
-        <h2>Import themes</h2>
-        <p>
-          T3 Code and VS Code JSON. Files and pasted data are limited to 256
-          KiB.
-        </p>
-        <button
-          onClick={() =>
-            void action(async () => prepare(await nativeApi.PickThemeFiles()))
-          }
-        >
-          Choose files
-        </button>
-        <textarea
-          aria-label="Paste theme JSON"
-          value={paste}
-          onChange={(event) => setPaste(event.target.value)}
-          placeholder="Paste theme JSON or drop files into the window"
-        />
-        <button
-          onClick={() =>
-            prepare([
-              {
-                name: "Pasted theme",
-                text: paste,
-                size: new TextEncoder().encode(paste).length,
-              },
-            ])
-          }
-        >
-          Preview pasted theme
-        </button>
-        {draft && (
-          <div
-            role="region"
-            aria-label="Theme import preview"
-            className="import-preview"
-          >
-            <h3>Ready to import {draft.themes.length} themes</h3>
-            <p>{draft.themes.map((theme) => theme.label).join(", ")}</p>
-            {draft.attribution && (
-              <p>
-                {draft.attribution.publisher} · {draft.attribution.version} ·{" "}
-                {draft.attribution.license}
-              </p>
-            )}
-            <label>
-              <input
-                type="checkbox"
-                checked={shouldReplace}
-                onChange={(event) => setShouldReplace(event.target.checked)}
-              />{" "}
-              Update existing themes / replace matching collection
-            </label>
-            <p>Uncheck to keep both when IDs collide.</p>
-            <button
-              disabled={context.isBusy}
-              onClick={() => void action(commitImport)}
-            >
-              Import themes
-            </button>
-            <button onClick={() => setDraft(null)}>Discard import</button>
-          </div>
-        )}
-      </section>
-      <section className="settings-block">
-        <h2>Open VSX</h2>
-        <p>
-          Only verified theme resources with supported licenses are imported.
-        </p>
-        <div className="preference-row">
-          <input
-            aria-label="Search Open VSX themes"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Dracula, Catppuccin, Nord, Tokyo Night"
-          />
-          <select
-            aria-label="Theme search sort"
-            value={sort}
-            onChange={(event) =>
-              setSort(event.target.value as OpenVsxThemeSort)
-            }
-          >
-            <option value="downloadCount">Most downloaded</option>
-            <option value="rating">Best rated</option>
-            <option value="timestamp">Newest</option>
-            <option value="relevance">Most relevant</option>
-          </select>
-          {isSearching && <span role="status">Searching…</span>}
-        </div>
-        <div className="card-actions">
-          {["Dracula", "Catppuccin", "Nord", "Tokyo Night"].map(
-            (suggestion) => (
-              <button key={suggestion} onClick={() => setQuery(suggestion)}>
-                {suggestion}
-              </button>
-            ),
-          )}
-        </div>
-        <div className="extension-list">
-          {extensions.map((extension) => (
-            <div className="extension-row" key={extension.id}>
-              <div>
-                <strong>{extension.name}</strong>
-                <p>{extension.description}</p>
-                <small>
-                  {extension.publisher} · {extension.version} ·{" "}
-                  {extension.license} ·{" "}
-                  {extension.downloadCount.toLocaleString()} downloads
-                </small>
-              </div>
-              <button
-                disabled={isDownloading}
-                onClick={() => void action(() => downloadExtension(extension))}
-              >
-                {collections.some(
-                  (collection) => collection.id === extension.collectionId,
-                )
-                  ? "Preview update"
-                  : "Preview import"}
-              </button>
-            </div>
-          ))}
-        </div>
-        {isDownloading && (
-          <button onClick={() => download.current?.abort()}>
-            Cancel download
-          </button>
-        )}
-      </section>
-      <section className="settings-block">
-        <h2>Typography</h2>
-        <p>Font size, display scale and spacing density are independent.</p>
-        <div className="preference-row">
-          <label>
-            Interface font{" "}
-            <input
-              list="local-font-families"
-              value={fontDraft.sans}
-              placeholder="System default"
-              onChange={(event) =>
-                setFontDraft({ ...fontDraft, sans: event.target.value })
-              }
-              onBlur={() =>
-                void action(() =>
-                  context.patch({
-                    typography: models.Typography.createFrom(fontDraft),
-                  }),
-                )
-              }
-            />
-          </label>
-          <button
-            disabled={context.isBusy}
-            onClick={() =>
-              void action(() =>
-                context.patch({
-                  typography: models.Typography.createFrom({
-                    ...preferences.typography,
-                    sans: "",
-                  }),
-                }),
-              )
-            }
-          >
-            Reset interface font
-          </button>
-          <label>
-            Monospace font{" "}
-            <input
-              list="local-font-families"
-              value={fontDraft.code}
-              placeholder="System default"
-              onChange={(event) =>
-                setFontDraft({ ...fontDraft, code: event.target.value })
-              }
-              onBlur={() =>
-                void action(() =>
-                  context.patch({
-                    typography: models.Typography.createFrom(fontDraft),
-                  }),
-                )
-              }
-            />
-          </label>
-          <button
-            disabled={context.isBusy}
-            onClick={() =>
-              void action(() =>
-                context.patch({
-                  typography: models.Typography.createFrom({
-                    ...preferences.typography,
-                    code: "",
-                  }),
-                }),
-              )
-            }
-          >
-            Reset monospace font
-          </button>
-          <button onClick={() => void action(discoverFonts)}>
-            Find installed fonts
-          </button>
-          <datalist id="local-font-families">
-            {fontNames.map((font) => (
-              <option key={font} value={font} />
             ))}
-          </datalist>
-        </div>
-        <div className="preference-row">
-          <label>
-            Interface size{" "}
-            <input
-              type="number"
-              min={12}
-              max={20}
-              value={fontDraft.interfaceSize}
-              onChange={(event) =>
-                setFontDraft({
-                  ...fontDraft,
-                  interfaceSize: Number(event.target.value),
-                })
-              }
-              onBlur={() =>
-                void action(() =>
-                  context.patch({
-                    typography: models.Typography.createFrom(fontDraft),
-                  }),
-                )
-              }
-            />
-          </label>
-          <button
-            disabled={context.isBusy}
-            onClick={() =>
-              void action(() =>
-                context.patch({
-                  typography: models.Typography.createFrom({
-                    ...preferences.typography,
-                    interfaceSize: 16,
-                  }),
-                }),
-              )
-            }
-          >
-            Reset interface size
-          </button>
-          <label>
-            Monospace size{" "}
-            <input
-              type="number"
-              min={10}
-              max={18}
-              value={fontDraft.codeSize}
-              onChange={(event) =>
-                setFontDraft({
-                  ...fontDraft,
-                  codeSize: Number(event.target.value),
-                })
-              }
-              onBlur={() =>
-                void action(() =>
-                  context.patch({
-                    typography: models.Typography.createFrom(fontDraft),
-                  }),
-                )
-              }
-            />
-          </label>
-          <button
-            disabled={context.isBusy}
-            onClick={() =>
-              void action(() =>
-                context.patch({
-                  typography: models.Typography.createFrom({
-                    ...preferences.typography,
-                    codeSize: 13,
-                  }),
-                }),
-              )
-            }
-          >
-            Reset monospace size
-          </button>
-          <label>
-            <input
-              type="checkbox"
-              checked={fontDraft.smoothing}
-              onChange={(event) => {
-                const typography = models.Typography.createFrom({
-                  ...fontDraft,
-                  smoothing: event.target.checked,
-                });
-                setFontDraft(typography);
-                void action(() => context.patch({ typography }));
-              }}
-            />{" "}
-            Smooth fonts
-          </label>
-          <button
-            disabled={context.isBusy}
-            onClick={() =>
-              void action(() =>
-                context.patch({
-                  typography: models.Typography.createFrom({
-                    ...preferences.typography,
-                    smoothing: false,
-                  }),
-                }),
-              )
-            }
-          >
-            Reset font smoothing
-          </button>
-        </div>
-        <p
-          className="font-preview"
-          style={{
-            fontFamily: fontFamilyList(fontDraft.sans || "Segoe UI"),
-            fontSize: fontDraft.interfaceSize,
+          </SettingsSection>
+        )}
+        <Dialog
+          open={removal !== null}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setRemoval(null);
           }}
         >
-          The quick brown fox · 0123456789
-        </p>
-        <code
-          style={{
-            fontFamily: fontFamilyList(fontDraft.code || "Consolas"),
-            fontSize: fontDraft.codeSize,
-          }}
-        >
-          input: 123,456 · cost: $1.2345
-        </code>
-      </section>
-      <section className="settings-block">
-        <h2>Effects</h2>
-        {(
-          [
-            { key: "contrast", label: "Contrast", min: 50, max: 200 },
-            { key: "glassOpacity", label: "Glass opacity", min: 40, max: 100 },
-            {
-              key: "motionMs",
-              label: "Panel animation duration",
-              min: 0,
-              max: 400,
-            },
-          ] as const
-        ).map((setting) => (
-          <EffectSlider
-            key={setting.key}
-            label={setting.label}
-            min={setting.min}
-            max={setting.max}
-            value={preferences[setting.key]}
-            unit={setting.key === "motionMs" ? " ms" : "%"}
-            defaultValue={
-              setting.key === "contrast"
-                ? 100
-                : setting.key === "glassOpacity"
-                  ? 80
-                  : 0
+          <DialogPopup className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("Remove custom themes")}</DialogTitle>
+              <DialogDescription>
+                {t(
+                  "Choose the variants to remove. Selected owners will fall back to the standard palette.",
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-1 px-6 pb-4">
+              {removal?.map((theme) => (
+                <label
+                  key={theme.id}
+                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={removedIds.includes(theme.id)}
+                    onChange={(event) =>
+                      setRemovedIds(
+                        event.target.checked
+                          ? [...removedIds, theme.id]
+                          : removedIds.filter(
+                              (identity) => identity !== theme.id,
+                            ),
+                      )
+                    }
+                  />
+                  {theme.label}
+                </label>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRemoval(null)}>
+                {t("Cancel")}
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={context.isBusy || removedIds.length === 0}
+                onClick={() =>
+                  void action(async () => {
+                    await removeThemes(removedIds);
+                    setRemoval(null);
+                  })
+                }
+              >
+                {t("Remove selected themes")}
+              </Button>
+            </DialogFooter>
+          </DialogPopup>
+        </Dialog>
+        <SettingsSection title={t("Typography")}>
+          <SettingsRow
+            title={t("Interface font")}
+            control={
+              <>
+                <Input
+                  size="sm"
+                  aria-label={t("Interface font")}
+                  className="w-52"
+                  list="local-font-families"
+                  value={fontDraft.sans}
+                  placeholder={t("System default")}
+                  onChange={(event) =>
+                    setFontDraft({ ...fontDraft, sans: event.target.value })
+                  }
+                  onBlur={saveTypography}
+                />
+                <ResetButton
+                  label={t("Reset interface font")}
+                  disabled={context.isBusy}
+                  onClick={() => resetTypography({ sans: "" })}
+                />
+              </>
             }
-            onSave={(value) => context.patch({ [setting.key]: value })}
           />
-        ))}
-        <p>Reduced-motion preferences take precedence over animations.</p>
-      </section>
-      {(context.snapshot.value.attributions ?? []).length > 0 && (
-        <details className="settings-block">
-          <summary>Imported theme licenses</summary>
-          {context.snapshot.value.attributions.map((value) => (
-            <p key={value.collectionId}>
-              {value.name} · {value.publisher} · {value.version} ·{" "}
-              {value.license}
-            </p>
+          <SettingsRow
+            title={t("Monospace font")}
+            control={
+              <>
+                <Input
+                  size="sm"
+                  aria-label={t("Monospace font")}
+                  className="w-52"
+                  list="local-font-families"
+                  value={fontDraft.code}
+                  placeholder={t("System default")}
+                  onChange={(event) =>
+                    setFontDraft({ ...fontDraft, code: event.target.value })
+                  }
+                  onBlur={saveTypography}
+                />
+                <ResetButton
+                  label={t("Reset monospace font")}
+                  disabled={context.isBusy}
+                  onClick={() => resetTypography({ code: "" })}
+                />
+              </>
+            }
+          />
+          <SettingsRow
+            title={t("Interface size")}
+            description="12–20 px"
+            control={
+              <>
+                <Input
+                  size="sm"
+                  type="number"
+                  aria-label={t("Interface size")}
+                  className="w-20"
+                  min={12}
+                  max={20}
+                  value={fontDraft.interfaceSize}
+                  onChange={(event) =>
+                    setFontDraft({
+                      ...fontDraft,
+                      interfaceSize: Number(event.target.value),
+                    })
+                  }
+                  onBlur={saveTypography}
+                />
+                <ResetButton
+                  label={t("Reset interface size")}
+                  disabled={context.isBusy}
+                  onClick={() => resetTypography({ interfaceSize: 16 })}
+                />
+              </>
+            }
+          />
+          <SettingsRow
+            title={t("Monospace size")}
+            description="10–18 px"
+            control={
+              <>
+                <Input
+                  size="sm"
+                  type="number"
+                  aria-label={t("Monospace size")}
+                  className="w-20"
+                  min={10}
+                  max={18}
+                  value={fontDraft.codeSize}
+                  onChange={(event) =>
+                    setFontDraft({
+                      ...fontDraft,
+                      codeSize: Number(event.target.value),
+                    })
+                  }
+                  onBlur={saveTypography}
+                />
+                <ResetButton
+                  label={t("Reset monospace size")}
+                  disabled={context.isBusy}
+                  onClick={() => resetTypography({ codeSize: 14 })}
+                />
+              </>
+            }
+          />
+          <SettingsRow
+            title={t("Smooth fonts")}
+            control={
+              <Switch
+                aria-label={t("Smooth fonts")}
+                checked={fontDraft.smoothing}
+                onCheckedChange={(isChecked) => {
+                  const typography = models.Typography.createFrom({
+                    ...fontDraft,
+                    smoothing: isChecked,
+                  });
+                  setFontDraft(typography);
+                  void action(() => context.patch({ typography }));
+                }}
+              />
+            }
+          />
+          <SettingsRow
+            title={t("Preview")}
+            control={
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => void action(discoverFonts)}
+              >
+                {t("Find installed fonts")}
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-1.5 rounded-lg bg-muted/40 px-3 py-2.5">
+              <p
+                style={{
+                  fontFamily: fontFamilyList(fontDraft.sans || "Segoe UI"),
+                  fontSize: fontDraft.interfaceSize,
+                }}
+              >
+                The quick brown fox · 0123456789
+              </p>
+              <code
+                className="text-muted-foreground"
+                style={{
+                  fontFamily: fontFamilyList(fontDraft.code || "Consolas"),
+                  fontSize: fontDraft.codeSize,
+                }}
+              >
+                input: 123,456 · cost: $1.2345
+              </code>
+            </div>
+            <datalist id="local-font-families">
+              {fontNames.map((font) => (
+                <option key={font} value={font} />
+              ))}
+            </datalist>
+          </SettingsRow>
+        </SettingsSection>
+        <SettingsSection title={t("Effects")}>
+          {(
+            [
+              { key: "contrast", label: msg("Contrast"), min: 50, max: 200 },
+              {
+                key: "glassOpacity",
+                label: msg("Glass opacity"),
+                min: 40,
+                max: 100,
+              },
+              {
+                key: "motionMs",
+                label: msg("Panel animation duration"),
+                min: 0,
+                max: 400,
+              },
+            ] as const
+          ).map((setting) => (
+            <EffectSlider
+              key={setting.key}
+              label={t(setting.label)}
+              min={setting.min}
+              max={setting.max}
+              value={preferences[setting.key]}
+              unit={setting.key === "motionMs" ? " ms" : "%"}
+              defaultValue={
+                setting.key === "contrast"
+                  ? 100
+                  : setting.key === "glassOpacity"
+                    ? 80
+                    : 0
+              }
+              onSave={(value) => context.patch({ [setting.key]: value })}
+            />
           ))}
-        </details>
-      )}
+        </SettingsSection>
+        <SettingsSection title={t("Import themes")}>
+          <SettingsRow
+            title={t("Theme files")}
+            description={t(
+              "T3 Code and VS Code JSON. Files and pasted data are limited to 256 KiB. You can also drop files into the window.",
+            )}
+            control={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void action(async () =>
+                    prepare(await nativeApi.PickThemeFiles()),
+                  )
+                }
+              >
+                <UploadIcon aria-hidden />
+                {t("Choose files")}
+              </Button>
+            }
+          />
+          <SettingsRow title={t("Paste JSON")}>
+            <textarea
+              aria-label={t("Paste theme JSON")}
+              value={paste}
+              onChange={(event) => setPaste(event.target.value)}
+              placeholder='{ "name": "My theme", … }'
+              className="h-32 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/24 dark:bg-input/32"
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!paste.trim()}
+                onClick={() =>
+                  prepare([
+                    {
+                      name: "Pasted theme",
+                      text: paste,
+                      size: new TextEncoder().encode(paste).length,
+                    },
+                  ])
+                }
+              >
+                {t("Preview pasted theme")}
+              </Button>
+            </div>
+          </SettingsRow>
+          {draft && (
+            <div
+              role="region"
+              aria-label={t("Theme import preview")}
+              className="settings-row flex flex-col gap-3 bg-primary/[0.04]"
+            >
+              <div className="flex flex-col gap-0.5">
+                <h3 className="text-sm font-medium">
+                  {t("Ready to import {count} themes", {
+                    count: draft.themes.length,
+                  })}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {draft.themes.map((theme) => theme.label).join(", ")}
+                </p>
+                {draft.attribution && (
+                  <p className="text-xs text-muted-foreground">
+                    {draft.attribution.publisher} · {draft.attribution.version}{" "}
+                    · {draft.attribution.license}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch
+                    size="sm"
+                    checked={shouldReplace}
+                    onCheckedChange={setShouldReplace}
+                  />
+                  {t("Update existing themes / replace matching collection")}
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDraft(null)}
+                  >
+                    {t("Discard import")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={context.isBusy}
+                    onClick={() => void action(commitImport)}
+                  >
+                    {t("Import themes")}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("Turn off to keep both when IDs collide.")}
+              </p>
+            </div>
+          )}
+        </SettingsSection>
+        <SettingsSection
+          title="Open VSX"
+          action={
+            isSearching ? (
+              <span role="status" className="text-xs text-muted-foreground">
+                {t("Searching…")}
+              </span>
+            ) : undefined
+          }
+        >
+          <SettingsRow>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-48 flex-1">
+                <SearchIcon
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  size="sm"
+                  className="[&_input]:ps-8"
+                  aria-label={t("Search Open VSX themes")}
+                  value={query}
+                  onChange={(event) => {
+                    setIsMarketOpen(true);
+                    setQuery(event.target.value);
+                  }}
+                  placeholder="Dracula, Catppuccin, Nord, Tokyo Night"
+                />
+              </div>
+              <OptionSelect
+                label={t("Theme search sort")}
+                value={sort}
+                options={SORT_OPTIONS.map((option) => ({
+                  ...option,
+                  label: t(option.label),
+                }))}
+                onChange={(next) => {
+                  setIsMarketOpen(true);
+                  setSort(next);
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {["Dracula", "Catppuccin", "Nord", "Tokyo Night"].map(
+                (suggestion) => (
+                  <Button
+                    key={suggestion}
+                    variant="secondary"
+                    size="xs"
+                    className="rounded-full"
+                    onClick={() => {
+                      setIsMarketOpen(true);
+                      setQuery(suggestion);
+                    }}
+                  >
+                    {suggestion}
+                  </Button>
+                ),
+              )}
+              {!isMarketOpen && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setIsMarketOpen(true)}
+                >
+                  {t("Browse theme catalogue")}
+                </Button>
+              )}
+            </div>
+          </SettingsRow>
+          {extensions.map((extension) => (
+            <SettingsRow
+              key={extension.id}
+              title={<span className="font-medium">{extension.name}</span>}
+              description={
+                <>
+                  {extension.description && (
+                    <span className="line-clamp-2">
+                      {extension.description}
+                    </span>
+                  )}
+                  <span className="text-2xs">
+                    {extension.publisher} · {extension.version} ·{" "}
+                    {extension.license} ·{" "}
+                    {t("{count} downloads", {
+                      count: extension.downloadCount.toLocaleString(),
+                    })}
+                  </span>
+                </>
+              }
+              control={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloading}
+                  onClick={() =>
+                    void action(() => downloadExtension(extension))
+                  }
+                >
+                  {collections.some(
+                    (collection) => collection.id === extension.collectionId,
+                  )
+                    ? t("Preview update")
+                    : t("Preview import")}
+                </Button>
+              }
+            />
+          ))}
+          {isDownloading && (
+            <SettingsRow
+              title={t("Downloading…")}
+              control={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => download.current?.abort()}
+                >
+                  {t("Cancel download")}
+                </Button>
+              }
+            />
+          )}
+        </SettingsSection>
+        {(context.snapshot.value.attributions ?? []).length > 0 && (
+          <SettingsSection title={t("Imported theme licenses")}>
+            {context.snapshot.value.attributions.map((value) => (
+              <SettingsRow
+                key={value.collectionId}
+                title={value.name}
+                description={`${value.publisher} · ${value.version} · ${value.license}`}
+              />
+            ))}
+          </SettingsSection>
+        )}
+      </PageBody>
     </section>
+  );
+}
+
+const SORT_OPTIONS: readonly { value: OpenVsxThemeSort; label: string }[] = [
+  { value: "downloadCount", label: msg("Most downloaded") },
+  { value: "rating", label: msg("Best rated") },
+  { value: "timestamp", label: msg("Newest") },
+  { value: "relevance", label: msg("Most relevant") },
+];
+
+/**
+ * Icon-only reset-to-default action.
+ *
+ * @param props - Accessible label, disabled state and click handler.
+ * @returns The reset button.
+ */
+function ResetButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <RotateCcwIcon aria-hidden />
+    </Button>
   );
 }
