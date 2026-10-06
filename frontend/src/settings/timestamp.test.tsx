@@ -1,6 +1,14 @@
-/** Reset labels preserve the upstream local calendar day and invalid-input rules. */
-import { describe, expect, it } from "vitest";
-import { formatUpcomingTimestamp } from "../../vendor/timestampFormat";
+/** Regional time choices must use the native locale and replace cached formatters. */
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  configureTimestampLocale,
+  formatDayAwareTimestamp,
+  formatShortTimestamp,
+  formatUpcomingTimestamp,
+  weekStartsOn,
+} from "../../vendor/timestampFormat";
+
+afterEach(() => configureTimestampLocale(undefined));
 
 describe("reset timestamp presentation", () => {
   it("uses tomorrow's calendar date rather than a rolling duration", () => {
@@ -22,4 +30,28 @@ describe("reset timestamp presentation", () => {
       "",
     );
   });
+});
+
+it("changes locale time, date order and calendar week without stale caches", () => {
+  const instant = new Date(2026, 9, 6, 13, 4).toISOString();
+  configureTimestampLocale("en-US");
+  expect(formatShortTimestamp(instant, "locale")).toBe(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(instant)),
+  );
+  configureTimestampLocale("de-DE");
+  expect(formatShortTimestamp(instant, "locale")).toBe(
+    new Intl.DateTimeFormat("de-DE", {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(instant)),
+  );
+  expect(
+    formatDayAwareTimestamp(instant, "24-hour", new Date(2026, 9, 9).getTime()),
+  ).toBe("6.10. 13:04");
+  expect(weekStartsOn).toBe(1);
+  configureTimestampLocale("not a locale");
+  expect(() => formatShortTimestamp(instant, "locale")).not.toThrow();
 });

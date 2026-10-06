@@ -46,12 +46,7 @@ export function resolveTimestampLocale(
   }
 }
 
-function readHostSystemLocale(): string | null {
-  if (typeof window === "undefined") return null;
-  return null;
-}
-
-const timestampLocale = resolveTimestampLocale(readHostSystemLocale());
+let timestampLocale: string | undefined;
 
 const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const;
 type WeekdayIndex = (typeof WEEKDAY_INDEXES)[number];
@@ -83,7 +78,7 @@ export function resolveWeekStartsOn(
 }
 
 /** Week start for calendars, from the same locale timestamps are shown in. */
-export const weekStartsOn = resolveWeekStartsOn(timestampLocale);
+export let weekStartsOn = resolveWeekStartsOn(timestampLocale);
 
 const timestampFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
@@ -165,15 +160,33 @@ export function formatShortTimestamp(
   return getTimestampFormatter(timestampFormat, false).format(date);
 }
 
-const numericDateFormatter = new Intl.DateTimeFormat(timestampLocale, {
+let numericDateFormatter = new Intl.DateTimeFormat(timestampLocale, {
   month: "numeric",
   day: "numeric",
 });
-const numericDateWithYearFormatter = new Intl.DateTimeFormat(timestampLocale, {
+let numericDateWithYearFormatter = new Intl.DateTimeFormat(timestampLocale, {
   month: "numeric",
   day: "numeric",
   year: "numeric",
 });
+
+/** Apply the native regional locale before mounting any usage views. */
+export function configureTimestampLocale(
+  systemLocale: string | undefined,
+): void {
+  timestampLocale = resolveTimestampLocale(systemLocale);
+  timestampFormatterCache.clear();
+  weekStartsOn = resolveWeekStartsOn(timestampLocale);
+  numericDateFormatter = new Intl.DateTimeFormat(timestampLocale, {
+    month: "numeric",
+    day: "numeric",
+  });
+  numericDateWithYearFormatter = new Intl.DateTimeFormat(timestampLocale, {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 /**
  * Chat timestamp that adds the date once the message is no longer from today:

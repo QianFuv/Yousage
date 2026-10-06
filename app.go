@@ -32,6 +32,7 @@ type Bootstrap struct {
 	RoleCount      int      `json:"roleCount"`
 	Pid            int      `json:"pid"`
 	LifecycleLog   string   `json:"lifecycleLog"`
+	SystemLocale   string   `json:"systemLocale"`
 }
 
 // App exposes bounded fixture and native demonstration actions.
@@ -329,7 +330,7 @@ func fileNames(paths []string) []string {
 
 // GetBootstrap returns reference metadata after native initialization.
 func (service *App) GetBootstrap() Bootstrap {
-	return Bootstrap{SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b", WailsVersion: "3.0.0-beta.28", ReferenceTime: "2026-10-06T12:00:00Z", TimeZone: "UTC", AppearanceMode: "system", IsSystemDark: service.nativeApp.Env.IsDarkMode(), Providers: []string{"codex", "claude", "grok", "cursor", "opencode", "antigravity"}, RoleCount: 57, Pid: os.Getpid(), LifecycleLog: service.logPath}
+	return Bootstrap{SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b", WailsVersion: "3.0.0-beta.28", ReferenceTime: "2026-10-06T12:00:00Z", TimeZone: "UTC", AppearanceMode: "system", IsSystemDark: service.nativeApp.Env.IsDarkMode(), Providers: []string{"codex", "claude", "grok", "cursor", "opencode", "antigravity"}, RoleCount: 57, Pid: os.Getpid(), LifecycleLog: service.logPath, SystemLocale: systemLocale()}
 }
 
 // FrontendReady reveals the window after the frontend applies its theme.

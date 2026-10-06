@@ -23,6 +23,7 @@ export class Bootstrap {
     "roleCount": number;
     "pid": number;
     "lifecycleLog": string;
+    "systemLocale": string;
 
     /** Creates a new Bootstrap instance. */
     constructor($$source: Partial<Bootstrap> = {}) {
@@ -55,6 +56,9 @@ export class Bootstrap {
         }
         if (!("lifecycleLog" in $$source)) {
             this["lifecycleLog"] = "";
+        }
+        if (!("systemLocale" in $$source)) {
+            this["systemLocale"] = "";
         }
 
         Object.assign(this, $$source);
