@@ -122,7 +122,7 @@ func TestPriceCacheFailureDoesNotBlockHistoryOrFreshRates(test *testing.T) {
 		if err := service.Store.Close(); err != nil {
 			test.Fatal(err)
 		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"fixture":{"input_cost_per_token":0.000001,"output_cost_per_token":0.000002}}`)), Header: http.Header{}}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"fixture-provider":{"models":{"fixture":{"cost":{"input":1,"output":2}}}}}`)), Header: http.Header{}}, nil
 	})}
 	if err := service.RefreshRates(ctx, refresh.Request{IsManual: true}); err != nil {
 		test.Fatal("cache write failure rejected valid fresh download", err)

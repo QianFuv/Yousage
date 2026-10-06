@@ -54,22 +54,54 @@ func TestHandCalculatedPricingAndProvenance(t *testing.T) {
 	}
 }
 
-func TestPublicRatesAmbiguityTiersAndExactOverrides(t *testing.T) {
-	table, err := ParseRateTable([]byte(`{"a/model":{"input_cost_per_token":1,"output_cost_per_token":2},"b/model":{"input_cost_per_token":2,"output_cost_per_token":2},"a/same":{"input_cost_per_token":1,"output_cost_per_token":2},"b/same":{"input_cost_per_token":1,"output_cost_per_token":2},"tier":{"input_cost_per_token":2e-6,"output_cost_per_token":1e-5,"cache_read_input_token_cost":2e-7,"cache_creation_input_token_cost":2.5e-6,"input_cost_per_token_priority":4e-6,"output_cost_per_token_priority":2e-5},"half":{"input_cost_per_token":1},"synthetic":{"input_cost_per_token":1,"output_cost_per_token":1}}`))
+func TestModelsDevCatalogPrefersFirstPartyAndConsensus(t *testing.T) {
+	table, err := ParseModelsDevCatalog([]byte(`{
+		"reseller":{"models":{"gpt-x":{"cost":{"input":5,"output":30}},"vendor/open-model":{"cost":{"input":1,"output":2}},"free-model":{"cost":{"input":0,"output":0}}}},
+		"openai":{"models":{"gpt-x":{"cost":{"input":4,"output":20,"cache_read":0.4}}}},
+		"gateway-a":{"models":{"open-model":{"cost":{"input":0.5,"output":1}}}},
+		"gateway-b":{"models":{"Open-Model":{"cost":{"input":0.5,"output":1,"cache_read":0.05,"cache_write":0.6}}}},
+		"gateway-c":{"models":{"open-model":{"cost":{"input":0.5,"output":1}}}},
+		"incomplete":{"models":{"half":{"cost":{"input":1}},"unpriced":{},"synthetic":{"cost":{"input":1,"output":1}}}}
+	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if LookupRate(table, "model") != nil || LookupRate(table, "same") == nil || LookupRate(table, "half") != nil || LookupRate(table, "synthetic") != nil {
-		t.Fatal("public alias ambiguity or synthetic handling")
+	first := LookupRate(table, "gpt-x")
+	if first == nil {
+		t.Fatal("first-party model missing")
 	}
-	rate := LookupRate(table, " Tier[1m] ")
-	assertNear(t, rate.Fast.CacheRead, 4e-7)
-	assertNear(t, rate.Fast.CacheCreation, 5e-6)
+	assertNear(t, first.Input, 4e-6)
+	assertNear(t, first.Output, 2e-5)
+	assertNear(t, first.CacheRead, 4e-7)
+	assertNear(t, first.CacheCreation, 4e-6)
+	gateway := LookupRate(table, "AL/gpt-x")
+	if gateway == nil || gateway.Input != first.Input {
+		t.Fatal("gateway-prefixed ID did not use the bare model price", gateway)
+	}
+	consensus := LookupRate(table, "open-model")
+	if consensus == nil {
+		t.Fatal("reseller-only model missing")
+	}
+	assertNear(t, consensus.Input, 5e-7)
+	assertNear(t, consensus.Output, 1e-6)
+	if free := LookupRate(table, "free-model"); free == nil || free.Input != 0 {
+		t.Fatal("free model must price at zero rather than be unpriced", free)
+	}
+	if LookupRate(table, "half") != nil || LookupRate(table, "unpriced") != nil || LookupRate(table, "synthetic") != nil || LookupRate(table, "missing") != nil {
+		t.Fatal("incomplete, synthetic or unknown model was priced")
+	}
+}
+
+func TestSpeedTiersAndExactOverrides(t *testing.T) {
+	table := RateTable{"tier": {TokenRates: TokenRates{2e-6, 1e-5, 2e-7, 2.5e-6}, Fast: &TokenRates{4e-6, 2e-5, 4e-7, 5e-6}}}
 	record := fixtureRecord()
 	record.Model, record.Speed = "tier", "fast"
 	priced := Price(table, nil, record)
 	assertNear(t, priced.CostUsd, 0.0093)
 	assertNear(t, priced.SpeedPremiumUsd, 0.00465)
+	if LookupRate(table, " Tier[1m] ") == nil {
+		t.Fatal("context suffix or case prevented lookup")
+	}
 	overrides := OverrideRates(map[string]domain.PriceOverride{"Tier[1m]": {InputCostPerMillionTokens: 0, OutputCostPerMillionTokens: 0}})
 	if Price(table, overrides, record).CostUsd == 0 {
 		t.Fatal("case-sensitive override applied to another ID")

@@ -77,7 +77,7 @@ Token accounting must preserve provider semantics:
 
 Pricing prefers explicit user overrides, then provider-reported cost, then
 public model rates. Unknown prices preserve token counts and an `unpriced`
-status. The LiteLLM rate table has a 24-hour cache lifetime, with a 60-second
+status. The models.dev rate table has a 24-hour cache lifetime, with a 60-second
 minimum interval even for forced refreshes. Failed downloads can reuse an old
 table. Normalized records allow repricing without reparsing raw transcripts.
 

@@ -170,7 +170,7 @@ func TestRatesKeepLastGoodOnFailedRefreshAndExpireFreshness(test *testing.T) {
 		if calls > 1 {
 			return nil, errors.New("fixture network failure")
 		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"model":{"input_cost_per_token":0.000001,"output_cost_per_token":0.000002}}`)), Header: http.Header{}}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"fixture-provider":{"models":{"model":{"cost":{"input":1,"output":2}}}}}`)), Header: http.Header{}}, nil
 	})}
 	request := refresh.Request{IsManual: true, IsVisible: true, IsUsagePage: true, IsAutoEnabled: true}
 	if err := service.RefreshRates(ctx, request); err != nil {

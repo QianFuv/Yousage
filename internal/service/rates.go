@@ -11,11 +11,13 @@ import (
 	"yousage/internal/remote"
 )
 
-const ratesUrl = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+// ratesUrl is the models.dev catalog, which also prices models served through gateways and other providers.
+const ratesUrl = "https://models.dev/api.json"
 
 type RateSnapshot struct {
 	Rates       accounting.RateTable `json:"rates"`
 	FetchedAtMs int64                `json:"fetchedAtMs"`
+	Source      string               `json:"source"`
 	IsFresh     bool                 `json:"-"`
 }
 
@@ -52,7 +54,7 @@ func (service *Service) RefreshRates(ctx context.Context, request refresh.Reques
 		return err
 	}
 	age := service.Now().Sub(time.UnixMilli(current.FetchedAtMs))
-	if len(current.Rates) > 0 && ((!request.IsManual && age < 24*time.Hour) || (request.IsManual && age < time.Minute)) {
+	if len(current.Rates) > 0 && current.Source == ratesUrl && ((!request.IsManual && age < 24*time.Hour) || (request.IsManual && age < time.Minute)) {
 		return nil
 	}
 	_, err = service.rates.Run(ctx, "public", request, func(owner context.Context) (RateSnapshot, error) {
@@ -78,11 +80,11 @@ func (service *Service) RefreshRates(ctx context.Context, request refresh.Reques
 		if err != nil || len(data) > 16*1024*1024 {
 			return RateSnapshot{}, errors.New("Public model price document could not be read.")
 		}
-		rates, err := accounting.ParseRateTable(data)
+		rates, err := accounting.ParseModelsDevCatalog(data)
 		if err != nil || len(rates) == 0 {
 			return RateSnapshot{}, errors.New("Public model price document is invalid.")
 		}
-		value := RateSnapshot{Rates: rates, FetchedAtMs: service.Now().UnixMilli(), IsFresh: true}
+		value := RateSnapshot{Rates: rates, FetchedAtMs: service.Now().UnixMilli(), Source: ratesUrl, IsFresh: true}
 		var previous RateSnapshot
 		revision, _ := service.Store.ReadSetting(owner, "public-model-rates", &previous)
 		_, _ = service.Store.WriteSetting(owner, "public-model-rates", revision, value)

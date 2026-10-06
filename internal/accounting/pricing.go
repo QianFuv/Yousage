@@ -27,92 +27,94 @@ type PricedUsage struct {
 	SpeedPremiumUsd float64       `json:"speedPremiumUsd"`
 }
 
-// ParseRateTable ignores incomplete models and ambiguous provider-qualified aliases.
-func ParseRateTable(data []byte) (RateTable, error) {
-	var document map[string]json.RawMessage
-	if err := json.Unmarshal(data, &document); err != nil {
+// FirstPartyProviders lists models.dev providers that publish their own models' list prices, in priority order.
+var FirstPartyProviders = []string{"openai", "anthropic", "google", "xai", "deepseek", "mistral", "moonshotai", "zai", "alibaba", "minimax", "meta", "cohere"}
+
+// ParseModelsDevCatalog reads the models.dev catalog into per-token rates keyed by lowercase bare model ID.
+//
+// The catalog lists the same model under many providers, often at reseller
+// prices. A first-party provider's own list price wins; otherwise the price
+// most providers agree on is used, ties going to the alphabetically first
+// provider. Missing cache rates fall back to the input rate.
+func ParseModelsDevCatalog(data []byte) (RateTable, error) {
+	var catalog map[string]struct {
+		Models map[string]struct {
+			Cost *struct {
+				Input      *float64 `json:"input"`
+				Output     *float64 `json:"output"`
+				CacheRead  *float64 `json:"cache_read"`
+				CacheWrite *float64 `json:"cache_write"`
+			} `json:"cost"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(data, &catalog); err != nil {
 		return nil, err
 	}
-	table := RateTable{}
-	keys := make([]string, 0, len(document))
-	for key := range document {
-		keys = append(keys, key)
+	type listing struct {
+		provider string
+		rate     ModelRate
 	}
-	sort.Strings(keys)
-	for _, name := range keys {
-		var entry map[string]json.RawMessage
-		if json.Unmarshal(document[name], &entry) != nil || entry == nil {
-			continue
+	listings := map[string][]listing{}
+	providers := make([]string, 0, len(catalog))
+	for provider := range catalog {
+		providers = append(providers, provider)
+	}
+	sort.Strings(providers)
+	for _, provider := range providers {
+		for id, model := range catalog[provider].Models {
+			cost := model.Cost
+			key := bareName(strings.ToLower(strings.TrimSpace(id)))
+			if cost == nil || key == "" || !validPrice(cost.Input) || !validPrice(cost.Output) {
+				continue
+			}
+			read, write := *cost.Input, *cost.Input
+			if validPrice(cost.CacheRead) {
+				read = *cost.CacheRead
+			}
+			if validPrice(cost.CacheWrite) {
+				write = *cost.CacheWrite
+			}
+			rate := ModelRate{TokenRates: TokenRates{*cost.Input / 1e6, *cost.Output / 1e6, read / 1e6, write / 1e6}}
+			listings[key] = append(listings[key], listing{strings.ToLower(provider), rate})
 		}
-		standard := readRates(entry, "", nil)
-		key := strings.ToLower(strings.TrimSpace(name))
-		if standard == nil || key == "" {
-			continue
-		}
-		rate := ModelRate{TokenRates: *standard, Fast: readRates(entry, "_priority", standard), Ultrafast: readRates(entry, "_ultrafast", standard)}
-		var specific map[string]json.RawMessage
-		if json.Unmarshal(entry["provider_specific_entry"], &specific) == nil {
-			if multiple := number(specific["fast"]); multiple != nil && *multiple > 0 {
-				rate.Fast = &TokenRates{standard.Input * *multiple, standard.Output * *multiple, standard.CacheRead * *multiple, standard.CacheCreation * *multiple}
+	}
+	priority := map[string]int{}
+	for index, provider := range FirstPartyProviders {
+		priority[provider] = index + 1
+	}
+	table := RateTable{}
+	for key, candidates := range listings {
+		sort.SliceStable(candidates, func(first, second int) bool { return candidates[first].provider < candidates[second].provider })
+		best, bestRank := -1, 0
+		for index, candidate := range candidates {
+			if rank := priority[candidate.provider]; rank > 0 && (best < 0 || rank < bestRank) {
+				best, bestRank = index, rank
 			}
 		}
-		table[key] = rate
-	}
-	candidates := map[string]*ModelRate{}
-	for key, rate := range table {
-		alias := bareName(key)
-		if alias == "" || alias == key {
-			continue
+		if best < 0 {
+			bestCount := 0
+			for index, candidate := range candidates {
+				count := 0
+				for _, other := range candidates {
+					if sameRate(candidate.rate, other.rate) {
+						count++
+					}
+				}
+				if count > bestCount {
+					best, bestCount = index, count
+				}
+			}
 		}
-		if _, exists := table[alias]; exists {
-			continue
-		}
-		held, exists := candidates[alias]
-		if !exists {
-			copy := rate
-			candidates[alias] = &copy
-		} else if held != nil && !sameRate(*held, rate) {
-			candidates[alias] = nil
-		}
-	}
-	for alias, rate := range candidates {
-		if rate != nil {
-			table[alias] = *rate
-		}
+		table[key] = candidates[best].rate
 	}
 	return table, nil
 }
 
-func number(raw json.RawMessage) *float64 {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil
-	}
-	var value float64
-	if json.Unmarshal(raw, &value) != nil || !domain.Finite(value) {
-		return nil
-	}
-	return &value
+// validPrice accepts finite, non-negative catalog prices.
+func validPrice(value *float64) bool {
+	return value != nil && domain.Finite(*value) && *value >= 0
 }
-func readRates(entry map[string]json.RawMessage, suffix string, standard *TokenRates) *TokenRates {
-	input, output := number(entry["input_cost_per_token"+suffix]), number(entry["output_cost_per_token"+suffix])
-	if input == nil || output == nil {
-		return nil
-	}
-	cache := func(name string, standardValue float64) float64 {
-		if value := number(entry[name+suffix]); value != nil {
-			return *value
-		}
-		if standard != nil && standard.Input > 0 {
-			return standardValue / standard.Input * *input
-		}
-		return *input
-	}
-	var read, creation float64
-	if standard != nil {
-		read, creation = standard.CacheRead, standard.CacheCreation
-	}
-	return &TokenRates{*input, *output, cache("cache_read_input_token_cost", read), cache("cache_creation_input_token_cost", creation)}
-}
+
 func sameRate(first, second ModelRate) bool {
 	equal := func(first, second *TokenRates) bool {
 		if first == nil || second == nil {
@@ -133,6 +135,10 @@ func LookupRate(table RateTable, model string) *ModelRate {
 		return nil
 	}
 	rate, exists := table[key]
+	if !exists {
+		// Gateway-prefixed IDs such as "gateway/gpt-5" price as their bare model.
+		rate, exists = table[bareName(key)]
+	}
 	if !exists {
 		return nil
 	}
