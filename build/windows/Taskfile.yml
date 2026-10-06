@@ -3,7 +3,6 @@ version: '3'
 tasks:
   build:
     cmds:
-      - go mod tidy
       - task: :common:build:frontend
       - wails3 generate syso -arch {{.ARCH}} -icon build/windows/icon.ico -manifest build/windows/wails.exe.manifest -info build/windows/info.json -out wails_windows_{{.ARCH}}.syso
       - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui" -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe" .

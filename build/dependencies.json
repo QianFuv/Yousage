@@ -1,0 +1,893 @@
+{
+  "version": "0.1.0",
+  "sourceCommit": "51f7f77f87318a5329d3bab15d513fda5654200b",
+  "dependencies": [
+    {
+      "ecosystem": "go",
+      "name": "github.com/adrg/xdg",
+      "version": "v0.5.3",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/adrg/xdg@v0.5.3",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "fb119fabde05e05b70b07f445b3f41863b22326c0ebb5b7bee9f0309112d3640"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/coder/websocket",
+      "version": "v1.8.14",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/coder/websocket@v1.8.14",
+      "licenses": [
+        {
+          "file": "LICENSE.txt",
+          "sha256": "cc0975a5f6305145bdd7b41ce9479632fdac3870e6ac4281f28017f18c767c4e"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/danieljoos/wincred",
+      "version": "v1.2.3",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/danieljoos/wincred@v1.2.3",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "1702a813fa31858c0d6c7788216fa3dd202472265716998024654c252fc7bb41"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/dlclark/regexp2/v2",
+      "version": "v2.8.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/dlclark/regexp2/v2@v2.8.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "9be5d04bb4d706914d5bf943710da4afeb42048f7c529902fb57c82762a991a9"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/dop251/goja",
+      "version": "v0.0.0-20261004200024-481fdb442bb4",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/dop251/goja@v0.0.0-20261004200024-481fdb442bb4",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "8a1266c1dd7d22027455bea83b92087f606c8d5fc701b269a8411f008ed49a99"
+        },
+        {
+          "file": "ftoa/LICENSE_LUCENE",
+          "sha256": "eb4df27f95a096a23d88e567331a4bee5590d22185942a1b0456197e29d03e59"
+        },
+        {
+          "file": "ftoa/internal/fast/LICENSE_V8",
+          "sha256": "a1ecb1a1e1d57c90ccb2455259db836c68942d83a885091bd4375a52e74bec9d"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/dustin/go-humanize",
+      "version": "v1.0.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/dustin/go-humanize@v1.0.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/fsnotify/fsnotify",
+      "version": "v1.9.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/fsnotify/fsnotify@v1.9.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "2dfbe6d2b5eb18b55148f3805d88648a09e0d17e38428123259afb08c8996e37"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/go-ole/go-ole",
+      "version": "v1.3.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "d883dbca28769ff23dd4368a8edb7ad9f9f23a8f86adde2875c6e41a828aac62"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/go-sourcemap/sourcemap",
+      "version": "v2.1.3+incompatible",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/go-sourcemap/sourcemap@v2.1.3+incompatible",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "92e002c4f78b8f80445cf72c4bd33d78e4998371a5eff80886c5648a7974a19f"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/godbus/dbus/v5",
+      "version": "v5.2.2",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/godbus/dbus/v5@v5.2.2",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "e4646a82a976369d7ae8f6ed5c11d35dc0af18433a8ccc24c85b459ad8b95128"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/google/pprof",
+      "version": "v0.0.0-20260802141513-ef3492d7dac3",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/google/pprof@v0.0.0-20260802141513-ef3492d7dac3",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "file": "third_party/svgpan/LICENSE",
+          "sha256": "154c946c17de61ca71d28e13673d76a5798e6e25995a7397fbae157afc8f62b4"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/google/uuid@v1.6.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0a8d61ed3cbfd5312326e8126c31ce9c627a283adc99131b56896d29ada04b2d"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/mattn/go-colorable",
+      "version": "v0.1.14",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/mattn/go-colorable@v0.1.14",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "88a2379b3ca34bf5c57127aff9dcb802bbb60ece0805cdbda65b3bd115f971d9"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/mattn/go-isatty",
+      "version": "v0.0.24",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/mattn/go-isatty@v0.0.24",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/ncruces/go-strftime",
+      "version": "v1.0.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/ncruces/go-strftime@v1.0.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "38ae43959daf953a393a585b2988672cb65a5a541aca0d0be5e72595a0a16883"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/remyoudompheng/bigfft",
+      "version": "v0.0.0-20230129092748-24d4a6f8daec",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/wailsapp/wails/v3",
+      "version": "v3.0.0-beta.28",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0-beta.28",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d"
+        },
+        {
+          "file": "internal/go-common-file-dialog/LICENSE",
+          "sha256": "2c09e92358414ef4da9739026acadfbd0663118e590238b306d70ccf60db3159"
+        },
+        {
+          "file": "internal/templates/ios/frontend/public/puppertino/LICENSE",
+          "sha256": "a82239687742375c71ef1cc05b9351f86db937b0dba8120c1f0a02e2b444508b"
+        },
+        {
+          "file": "internal/webview2/webviewloader/LICENSE",
+          "sha256": "e2c9290019954c3c3664428b73b34186b2bb8faad9b2c50605d7cdd9df5c7177"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "github.com/zalando/go-keyring",
+      "version": "v0.2.8",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/github.com/zalando/go-keyring@v0.2.8",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "14bc00f1a298eb6af250216b9e60027a4386c8a84fa2c7ddc2b5c10908e06d0d"
+        },
+        {
+          "file": "internal/shellescape/LICENSE",
+          "sha256": "01a4609ac3c7ac0a26d65a967c26c0deb146aa01bdcc8531048a70be52695556"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "golang.org/x/sys",
+      "version": "v0.48.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "golang.org/x/text",
+      "version": "v0.39.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/golang.org/x/text@v0.39.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/libc",
+      "version": "v1.77.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600"
+        },
+        {
+          "file": "LICENSE-3RD-PARTY.md",
+          "sha256": "f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c"
+        },
+        {
+          "file": "testdata/nsz.repo.hu/libc-test/COPYRIGHT",
+          "sha256": "41b8f2e2706012eb534f89e72ff547308cb81dcb9acf077c40a9058a7c06088d"
+        },
+        {
+          "file": "testdata/nsz.repo.hu/libc-test/src/math/crlibm/COPYING",
+          "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/mathutil",
+      "version": "v1.7.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "bfa9bf72a72ca009fd62a8f84fca3dca67e51d93af96352723646599898b6cf5"
+        },
+        {
+          "file": "mersenne/LICENSE",
+          "sha256": "c05630f9ca899ea094620d37daea6ba66f99adbf9268ea5fea9db607e1102bd9"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/memory",
+      "version": "v1.12.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "59895e669f48f168b6b858358f6005779cdf40a265f7828813061b56af67b496"
+        },
+        {
+          "file": "LICENSE-GO",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+        },
+        {
+          "file": "LICENSE-LOGO",
+          "sha256": "5ae5bee3072a841376451b48d8cfcec7188e10543926d5870828d36c8a750dc5"
+        },
+        {
+          "file": "LICENSE-MMAP-GO",
+          "sha256": "c2eba69f20d05414538c3a5df7694dde392e065ff70882e1625e90f5d6659fff"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "modernc.org/sqlite",
+      "version": "v1.60.1",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "c6fe05491a60ae13bcd223088d2705e36dede24e5587226231d2459ada5c4822"
+        },
+        {
+          "file": "LICENSE-3RD-PARTY.md",
+          "sha256": "b4366b9c27a9364633e015011a231913ed19bf1228f335bf617e50a6f7b168a6"
+        },
+        {
+          "file": "LICENSE-SQLITE",
+          "sha256": "8438c9c89b849131ead81d5435cb97fcf052df5b0b286dda8a2d4c29e6cb3fd0"
+        },
+        {
+          "file": "LICENSE-SQLITE_VEC",
+          "sha256": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
+      "name": "Go standard library",
+      "version": "go1.26.2",
+      "license": "BSD-3-Clause",
+      "source": "https://go.dev/LICENSE",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@babel/runtime",
+      "version": "7.29.7",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.7.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@base-ui/react",
+      "version": "1.5.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@base-ui/react/-/react-1.5.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "dc65dbc1cb6dc35e18861d341fa1d98a6e40aaa19b43d7d0a40ba67914d47c55"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@base-ui/utils",
+      "version": "0.2.9",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@base-ui/utils/-/utils-0.2.9.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "dc65dbc1cb6dc35e18861d341fa1d98a6e40aaa19b43d7d0a40ba67914d47c55"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@floating-ui/core",
+      "version": "1.8.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@floating-ui/core/-/core-1.8.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@floating-ui/dom",
+      "version": "1.8.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@floating-ui/dom/-/dom-1.8.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@floating-ui/react-dom",
+      "version": "2.1.9",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@floating-ui/react-dom/-/react-dom-2.1.9.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@floating-ui/utils",
+      "version": "0.2.12",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@floating-ui/utils/-/utils-0.2.12.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@noble/hashes",
+      "version": "2.2.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@noble/hashes/-/hashes-2.2.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@types/react",
+      "version": "19.3.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@wailsio/runtime",
+      "version": "3.0.0-beta.28",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@wailsio/runtime/-/runtime-3.0.0-beta.28.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "class-variance-authority",
+      "version": "0.7.1",
+      "license": "Apache-2.0",
+      "source": "https://registry.npmjs.org/class-variance-authority/-/class-variance-authority-0.7.1.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0ccbf956cffc8dcf515809433cb5242ee67c94513d46e48c261d68d0880de406"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "clsx",
+      "version": "2.1.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
+      "licenses": [
+        {
+          "file": "license",
+          "sha256": "9a9edad7baae52622bddf3c15b2ef8a33d2c89f2d25408ad13e8a7481c6b0c97"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "core-util-is",
+      "version": "1.0.3",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/core-util-is/-/core-util-is-1.0.3.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "csstype",
+      "version": "3.2.3",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "11d55bd4541c75ee7879547ac49089c489163dae49551389713c3d026cab383e"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "culori",
+      "version": "4.0.2",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/culori/-/culori-4.0.2.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "5e9ac3317f048184d001bd3814aed28d4874bdcac9da1d001465e52e1a0e8077"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "effect",
+      "version": "4.0.0-rc.115",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/effect/-/effect-4.0.0-rc.115.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "774c3bc5924ad8ae6c5a75f1c53db13feb238ade15989625c513d07b60dedf30"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "immediate",
+      "version": "3.0.6",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/immediate/-/immediate-3.0.6.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE.txt",
+          "sha256": "809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "inherits",
+      "version": "2.0.4",
+      "license": "ISC",
+      "source": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "5ffe28e7ade7d8f10d85d5337a73fd793dac5c462fb9a28fbf8c5046c7fbca3b"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "isarray",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
+      "licenses": [
+        {
+          "file": "README.md",
+          "sha256": "ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "jsonc-parser",
+      "version": "3.3.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "d0e26984080b12c7830983ef4de2ec522e1aa94047f2753347953b278e9c66e0"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "jszip",
+      "version": "3.10.1",
+      "license": "(MIT OR GPL-3.0-or-later)",
+      "source": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE.markdown",
+          "sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "lie",
+      "version": "3.3.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/lie/-/lie-3.3.0.tgz",
+      "licenses": [
+        {
+          "file": "license.md",
+          "sha256": "5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "lucide-react",
+      "version": "0.564.0",
+      "license": "ISC",
+      "source": "https://registry.npmjs.org/lucide-react/-/lucide-react-0.564.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "668dcc52803480e0a026b31140a4cae668772663cd764e5991d252eef03f98db"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "lucide",
+      "version": "0.564.0",
+      "license": "ISC",
+      "source": "https://registry.npmjs.org/lucide/-/lucide-0.564.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "668dcc52803480e0a026b31140a4cae668772663cd764e5991d252eef03f98db"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "morphicons",
+      "version": "1.7.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/morphicons/-/morphicons-1.7.1.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "bca713965691c297a4fc7e17eb115b373b7d08db4975c1968df7f7707267a4be"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pako",
+      "version": "1.0.11",
+      "license": "(MIT AND Zlib)",
+      "source": "https://registry.npmjs.org/pako/-/pako-1.0.11.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "process-nextick-args",
+      "version": "2.0.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/process-nextick-args/-/process-nextick-args-2.0.1.tgz",
+      "licenses": [
+        {
+          "file": "license.md",
+          "sha256": "ecdccbcf39024f624ded480c01c0b25458e1eca8f26ecf040933865ce56d9a4f"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react-dom",
+      "version": "19.2.6",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react",
+      "version": "19.2.6",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/react/-/react-19.2.6.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "readable-stream",
+      "version": "2.3.8",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/readable-stream/-/readable-stream-2.3.8.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "reselect",
+      "version": "5.3.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/reselect/-/reselect-5.3.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "e98047a5dee068b33f82e8c4b7a63037b5108c93393198efd4097753004af5dd"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "safe-buffer",
+      "version": "5.1.2",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.1.2.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "scheduler",
+      "version": "0.27.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "setimmediate",
+      "version": "1.0.5",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/setimmediate/-/setimmediate-1.0.5.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE.txt",
+          "sha256": "c4b4ad3a5746f1f5249a6dd90396ec519264e1bb02e01e48a6522c48a3a97cb4"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "string_decoder",
+      "version": "1.1.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/string_decoder/-/string_decoder-1.1.1.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tailwind-merge",
+      "version": "3.6.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.6.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "d4c70c7ce38cea8778f0aed3fc0bef0a9dbd27f13bd8b6773cbd6d37941971e5"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "use-sync-external-store",
+      "version": "1.7.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.7.0.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7"
+        }
+      ]
+    }
+  ]
+}

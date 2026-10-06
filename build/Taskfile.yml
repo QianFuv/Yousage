@@ -5,5 +5,13 @@ tasks:
     cmds:
       - pnpm --dir tools/parity install --frozen-lockfile
       - pnpm --dir frontend install --frozen-lockfile
+      - go mod download
+      - task: notices
       - wails3 generate bindings -ts -clean=true
       - pnpm --dir frontend build
+  notices:
+    cmds:
+      - node -e "require('fs').mkdirSync('bin', {recursive:true})"
+      - pnpm --dir frontend list --prod --depth Infinity --json > bin/frontend-dependencies.json
+      - pnpm --dir tools/parity list --prod --depth Infinity --json > bin/reference-dependencies.json
+      - node build/notices.mjs bin/frontend-dependencies.json bin/reference-dependencies.json

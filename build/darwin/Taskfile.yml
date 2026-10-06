@@ -1,0 +1,26 @@
+version: '3'
+tasks:
+  build:
+    platforms: [darwin]
+    cmds:
+      - task: :common:build:frontend
+      - wails3 tool prepare-macos-output --dir "{{.BIN_DIR}}"
+      - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o "{{.BIN_DIR}}/{{.APP_NAME}}" .
+    env:
+      GOOS: darwin
+      GOARCH: '{{.ARCH}}'
+      CGO_ENABLED: '1'
+      CGO_CFLAGS: '-mmacosx-version-min=12.0'
+      CGO_LDFLAGS: '-mmacosx-version-min=12.0'
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+  package:
+    platforms: [darwin]
+    cmds:
+      - task: build
+      - mkdir -p "{{.BIN_DIR}}/Yousage.app/Contents/MacOS" "{{.BIN_DIR}}/Yousage.app/Contents/Resources"
+      - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/Yousage.app/Contents/MacOS/yousage"
+      - cp build/darwin/icon.icns "{{.BIN_DIR}}/Yousage.app/Contents/Resources/icon.icns"
+      - cp build/darwin/Info.plist "{{.BIN_DIR}}/Yousage.app/Contents/Info.plist"
+      - cp THIRD_PARTY_NOTICES.md "{{.BIN_DIR}}/Yousage.app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+      - codesign --force --deep --sign - "{{.BIN_DIR}}/Yousage.app"
+      - codesign --verify --deep --strict "{{.BIN_DIR}}/Yousage.app"

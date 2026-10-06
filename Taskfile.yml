@@ -8,11 +8,13 @@ vars:
 includes:
   common: ./build/Taskfile.yml
   windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
 
 tasks:
   build:
     cmds:
-      - task: windows:build
+      - task: '{{OS}}:build'
   dev:
     cmds:
       - wails3 dev -config build/config.yml -port 4175
