@@ -110,7 +110,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 			gravityIds[root] = source.Id
 		}
 	}
-	results, err := (history.Collector{Store: service.Store, HostId: service.hostId()}).Scan(ctx, jsonRoots, now)
+	results, err := (history.Collector{Store: service.Store, HostId: service.hostId()}).Synchronize(ctx, jsonRoots, now)
 	if err != nil {
 		return false, err
 	}
@@ -221,15 +221,12 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	for index := range entries {
 		id := entries[index].Source.Fingerprint.Id()
 		if entries[index].Source.Status == "missing" && !entries[index].ShouldExcludeRecords {
-			records, err := service.Store.FileRecords(ctx, id)
+			hasHistory, err := service.Store.HasRetainedHistory(ctx, id, now.Add(-90*24*time.Hour).UnixNano())
 			if err != nil {
 				return false, err
 			}
-			for _, facts := range records {
-				if len(facts) > 0 {
-					entries[index].Source.Status = "partial"
-					break
-				}
+			if hasHistory {
+				entries[index].Source.Status = "partial"
 			}
 		}
 	}
@@ -313,20 +310,21 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 			summary.Sources[position].DistinctSessions = 0
 			continue
 		}
-		fileRecords, err := service.Store.FileRecords(ctx, id)
+		modifiedSince := cutoff
+		if entry.IsSnapshot {
+			modifiedSince = now.Add(-90 * 24 * time.Hour).UnixNano()
+		}
+		fileRecords, err := service.Store.FileRecordsSince(ctx, id, modifiedSince)
 		if err != nil {
 			return summary, err
 		}
-		checkpoints, err := service.Store.Checkpoints(ctx, id)
-		if err != nil {
-			return summary, err
+		paths := make([]string, 0, len(fileRecords))
+		for path := range fileRecords {
+			paths = append(paths, path)
 		}
-		sort.SliceStable(checkpoints, func(first, second int) bool { return checkpoints[first].Path < checkpoints[second].Path })
-		for _, checkpoint := range checkpoints {
-			if checkpoint.ModifiedNs < now.Add(-90*24*time.Hour).UnixNano() || (!entry.IsSnapshot && checkpoint.ModifiedNs < cutoff) {
-				continue
-			}
-			files = append(files, fileRecords[checkpoint.Path])
+		sort.Strings(paths)
+		for _, path := range paths {
+			files = append(files, fileRecords[path])
 			owners = append(owners, position)
 		}
 	}

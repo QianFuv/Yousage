@@ -69,6 +69,15 @@ func ExpandHome(path string) (string, error) {
 
 // Scan keeps disabled-account history readable; account enablement is a separate quota setting.
 func (collector Collector) Scan(ctx context.Context, roots []Root, now time.Time) ([]SourceResult, error) {
+	return collector.scan(ctx, roots, now, true)
+}
+
+// Synchronize updates incremental facts and observations without allocating a redundant full-history result.
+func (collector Collector) Synchronize(ctx context.Context, roots []Root, now time.Time) ([]SourceResult, error) {
+	return collector.scan(ctx, roots, now, false)
+}
+
+func (collector Collector) scan(ctx context.Context, roots []Root, now time.Time, shouldReadRecords bool) ([]SourceResult, error) {
 	results := []SourceResult{}
 	seen := map[string]bool{}
 	for _, root := range roots {
@@ -134,11 +143,14 @@ func (collector Collector) Scan(ctx context.Context, roots []Root, now time.Time
 			continue
 		}
 		seen[physicalKey] = true
-		result, err := collector.scanSource(ctx, fingerprint, now)
+		result, err := collector.scanSource(ctx, fingerprint, now, shouldReadRecords)
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, result)
+	}
+	if !shouldReadRecords {
+		return results, nil
 	}
 	allFiles := [][]domain.Record{}
 	for _, result := range results {
@@ -159,7 +171,7 @@ func (collector Collector) Scan(ctx context.Context, roots []Root, now time.Time
 	return results, nil
 }
 
-func (collector Collector) scanSource(ctx context.Context, fingerprint domain.SourceFingerprint, now time.Time) (SourceResult, error) {
+func (collector Collector) scanSource(ctx context.Context, fingerprint domain.SourceFingerprint, now time.Time, shouldReadRecords bool) (SourceResult, error) {
 	result := SourceResult{Fingerprint: fingerprint, Status: "ok", Records: []domain.Record{}}
 	id := fingerprint.Id()
 	cutoff := now.Add(-90 * 24 * time.Hour)
@@ -276,30 +288,36 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 	if err := collector.Store.PruneHistory(ctx, id, cutoff.UnixNano()); err != nil {
 		return result, err
 	}
-	files, err := collector.Store.FileRecords(ctx, id)
+	counts, err := collector.Store.FileRecordCounts(ctx, id)
 	if err != nil {
 		return result, err
 	}
 	filePaths := []string{}
-	for path := range files {
+	for path := range counts {
 		filePaths = append(filePaths, path)
 	}
 	sort.Strings(filePaths)
 	result.ScannedFiles = len(filePaths)
 	for _, path := range paths {
-		if len(files[path]) == 0 {
+		if counts[path] == 0 {
 			result.SkippedFiles++
 		}
 	}
-	for _, path := range filePaths {
-		result.files = append(result.files, files[path])
-		result.Records = append(result.Records, files[path]...)
+	if shouldReadRecords {
+		files, err := collector.Store.FileRecords(ctx, id)
+		if err != nil {
+			return result, err
+		}
+		for _, path := range filePaths {
+			result.files = append(result.files, files[path])
+			result.Records = append(result.Records, files[path]...)
+		}
 	}
-	if result.Status == "missing" && len(result.Records) > 0 {
+	if result.Status == "missing" && len(counts) > 0 {
 		result.Status = "ok"
 		result.Notice = "Original history removed; showing saved usage."
 	}
-	if fingerprint.Provider == domain.Grok && len(result.Records) == 0 && result.Status == "ok" {
+	if fingerprint.Provider == domain.Grok && len(counts) == 0 && result.Status == "ok" {
 		result.Notice = "No compatible saved turn_completed usage. Grok Build must persist completed-turn usage in sessions/.../updates.jsonl; past usage cannot be reconstructed."
 	}
 	observation := domain.Observation{SourceId: id, Status: result.Status, AttemptedAt: now.UnixMilli(), Notice: result.Notice}

@@ -163,6 +163,35 @@ func TestCollectorDedupRetentionDeletionAndRootRecovery(t *testing.T) {
 	}
 }
 
+func TestSynchronizeKeepsSavedFactsWithoutReturningFullHistory(t *testing.T) {
+	home := t.TempDir()
+	store, err := storage.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	collector := Collector{Store: store, HostId: "fixture-host"}
+	root := Root{Provider: domain.Codex, Home: home}
+	path := filepath.Join(home, "sessions", "first.jsonl")
+	writeHistory(t, path, sessionMeta+"\n"+turnContext+"\n"+codexUsage(11, "2026-10-06T12:00:01Z")+"\n")
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	metadata, err := collector.Synchronize(context.Background(), []Root{root}, now)
+	if err != nil || len(metadata) != 1 || metadata[0].ScannedFiles != 1 || len(metadata[0].Records) != 0 {
+		t.Fatal("metadata refresh materialized history", metadata, err)
+	}
+	full, err := collector.Scan(context.Background(), []Root{root}, now)
+	if err != nil || len(full[0].Records) != 1 || full[0].Fingerprint != metadata[0].Fingerprint {
+		t.Fatal("metadata refresh discarded saved usage", full, err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err = collector.Synchronize(context.Background(), []Root{root}, now)
+	if err != nil || metadata[0].Status != "ok" || metadata[0].ScannedFiles != 1 || len(metadata[0].Records) != 0 {
+		t.Fatal("removed transcript lost retained availability", metadata, err)
+	}
+}
+
 func TestTimestampFormatsAndOrderedSignatures(t *testing.T) {
 	for _, value := range []string{"2026-10-06T12:00:00Z", "2026-10-06T20:00:00+08:00", "2026-10-06"} {
 		if _, ok := timestamp(value); !ok {

@@ -34,7 +34,35 @@ func (store *Store) CommittedFileRecords(ctx context.Context, sourceId, path str
 }
 
 func (store *Store) FileRecords(ctx context.Context, sourceId string) (map[string][]domain.Record, error) {
-	rows, err := store.database.QueryContext(ctx, "SELECT path,data FROM records WHERE source_id=? ORDER BY path,is_tail,ordinal", sourceId)
+	return store.fileRecords(ctx, "SELECT path,data FROM records WHERE source_id=? ORDER BY path,is_tail,ordinal", sourceId)
+}
+
+// FileRecordsSince excludes ineligible files before decoding, preserving complete-file deduplication order.
+func (store *Store) FileRecordsSince(ctx context.Context, sourceId string, modifiedSinceNs int64) (map[string][]domain.Record, error) {
+	return store.fileRecords(ctx, `SELECT path,data FROM records WHERE source_id=? AND path IN (SELECT path FROM checkpoints WHERE source_id=? AND CAST(json_extract(data,'$.modifiedNs') AS INTEGER)>=?) ORDER BY path,is_tail,ordinal`, sourceId, sourceId, modifiedSinceNs)
+}
+
+// FileRecordCounts reports cached file availability without materializing usage facts.
+func (store *Store) FileRecordCounts(ctx context.Context, sourceId string) (map[string]int, error) {
+	rows, err := store.database.QueryContext(ctx, "SELECT path,COUNT(*) FROM records WHERE source_id=? GROUP BY path", sourceId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := map[string]int{}
+	for rows.Next() {
+		var path string
+		var count int
+		if err := rows.Scan(&path, &count); err != nil {
+			return nil, err
+		}
+		counts[path] = count
+	}
+	return counts, rows.Err()
+}
+
+func (store *Store) fileRecords(ctx context.Context, query string, arguments ...any) (map[string][]domain.Record, error) {
+	rows, err := store.database.QueryContext(ctx, query, arguments...)
 	if err != nil {
 		return nil, err
 	}
