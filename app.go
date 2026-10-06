@@ -20,22 +20,13 @@ import (
 	"yousage/internal/theme"
 )
 
-// Bootstrap is the fixture-only native contract; it carries no account data.
+// Bootstrap supplies native appearance and regional preferences before rendering.
 type Bootstrap struct {
-	SourceCommit   string   `json:"sourceCommit"`
-	WailsVersion   string   `json:"wailsVersion"`
-	ReferenceTime  string   `json:"referenceTime"`
-	TimeZone       string   `json:"timeZone"`
-	AppearanceMode string   `json:"appearanceMode"`
-	IsSystemDark   bool     `json:"isSystemDark"`
-	Providers      []string `json:"providers"`
-	RoleCount      int      `json:"roleCount"`
-	Pid            int      `json:"pid"`
-	LifecycleLog   string   `json:"lifecycleLog"`
-	SystemLocale   string   `json:"systemLocale"`
+	IsSystemDark bool   `json:"isSystemDark"`
+	SystemLocale string `json:"systemLocale"`
 }
 
-// App exposes bounded fixture and native demonstration actions.
+// App bridges authoritative local services to the desktop interface.
 type App struct {
 	context             context.Context
 	nativeApp           *application.App
@@ -43,6 +34,7 @@ type App struct {
 	logFile             *os.File
 	logMutex            sync.Mutex
 	logPath             string
+	stateDirectory      string
 	store               *storage.Store
 	themes              *theme.Library
 	themeCancel         context.CancelFunc
@@ -57,7 +49,7 @@ type App struct {
 }
 
 func newApp() (*App, error) {
-	directory, err := os.MkdirTemp("", "yousage-native-preflight-")
+	directory, err := os.MkdirTemp("", "yousage-native-lifecycle-")
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +63,29 @@ func newApp() (*App, error) {
 		logFile.Close()
 		return nil, err
 	}
-	database, err := storage.Open(filepath.Join(config, "Yousage", "yousage.sqlite"))
+	stateDirectory := filepath.Join(config, "Yousage")
+	if hasNativeSmokeArgument() {
+		stateDirectory = filepath.Join(directory, "isolated-state")
+	}
+	database, err := storage.Open(filepath.Join(stateDirectory, "yousage.sqlite"))
 	if err != nil {
 		logFile.Close()
 		return nil, err
 	}
-	return &App{logFile: logFile, logPath: logPath, store: database, themes: &theme.Library{Repository: database, PublishedStore: theme.Store{Directory: filepath.Join(config, "Yousage")}}}, nil
+	if hasNativeSmokeArgument() {
+		preferenceService := preferences.New(database)
+		if _, err = preferenceService.SaveSources(context.Background(), []preferences.Source{}, 0); err == nil {
+			display := preferences.Defaults()
+			display.ShouldAutoRefresh = false
+			_, err = preferenceService.SaveDisplay(context.Background(), preferences.SavedDisplay{Value: display})
+		}
+		if err != nil {
+			database.Close()
+			logFile.Close()
+			return nil, err
+		}
+	}
+	return &App{logFile: logFile, logPath: logPath, stateDirectory: stateDirectory, store: database, themes: &theme.Library{Repository: database, PublishedStore: theme.Store{Directory: stateDirectory}}}, nil
 }
 
 // ServiceStartup initializes lifecycle evidence before native windows are created.
@@ -325,17 +334,9 @@ func (service *App) record(event string) {
 	json.NewEncoder(service.logFile).Encode(map[string]any{"event": event, "pid": os.Getpid(), "at": time.Now().UTC().Format(time.RFC3339Nano)})
 }
 
-func fileNames(paths []string) []string {
-	names := make([]string, len(paths))
-	for index, path := range paths {
-		names[index] = filepath.Base(path)
-	}
-	return names
-}
-
-// GetBootstrap returns reference metadata after native initialization.
+// GetBootstrap returns native preferences after application initialization.
 func (service *App) GetBootstrap() Bootstrap {
-	return Bootstrap{SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b", WailsVersion: "3.0.0-beta.28", ReferenceTime: "2026-10-06T12:00:00Z", TimeZone: "UTC", AppearanceMode: "system", IsSystemDark: service.nativeApp.Env.IsDarkMode(), Providers: []string{"codex", "claude", "grok", "cursor", "opencode", "antigravity"}, RoleCount: 57, Pid: os.Getpid(), LifecycleLog: service.logPath, SystemLocale: systemLocale()}
+	return Bootstrap{IsSystemDark: service.nativeApp.Env.IsDarkMode(), SystemLocale: systemLocale()}
 }
 
 // FrontendReady reveals the window after the frontend applies its theme.
@@ -371,37 +372,6 @@ func (service *App) SyncAppearance(isDark bool, red, green, blue int) error {
 	}
 	service.record("appearance")
 	return nil
-}
-
-// PickFixtureFiles selects public fixtures without reading selected contents.
-func (service *App) PickFixtureFiles() ([]string, error) {
-	paths, err := service.nativeApp.Dialog.OpenFile().SetTitle("Select synthetic theme fixtures").AddFilter("Theme JSON fixtures", "*.json").AttachToWindow(service.window).PromptForMultipleSelection()
-	if err != nil && err.Error() == "cancelled by user" {
-		return []string{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	service.record("file-picker")
-	return fileNames(paths), nil
-}
-
-// ExportFixture writes the fixed fixture after a native save-path choice.
-func (service *App) ExportFixture() (string, error) {
-	dialog := service.nativeApp.Dialog.SaveFile()
-	dialog.SetOptions(&application.SaveFileDialogOptions{Title: "Export synthetic fixture", Filename: "yousage-fixture.json", Filters: []application.FileFilter{{DisplayName: "JSON fixture", Pattern: "*.json"}}, Window: service.window})
-	path, err := dialog.PromptForSingleSelection()
-	if err != nil && err.Error() == "cancelled by user" {
-		return "", nil
-	}
-	if err != nil || path == "" {
-		return "", err
-	}
-	if err = os.WriteFile(path, fixtureTheme, 0600); err != nil {
-		return "", err
-	}
-	service.record("fixture-export")
-	return filepath.Base(path), nil
 }
 
 // OpenDocumentation opens only the fixed official documentation destination.

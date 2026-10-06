@@ -1,4 +1,4 @@
-// Yousage embeds the pinned parity slice in a native Wails v3 window.
+// Yousage embeds the usage and settings interface in a native Wails v3 window.
 package main
 
 import (
@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 	"yousage/internal/quota"
 	"yousage/internal/secrets"
@@ -16,9 +17,6 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
-
-//go:embed frontend/public/theme-fixture.json
-var fixtureTheme []byte
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--quota-credential-helper" {
@@ -41,6 +39,7 @@ func main() {
 		Services: []application.Service{application.NewService(service)},
 		Assets:   application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
 		Mac:      application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+		Windows:  application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview")},
 	})
 	service.nativeApp = nativeApp
 	service.window = nativeApp.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -55,7 +54,6 @@ func main() {
 	service.window.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		paths := event.Context().DroppedFiles()
 		nativeApp.Event.Emit("theme-files-dropped", service.ReadThemeFiles(paths))
-		nativeApp.Event.Emit("fixture-files-dropped", fileNames(event.Context().DroppedFiles()))
 		service.record("file-drop")
 	})
 	if hasNativeSmokeArgument() {

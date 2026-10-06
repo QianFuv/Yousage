@@ -60,7 +60,7 @@ are rejected before mutation; this deliberate application contract is tested.
   and `git diff --check`: pass, with no unformatted authored Go files.
 - `pnpm --dir tools/parity test`: 56 immutable source hashes verified and
   14 original TypeScript oracle tests pass.
-- Frontend typecheck, scoped ESLint, Prettier, 18 tests in five files and
+- Frontend typecheck, scoped ESLint, Prettier, 19 tests in five files and
   production build pass. Production inputs exclude the development transport
   fixture.
 - Controlled browser observations validate route separation, root-mounted
@@ -70,6 +70,41 @@ are rejected before mutation; this deliberate application contract is tested.
 Evidence remains in the ignored task artifacts. Browser sizing is CSS
 verification; it does not certify Windows WebView2 DPI, native dialogs,
 caption colors, OS focus, display removal or process shutdown.
+
+## Sidebar, discovery and performance revision
+
+The sidebar separates quota monitoring (额度监控) and history statistics
+(用量统计), with Settings at the bottom. Actual production root CSS supplies
+viewport height and independent content scrolling. Browser checks cover all
+five settings sections, 320px and 420px widths, retained settings drafts,
+and model detail comparisons including per-environment cached tokens.
+Controls share 14px text and 36px/32px heights by density. Root font changes
+scale titles and controls; theme editor controls use the same tokens.
+Secondary actions retain keyboard access through compact disclosures; Escape
+returns focus, and menus near the bottom open upward within the viewport.
+
+Provider discovery checks native executable payloads and metadata only. Tests
+cover Windows PATH quoting/casing, native npm/pnpm payloads and Volta fallback,
+automatic roots changing between scans, empty overrides, Unix variable casing,
+and preservation of explicit legacy roots. Detection does not enable accounts.
+
+History synchronization no longer decodes every retained fact solely to return
+scan metadata. Eligible-file SQL skips expired files before decoding while
+preserving complete-file deduplication and order. Regression tests demonstrate
+excluded corrupt records do not affect current windows and retained facts
+remain available after metadata-only synchronization.
+
+The isolated benchmark uses 90 files containing 9,000 synthetic Claude facts.
+Three-iteration samples compare cached 1/7/30/90-day queries. The 1-day query
+changes from 48.28ms and 14.46MB allocated to 1.76ms and 0.84MB allocated;
+7-day changes from 46.75ms/15.05MB to 5.16ms/2.36MB. The 90-day query remains
+roughly unchanged (54.79ms/27.29MB versus 60.87ms/27.16MB). These allocations
+are query costs, not whole-application resident memory measurements.
+
+Settings, statistics, the theme editor and OpenVSX ZIP handling load lazily.
+Visited settings remain mounted to retain drafts. Market requests begin only
+when browsing or searching the catalogue. Final startup artifact/process
+measurements are recorded in the Windows release record.
 
 ## Remaining qualification boundaries
 

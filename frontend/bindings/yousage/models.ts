@@ -10,52 +10,16 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as preferences$0 from "./internal/preferences/models.js";
 
 /**
- * Bootstrap is the fixture-only native contract; it carries no account data.
+ * Bootstrap supplies native appearance and regional preferences before rendering.
  */
 export class Bootstrap {
-    "sourceCommit": string;
-    "wailsVersion": string;
-    "referenceTime": string;
-    "timeZone": string;
-    "appearanceMode": string;
     "isSystemDark": boolean;
-    "providers": string[];
-    "roleCount": number;
-    "pid": number;
-    "lifecycleLog": string;
     "systemLocale": string;
 
     /** Creates a new Bootstrap instance. */
     constructor($$source: Partial<Bootstrap> = {}) {
-        if (!("sourceCommit" in $$source)) {
-            this["sourceCommit"] = "";
-        }
-        if (!("wailsVersion" in $$source)) {
-            this["wailsVersion"] = "";
-        }
-        if (!("referenceTime" in $$source)) {
-            this["referenceTime"] = "";
-        }
-        if (!("timeZone" in $$source)) {
-            this["timeZone"] = "";
-        }
-        if (!("appearanceMode" in $$source)) {
-            this["appearanceMode"] = "";
-        }
         if (!("isSystemDark" in $$source)) {
             this["isSystemDark"] = false;
-        }
-        if (!("providers" in $$source)) {
-            this["providers"] = [];
-        }
-        if (!("roleCount" in $$source)) {
-            this["roleCount"] = 0;
-        }
-        if (!("pid" in $$source)) {
-            this["pid"] = 0;
-        }
-        if (!("lifecycleLog" in $$source)) {
-            this["lifecycleLog"] = "";
         }
         if (!("systemLocale" in $$source)) {
             this["systemLocale"] = "";
@@ -68,11 +32,7 @@ export class Bootstrap {
      * Creates a new Bootstrap instance from a string or object.
      */
     static createFrom($$source: any = {}): Bootstrap {
-        const $$createField6_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("providers" in $$parsedSource) {
-            $$parsedSource["providers"] = $$createField6_0($$parsedSource["providers"]);
-        }
         return new Bootstrap($$parsedSource as Partial<Bootstrap>);
     }
 }
@@ -97,7 +57,7 @@ export class SavedSources {
      * Creates a new SavedSources instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedSources {
-        const $$createField1_0 = $$createType2;
+        const $$createField1_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -137,6 +97,5 @@ export class ThemeFileInput {
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = preferences$0.Source.createFrom;
-const $$createType2 = $Create.Array($$createType1);
+const $$createType0 = preferences$0.Source.createFrom;
+const $$createType1 = $Create.Array($$createType0);
