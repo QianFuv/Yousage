@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"yousage/internal/domain"
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
 	"yousage/internal/refresh"
@@ -96,6 +97,7 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	if err != nil {
 		return err
 	}
+	usage.Scope = []domain.Provider{domain.Codex, domain.Claude}
 	service.usage = usage
 	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
 	usage.ReconcileConnections()

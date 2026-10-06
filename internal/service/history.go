@@ -62,7 +62,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	sources = service.expandedSources(sources)
+	sources = service.expandedSources(service.scopedSources(sources))
 	entries, revision, err := service.sourceIndex(ctx)
 	if err != nil {
 		return false, err
@@ -297,7 +297,7 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 	seen := map[string]bool{}
 	cutoff := max(windowStart(window).Add(-36*time.Hour).UnixNano(), now.Add(-90*24*time.Hour).UnixNano())
 	for _, entry := range entries {
-		if entry.IsHidden {
+		if entry.IsHidden || !service.isProviderInScope(entry.Source.Fingerprint.Provider) {
 			continue
 		}
 		id := entry.Source.Fingerprint.Id()
@@ -359,7 +359,8 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 
 // Sources reports configured roots; source paths remain private to the local settings and aggregate contract.
 func (service *Service) Sources(ctx context.Context) ([]preferences.Source, int64, error) {
-	return service.Preferences.Sources(ctx)
+	sources, revision, err := service.Preferences.Sources(ctx)
+	return service.scopedSources(sources), revision, err
 }
 
 func (service *Service) SaveSources(ctx context.Context, sources []preferences.Source, revision int64) (int64, error) {
@@ -368,6 +369,7 @@ func (service *Service) SaveSources(ctx context.Context, sources []preferences.S
 		return revision, err
 	}
 	defer release()
+	sources = service.scopedSources(sources)
 	for index := range sources {
 		if sources[index].IsAutomatic {
 			sources[index].Root = ""

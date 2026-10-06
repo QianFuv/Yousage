@@ -73,6 +73,7 @@ type Service struct {
 	Home             string
 	Platform         string
 	Environment      map[string]string
+	Scope            []domain.Provider
 	mutex            sync.Mutex
 	themeSync        sync.Mutex
 	credentialMutex  sync.Mutex
@@ -149,7 +150,7 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 		return nil, err
 	}
 	if revision == 0 && len(sources) == 0 {
-		for _, provider := range []domain.Provider{domain.Codex, domain.Claude, domain.Grok, domain.OpenCode, domain.Antigravity, domain.Cursor} {
+		for _, provider := range []domain.Provider{domain.Codex, domain.Claude} {
 			sources = append(sources, preferences.Source{Id: string(provider) + "-auto", Provider: provider, IsEnabled: true, IsAutomatic: true})
 		}
 		if _, err = service.Preferences.SaveSources(ctx, sources, revision); err != nil {
@@ -178,6 +179,7 @@ func (service *Service) Configuration(ctx context.Context) (SavedConfiguration, 
 	if value.Value.Providers == nil {
 		value.Value.Providers = []NativeProvider{}
 	}
+	value.Value.Providers = service.scopedProviders(value.Value.Providers)
 	if value.Value.Hubs == nil {
 		value.Value.Hubs = []quota.HubConfig{}
 	}
@@ -213,6 +215,9 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 	for _, provider := range saved.Value.Providers {
 		if provider.Id == "" || len(provider.Id) > 96 || len(provider.Label) > 128 || len(provider.Home) > 4096 || (provider.Home != "" && !filepath.IsAbs(provider.Home)) || seen[provider.Id] || (provider.Driver != "codex" && provider.Driver != "claudeAgent" && provider.Driver != "cursor" && provider.Driver != "grok" && provider.Driver != "opencode" && provider.Driver != "antigravity") {
 			return saved, errors.New("invalid provider target")
+		}
+		if !service.isDriverInScope(provider.Driver) {
+			return saved, errors.New("provider is not monitored")
 		}
 		if (provider.Driver == "codex" || provider.Driver == "claudeAgent") && provider.Executable != "" && !filepath.IsAbs(provider.Executable) {
 			return saved, errors.New("select an absolute native executable path")

@@ -222,6 +222,9 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 		driver   string
 		provider domain.Provider
 	}{{"codex", domain.Codex}, {"claudeAgent", domain.Claude}, {"cursor", domain.Cursor}, {"grok", domain.Grok}, {"opencode", domain.OpenCode}, {"antigravity", domain.Antigravity}} {
+		if !service.isProviderInScope(pair.provider) {
+			continue
+		}
 		detection := ProviderDetection{Driver: pair.driver, Provider: pair.provider}
 		for _, root := range service.historyRoots(pair.provider) {
 			if _, err := os.Stat(root); err == nil {
