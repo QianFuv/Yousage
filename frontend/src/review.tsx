@@ -191,6 +191,8 @@ function usageFixture(days: number, zone: string) {
     })),
   };
 }
+let shouldRejectAppearance = false;
+let isFixtureSystemDark = false;
 let snapshot: LibrarySnapshot = {
   revision: 0,
   value: {
@@ -208,7 +210,7 @@ let snapshot: LibrarySnapshot = {
       },
       contrast: 100,
       glassOpacity: 80,
-      motionMs: 200,
+      motionMs: 0,
       appliedGenerations: {},
     },
     customThemes: [],
@@ -328,6 +330,10 @@ setTransport({
       case 3469612837:
         return JSON.parse(JSON.stringify(snapshot));
       case 2592400194: {
+        if (shouldRejectAppearance) {
+          shouldRejectAppearance = false;
+          throw new Error("Controlled appearance save failure");
+        }
         const [revision, value] = request.args;
         if (revision !== snapshot.revision)
           throw new Error(
@@ -367,6 +373,24 @@ await import("./main");
 
 /** Simulate native close requests only in the development review harness. */
 window.addEventListener("keydown", (event) => {
+  if (event.key === "F9") {
+    event.preventDefault();
+    shouldRejectAppearance = true;
+  }
+  if (event.key === "F7") {
+    event.preventDefault();
+    isFixtureSystemDark = !isFixtureSystemDark;
+    (
+      window as unknown as {
+        _wails: {
+          dispatchWailsEvent: (event: { name: string; data: boolean }) => void;
+        };
+      }
+    )._wails.dispatchWailsEvent({
+      name: "system-appearance",
+      data: isFixtureSystemDark,
+    });
+  }
   if (event.key === "F8") {
     event.preventDefault();
     (

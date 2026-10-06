@@ -101,7 +101,9 @@ export function DisplayPanel() {
         <p>
           <kbd>Ctrl / ⌘ ,</kbd> opens Settings. <kbd>Ctrl / ⌘ 1</kbd> returns to
           Usage. <kbd>Ctrl / ⌘ R</kbd> refreshes Usage. <kbd>Tab</kbd> moves
-          focus; <kbd>Escape</kbd> dismisses a close confirmation.
+          focus; <kbd>Escape</kbd> dismisses a close confirmation.{" "}
+          <kbd>Ctrl / ⌘ Alt A</kbd> opens Appearance;{" "}
+          <kbd>Ctrl / ⌘ Alt Shift A</kbd> cycles System, Light and Dark.
         </p>
         <p>
           Returning to Usage retains your environments, period, metric and

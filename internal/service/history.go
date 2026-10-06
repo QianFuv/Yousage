@@ -20,9 +20,11 @@ import (
 )
 
 type sourceIndex struct {
-	ConfigurationId string        `json:"configurationId"`
-	Source          remote.Source `json:"source"`
-	IsSnapshot      bool          `json:"snapshot"`
+	ConfigurationId      string        `json:"configurationId"`
+	Source               remote.Source `json:"source"`
+	IsSnapshot           bool          `json:"snapshot"`
+	IsHidden             bool          `json:"hidden,omitempty"`
+	ShouldExcludeRecords bool          `json:"excludeRecords,omitempty"`
 }
 
 func (service *Service) sourceIndex(ctx context.Context) ([]sourceIndex, int64, error) {
@@ -74,7 +76,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 		byId[entry.ConfigurationId] = index
 	}
 	put := func(identity string, source remote.Source, isSnapshot bool) {
-		entry := sourceIndex{identity, source, isSnapshot}
+		entry := sourceIndex{ConfigurationId: identity, Source: source, IsSnapshot: isSnapshot}
 		if index, exists := byId[identity]; exists {
 			entries[index] = entry
 		} else {
@@ -179,6 +181,16 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 				credentials.Path = root
 			}
 			result := cursor.Read(ctx, cursor.Options{Credentials: credentials, KeychainToken: service.keychain.Read}, now.Add(-90*24*time.Hour).UnixMilli(), now.UnixMilli())
+			if result.IsMissing && result.Error == "" {
+				if credentials.NeedsKeychainOptIn {
+					put(source.Id, remote.Source{Fingerprint: service.fingerprint(domain.Cursor, root), Status: "missing", Message: sourceMessage(result.Notice), Action: "enableCursorKeychain"}, true)
+					entries[byId[source.Id]].ShouldExcludeRecords = true
+				} else if previous, exists := byId[source.Id]; exists {
+					entries[previous].IsHidden = true
+					entries[previous].ShouldExcludeRecords = true
+				}
+				continue
+			}
 			fingerprint := result.SourceIdentity()
 			if result.AccountKey == "" {
 				if previous, exists := byId[source.Id]; exists {
@@ -203,12 +215,12 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 			put(source.Id, remote.Source{Fingerprint: fingerprint, Status: status, ScannedFiles: 1, Message: sourceMessage(notice), Action: action}, true)
 		}
 	}
+	if err := service.Store.PruneExpiredHistory(ctx, now.Add(-90*24*time.Hour).UnixNano()); err != nil {
+		return false, err
+	}
 	for index := range entries {
 		id := entries[index].Source.Fingerprint.Id()
-		if err := service.Store.PruneHistory(ctx, id, now.Add(-90*24*time.Hour).UnixNano()); err != nil {
-			return false, err
-		}
-		if entries[index].Source.Status == "missing" {
+		if entries[index].Source.Status == "missing" && !entries[index].ShouldExcludeRecords {
 			records, err := service.Store.FileRecords(ctx, id)
 			if err != nil {
 				return false, err
@@ -287,6 +299,9 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 	seen := map[string]bool{}
 	cutoff := max(windowStart(window).Add(-36*time.Hour).UnixNano(), now.Add(-90*24*time.Hour).UnixNano())
 	for _, entry := range entries {
+		if entry.IsHidden {
+			continue
+		}
 		id := entry.Source.Fingerprint.Id()
 		if seen[id] {
 			continue
@@ -294,6 +309,10 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		seen[id] = true
 		position := len(summary.Sources)
 		summary.Sources = append(summary.Sources, entry.Source)
+		if entry.ShouldExcludeRecords {
+			summary.Sources[position].DistinctSessions = 0
+			continue
+		}
 		fileRecords, err := service.Store.FileRecords(ctx, id)
 		if err != nil {
 			return summary, err
@@ -335,6 +354,7 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		summary.Sources[index].DistinctSessions = aggregate.DistinctSessions
 		summary.Buckets = append(summary.Buckets, aggregate.Buckets...)
 	}
+	summary.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
 	return summary, nil
 }
 
@@ -344,7 +364,11 @@ func (service *Service) Sources(ctx context.Context) ([]preferences.Source, int6
 }
 
 func (service *Service) SaveSources(ctx context.Context, sources []preferences.Source, revision int64) (int64, error) {
- ctx, release, err := service.ownOperation(ctx);if err != nil {return revision,err};defer release()
+	ctx, release, err := service.ownOperation(ctx)
+	if err != nil {
+		return revision, err
+	}
+	defer release()
 	for index := range sources {
 		absolute, err := history.ExpandHome(sources[index].Root)
 		if err != nil {

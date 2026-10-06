@@ -27,10 +27,11 @@ const dashboardUrl = "https://cursor.com/api/dashboard/get-filtered-usage-events
 const pageSize = 1000
 
 type CredentialSource struct {
-	Path       string
-	IsKeychain bool
-	IsDisabled bool
-	Notice     string
+	Path               string
+	IsKeychain         bool
+	IsDisabled         bool
+	NeedsKeychainOptIn bool
+	Notice             string
 }
 type Options struct {
 	Credentials   CredentialSource
@@ -64,7 +65,7 @@ func DiscoverCredentials(platform, home string, environment map[string]string, i
 			return CredentialSource{Path: filepath.Join(userHome, ".cursor", "auth.json")}
 		}
 		if !isKeychainEnabled {
-			return CredentialSource{IsDisabled: true, Notice: "Enable Cursor Keychain usage on this environment to read account history."}
+			return CredentialSource{IsDisabled: true, NeedsKeychainOptIn: true, Notice: "Enable Cursor Keychain usage on this environment to read account history."}
 		}
 		return CredentialSource{IsKeychain: true}
 	}

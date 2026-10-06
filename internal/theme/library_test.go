@@ -16,6 +16,12 @@ type failingRepository struct {
 	shouldFail bool
 }
 
+func TestDefaultMotionDoesNotAnimatePanels(test *testing.T) {
+	if defaultLibraryValue().Preferences.MotionMs != 0 {
+		test.Fatal("fresh installation should not animate panels")
+	}
+}
+
 func (repository *failingRepository) WriteSetting(ctx context.Context, key string, revision int64, value any) (int64, error) {
 	if repository.shouldFail {
 		return revision, errors.New("fixture write failed")

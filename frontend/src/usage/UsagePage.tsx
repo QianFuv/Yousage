@@ -7,6 +7,7 @@ import {
 } from "@t3tools/shared/usageFormat";
 import {
   CHATGPT_USAGE_URL,
+  collectLimitAccounts,
   usesChatGptSharing,
   type LimitPresentations,
 } from "@t3tools/shared/usageLimits";
@@ -34,6 +35,7 @@ export function UsagePage({
   refreshRef.current = data.refresh;
   const [limitsNow, setLimitsNow] = useState(Date.now);
   const [cursorError, setCursorError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const environmentKey =
     data.snapshot?.environments
       .filter(
@@ -312,11 +314,40 @@ export function UsagePage({
           </p>
         ))}
       {metric === "limits" ? (
-        <UsageLimitsPooled
-          presentations={presentations}
-          now={limitsNow}
-          cursorPrompt={cursorPrompt}
-        />
+        <>
+          <div className="usage-controls">
+            <button
+              onClick={async () => {
+                try {
+                  const observations = collectLimitAccounts(presentations).map(
+                    (account, index) => ({
+                      account: index + 1,
+                      driver: account.driver,
+                      checkedAt: account.limits.checkedAt,
+                      windows: account.limits.windows,
+                      availableResetCredits:
+                        account.limits.resetCredits?.availableCount,
+                    }),
+                  );
+                  await nativeApi.CopyText(
+                    JSON.stringify(observations, null, 2),
+                  );
+                  setCopyStatus("Exact quota observations copied.");
+                } catch (cause) {
+                  setCopyStatus(String(cause));
+                }
+              }}
+            >
+              Copy exact quota observations
+            </button>
+            {copyStatus && <output role="status">{copyStatus}</output>}
+          </div>
+          <UsageLimitsPooled
+            presentations={presentations}
+            now={limitsNow}
+            cursorPrompt={cursorPrompt}
+          />
+        </>
       ) : (
         usageWindow && (
           <>

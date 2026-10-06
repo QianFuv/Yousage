@@ -39,7 +39,10 @@ func (service *Service) Rates(ctx context.Context) (RateSnapshot, error) {
 	}
 	value := RateSnapshot{Rates: accounting.RateTable{}}
 	_, err := service.Store.ReadSetting(ctx, "public-model-rates", &value)
-	return value, err
+	if err != nil {
+		return RateSnapshot{Rates: accounting.RateTable{}}, nil
+	}
+	return value, nil
 }
 
 // RefreshRates honors persisted freshness after restart and retains the previous rates on failure.
@@ -81,13 +84,8 @@ func (service *Service) RefreshRates(ctx context.Context, request refresh.Reques
 		}
 		value := RateSnapshot{Rates: rates, FetchedAtMs: service.Now().UnixMilli(), IsFresh: true}
 		var previous RateSnapshot
-		revision, err := service.Store.ReadSetting(owner, "public-model-rates", &previous)
-		if err != nil {
-			return RateSnapshot{}, err
-		}
-		if _, err = service.Store.WriteSetting(owner, "public-model-rates", revision, value); err != nil {
-			return RateSnapshot{}, err
-		}
+		revision, _ := service.Store.ReadSetting(owner, "public-model-rates", &previous)
+		_, _ = service.Store.WriteSetting(owner, "public-model-rates", revision, value)
 		service.emit("usage-invalidated", nil)
 		return value, nil
 	})

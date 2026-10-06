@@ -293,9 +293,11 @@ func (service *Service) RefreshUsage(ctx context.Context, days int, zone string,
 				}
 				deadline, cancel := context.WithTimeout(owner, 20*time.Second)
 				defer cancel()
+				var rateError error
 				if request.IsManual {
-					if _, err := client.Call(deadline, "server.refreshUsageRates", map[string]any{}, false); err != nil {
-						return false, err
+					_, rateError = client.Call(deadline, "server.refreshUsageRates", map[string]any{}, false)
+					if rateError != nil && (deadline.Err() != nil || !client.IsOnline()) {
+						return false, rateError
 					}
 				}
 				summary, err := client.Summary(deadline, window)
@@ -317,9 +319,12 @@ func (service *Service) RefreshUsage(ctx context.Context, days int, zone string,
 				}
 				service.mutex.Lock()
 				state.error = ""
+				if rateError != nil {
+					state.error = rateError.Error()
+				}
 				service.mutex.Unlock()
 				service.emit("usage-invalidated", nil)
-				return true, nil
+				return true, rateError
 			})
 			if errors.Is(err, refresh.ErrSkipped) {
 				return nil

@@ -94,6 +94,7 @@ export function nativeLibrary(value: unknown): models.LibraryValue {
 export function applySavedAppearance(
   snapshot: AppearanceSnapshot,
   isSystemDark: boolean,
+  shouldApplyPalette = true,
 ): "light" | "dark" {
   const value = snapshot.value.preferences;
   loadSavedCustomThemes(snapshot.value.customThemes.map(frontendTheme));
@@ -108,11 +109,13 @@ export function applySavedAppearance(
     value.mode as "system" | "light" | "dark",
     halves,
   );
-  document.documentElement.classList.toggle("dark", appearance === "dark");
-  applyThemePalette(
-    resolveThemeHalf(value.baseThemeId, halves, appearance),
-    appearance,
-  );
+  if (shouldApplyPalette) {
+    document.documentElement.classList.toggle("dark", appearance === "dark");
+    applyThemePalette(
+      resolveThemeHalf(value.baseThemeId, halves, appearance),
+      appearance,
+    );
+  }
   const root = document.documentElement;
   root.style.fontSize = `${value.typography.interfaceSize}px`;
   root.style.setProperty(
@@ -164,6 +167,8 @@ export function AppearanceProvider({
   const current = useRef(snapshot);
   current.current = snapshot;
   const [isSystemDark, setIsSystemDark] = useState(initialSystemDark);
+  const systemDark = useRef(isSystemDark);
+  systemDark.current = isSystemDark;
   const [isBusy, setIsBusy] = useState(false);
   const busy = useRef(false);
   const [error, setError] = useState("");
@@ -177,20 +182,24 @@ export function AppearanceProvider({
     [],
   );
   const [editor, setEditor] = useState<EditorSession | null>(null);
+  const currentEditor = useRef(editor);
+  currentEditor.current = editor;
   const editorSequence = useRef(0);
   const patchQueue = useRef(Promise.resolve());
   const [appearance, setAppearance] = useState<"light" | "dark">(() =>
     applySavedAppearance(initial, initialSystemDark),
   );
   const restore = useCallback(
-    () => setAppearance(applySavedAppearance(current.current, isSystemDark)),
-    [isSystemDark],
+    () =>
+      setAppearance(applySavedAppearance(current.current, systemDark.current)),
+    [],
   );
   useEffect(() => {
     loadSavedCustomThemes(snapshot.value.customThemes.map(frontendTheme));
     setEnvironmentThemes(snapshot.published.themes.map(frontendTheme));
     if (!editor) restore();
-  }, [snapshot, restore, editor]);
+    else applySavedAppearance(snapshot, isSystemDark, false);
+  }, [snapshot, restore, editor, isSystemDark]);
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const changed = () =>
@@ -247,9 +256,17 @@ export function AppearanceProvider({
           const next = await nativeApi.GetAppearance();
           current.current = next;
           setSnapshot(next);
-          applySavedAppearance(next, isSystemDark);
+          applySavedAppearance(
+            next,
+            systemDark.current,
+            !currentEditor.current,
+          );
         } catch {
-          restore();
+          applySavedAppearance(
+            current.current,
+            systemDark.current,
+            !currentEditor.current,
+          );
         }
         throw new Error(message);
       } finally {
@@ -257,7 +274,7 @@ export function AppearanceProvider({
         setIsBusy(false);
       }
     },
-    [isSystemDark, restore],
+    [],
   );
   /** Save ordinary preference changes immediately without modifying unsaved editor palettes. */
   const patch = useCallback(

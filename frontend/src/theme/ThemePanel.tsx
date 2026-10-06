@@ -33,7 +33,13 @@ import {
   STANDARD_THEME_CARDS,
   ThemePreviewCircles,
 } from "../../vendor/ThemePreviewCircles";
-import { frontendTheme, nativeLibrary, useAppearance } from "./appearance";
+import {
+  fontFamilyList,
+  frontendTheme,
+  nativeLibrary,
+  useAppearance,
+  type AppearancePreferences,
+} from "./appearance";
 import {
   Dialog,
   DialogPopup,
@@ -48,6 +54,31 @@ type ImportDraft = {
   attribution?: OpenVsxThemeExtension;
 };
 
+/** Keep a collection visible when its previously selected variant has been removed. */
+export function survivingCollectionVariant(
+  members: ThemeDefinition[],
+  selected?: string,
+): ThemeDefinition {
+  return members.find((theme) => theme.id === selected) ?? members[0];
+}
+
+/** Assign supported halves while preserving unrelated raw ownership, mode and base selection. */
+export function collectionOwners(
+  members: ThemeDefinition[],
+): Partial<AppearancePreferences> | null {
+  if (
+    members.length === 0 ||
+    (members.length === 1 && getThemeModes(members[0]).length === 2)
+  )
+    return null;
+  const light = members.find((theme) => getThemeModes(theme).includes("light"));
+  const dark = members.find((theme) => getThemeModes(theme).includes("dark"));
+  return {
+    ...(light ? { lightOwner: light.id } : {}),
+    ...(dark ? { darkOwner: dark.id } : {}),
+  };
+}
+
 /** Preview the latest range value locally and save only settled pointer/keyboard changes. */
 function EffectSlider({
   label,
@@ -56,6 +87,7 @@ function EffectSlider({
   value,
   unit,
   onSave,
+  defaultValue,
 }: {
   label: string;
   min: number;
@@ -63,18 +95,30 @@ function EffectSlider({
   value: number;
   unit: string;
   onSave: (value: number) => Promise<void>;
+  defaultValue: number;
 }) {
   const [draft, setDraft] = useState(value);
   const last = useRef(value);
+  const [isPending, setIsPending] = useState(false);
+  const pending = useRef(false);
   useEffect(() => {
     setDraft(value);
     last.current = value;
   }, [value]);
   /** Avoid duplicate blur/up writes while acknowledging the final selected value. */
-  function commit() {
-    if (last.current !== draft) {
-      last.current = draft;
-      void onSave(draft);
+  async function commit(next = draft) {
+    if (pending.current || last.current === next) return;
+    pending.current = true;
+    setIsPending(true);
+    try {
+      await onSave(next);
+      last.current = next;
+      setDraft(next);
+    } catch {
+      setDraft(last.current);
+    } finally {
+      pending.current = false;
+      setIsPending(false);
     }
   }
   return (
@@ -85,15 +129,24 @@ function EffectSlider({
         min={min}
         max={max}
         value={draft}
+        disabled={isPending}
         onChange={(event) => setDraft(Number(event.target.value))}
-        onPointerUp={commit}
-        onKeyUp={commit}
-        onBlur={commit}
+        onPointerUp={() => void commit()}
+        onKeyUp={() => void commit()}
+        onBlur={() => void commit()}
       />
       <span>
         {draft}
         {unit}
       </span>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => void commit(defaultValue)}
+        aria-label={`Reset ${label}`}
+      >
+        Reset
+      </button>
     </label>
   );
 }
@@ -259,7 +312,7 @@ export function ThemePanel({
   }, [draft, paste, fontDraft, preferences.typography, onDirtyChange]);
   useEffect(
     () => setFontDraft(preferences.typography),
-    [preferences.typography],
+    [JSON.stringify(preferences.typography)],
   );
   /** Settle one explicitly initiated action into a status message without hiding failed drafts. */
   async function action(execute: () => Promise<void>) {
@@ -429,7 +482,11 @@ export function ThemePanel({
       (value) => value.collection?.id === theme.collection!.id,
     );
     return (
-      card.id === (collectionVariants[theme.collection.id] ?? members[0].id)
+      card.id ===
+      survivingCollectionVariant(
+        members,
+        collectionVariants[theme.collection.id],
+      ).id
     );
   });
   /** Review individual or whole-collection deletion before changing persisted ownership. */
@@ -570,11 +627,28 @@ export function ThemePanel({
                 <button
                   disabled={context.isBusy}
                   onClick={() =>
-                    void action(() =>
-                      context.select(
-                        card.id === "default" ? preferences.mode : card.id,
-                      ),
-                    )
+                    void action(async () => {
+                      const members = definition?.collection
+                        ? definitions.filter(
+                            (theme) =>
+                              theme.collection?.id ===
+                              definition.collection!.id,
+                          )
+                        : definition
+                          ? [definition]
+                          : [];
+                      const owners = collectionOwners(members);
+                      if (owners) await context.patch(owners);
+                      else
+                        await context.select(
+                          card.id === "default" ? preferences.mode : card.id,
+                        );
+                      if (definition?.collection)
+                        setCollectionVariants((current) => ({
+                          ...current,
+                          [definition.collection!.id]: members[0].id,
+                        }));
+                    })
                   }
                 >
                   Use theme
@@ -865,6 +939,21 @@ export function ThemePanel({
               }
             />
           </label>
+          <button
+            disabled={context.isBusy}
+            onClick={() =>
+              void action(() =>
+                context.patch({
+                  typography: models.Typography.createFrom({
+                    ...preferences.typography,
+                    sans: "",
+                  }),
+                }),
+              )
+            }
+          >
+            Reset interface font
+          </button>
           <label>
             Monospace font{" "}
             <input
@@ -883,6 +972,21 @@ export function ThemePanel({
               }
             />
           </label>
+          <button
+            disabled={context.isBusy}
+            onClick={() =>
+              void action(() =>
+                context.patch({
+                  typography: models.Typography.createFrom({
+                    ...preferences.typography,
+                    code: "",
+                  }),
+                }),
+              )
+            }
+          >
+            Reset monospace font
+          </button>
           <button onClick={() => void action(discoverFonts)}>
             Find installed fonts
           </button>
@@ -915,6 +1019,21 @@ export function ThemePanel({
               }
             />
           </label>
+          <button
+            disabled={context.isBusy}
+            onClick={() =>
+              void action(() =>
+                context.patch({
+                  typography: models.Typography.createFrom({
+                    ...preferences.typography,
+                    interfaceSize: 16,
+                  }),
+                }),
+              )
+            }
+          >
+            Reset interface size
+          </button>
           <label>
             Monospace size{" "}
             <input
@@ -937,6 +1056,21 @@ export function ThemePanel({
               }
             />
           </label>
+          <button
+            disabled={context.isBusy}
+            onClick={() =>
+              void action(() =>
+                context.patch({
+                  typography: models.Typography.createFrom({
+                    ...preferences.typography,
+                    codeSize: 13,
+                  }),
+                }),
+              )
+            }
+          >
+            Reset monospace size
+          </button>
           <label>
             <input
               type="checkbox"
@@ -952,11 +1086,26 @@ export function ThemePanel({
             />{" "}
             Smooth fonts
           </label>
+          <button
+            disabled={context.isBusy}
+            onClick={() =>
+              void action(() =>
+                context.patch({
+                  typography: models.Typography.createFrom({
+                    ...preferences.typography,
+                    smoothing: false,
+                  }),
+                }),
+              )
+            }
+          >
+            Reset font smoothing
+          </button>
         </div>
         <p
           className="font-preview"
           style={{
-            fontFamily: JSON.stringify(fontDraft.sans || "Segoe UI"),
+            fontFamily: fontFamilyList(fontDraft.sans || "Segoe UI"),
             fontSize: fontDraft.interfaceSize,
           }}
         >
@@ -964,7 +1113,7 @@ export function ThemePanel({
         </p>
         <code
           style={{
-            fontFamily: JSON.stringify(fontDraft.code || "Consolas"),
+            fontFamily: fontFamilyList(fontDraft.code || "Consolas"),
             fontSize: fontDraft.codeSize,
           }}
         >
@@ -992,9 +1141,14 @@ export function ThemePanel({
             max={setting.max}
             value={preferences[setting.key]}
             unit={setting.key === "motionMs" ? " ms" : "%"}
-            onSave={(value) =>
-              action(() => context.patch({ [setting.key]: value }))
+            defaultValue={
+              setting.key === "contrast"
+                ? 100
+                : setting.key === "glassOpacity"
+                  ? 80
+                  : 0
             }
+            onSave={(value) => context.patch({ [setting.key]: value })}
           />
         ))}
         <p>Reduced-motion preferences take precedence over animations.</p>

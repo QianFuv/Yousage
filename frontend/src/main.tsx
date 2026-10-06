@@ -133,12 +133,26 @@ function Desktop() {
   useEffect(() => {
     /** Offer the same settings shortcut in every application route. */
     const changed = (event: KeyboardEvent) => {
+      if (isClosing) return;
       if ((event.ctrlKey || event.metaKey) && event.key === ",") {
         event.preventDefault();
         navigate("settings");
       } else if ((event.ctrlKey || event.metaKey) && event.key === "1") {
         event.preventDefault();
         navigate("usage");
+      } else if (
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        event.key.toLowerCase() === "a"
+      ) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          const modes = ["system", "light", "dark"];
+          const mode = appearance.snapshot.value.preferences.mode;
+          void appearance
+            .patch({ mode: modes[(modes.indexOf(mode) + 1) % modes.length] })
+            .catch((cause) => setStatus(String(cause)));
+        } else navigate("settings", "appearance");
       } else if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "r"
@@ -149,7 +163,7 @@ function Desktop() {
     };
     window.addEventListener("keydown", changed);
     return () => window.removeEventListener("keydown", changed);
-  }, [route, data.refresh, navigate]);
+  }, [route, data.refresh, navigate, appearance, isClosing]);
   useEffect(() => {
     /** Synchronize preview colors as well as saved themes without waiting on hidden WebView frames. */
     const synchronize = () => {

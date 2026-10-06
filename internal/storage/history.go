@@ -75,6 +75,22 @@ func (store *Store) Checkpoints(ctx context.Context, sourceId string) ([]domain.
 	return checkpoints, rows.Err()
 }
 
+// PruneExpiredHistory also expires cached accounts no longer referenced by active configuration.
+func (store *Store) PruneExpiredHistory(ctx context.Context, cutoffNs int64) error {
+	transaction, err := store.database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer transaction.Rollback()
+	if _, err := transaction.ExecContext(ctx, `DELETE FROM records WHERE EXISTS (SELECT 1 FROM checkpoints WHERE checkpoints.source_id=records.source_id AND checkpoints.path=records.path AND CAST(json_extract(checkpoints.data,'$.modifiedNs') AS INTEGER) < ?)`, cutoffNs); err != nil {
+		return err
+	}
+	if _, err := transaction.ExecContext(ctx, `DELETE FROM checkpoints WHERE CAST(json_extract(data,'$.modifiedNs') AS INTEGER) < ?`, cutoffNs); err != nil {
+		return err
+	}
+	return transaction.Commit()
+}
+
 // PruneHistory drops only app-owned cache entries whose source files were last modified before cutoff.
 func (store *Store) PruneHistory(ctx context.Context, sourceId string, cutoffNs int64) error {
 	transaction, err := store.database.BeginTx(ctx, nil)

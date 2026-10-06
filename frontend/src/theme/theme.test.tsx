@@ -11,7 +11,12 @@ vi.mock("@wailsio/runtime", async () => ({
   Events: { On: () => () => {} },
 }));
 vi.mock("../../bindings/yousage/app", () => ({}));
-import { mergedImport, parseThemeBatch } from "./ThemePanel";
+import {
+  collectionOwners,
+  survivingCollectionVariant,
+  mergedImport,
+  parseThemeBatch,
+} from "./ThemePanel";
 import { fontFamilyList, frontendTheme, nativeLibrary } from "./appearance";
 import {
   LibraryValue,
@@ -41,6 +46,38 @@ const CSS_INPUTS = [
   "var(--accent)",
   "color-mix(in srgb,red,blue)",
 ];
+
+it("keeps surviving collection variants and preserves unrelated half ownership", () => {
+  const light = {
+    ...BUILT_IN_THEMES[0],
+    id: "collection-light",
+    appearance: "light" as const,
+    variants: undefined,
+  };
+  const dark = {
+    ...BUILT_IN_THEMES[0],
+    id: "collection-dark",
+    appearance: "dark" as const,
+    variants: undefined,
+  };
+  expect(survivingCollectionVariant([light], dark.id)).toBe(light);
+  expect(collectionOwners([light, dark])).toEqual({
+    lightOwner: light.id,
+    darkOwner: dark.id,
+  });
+  expect(collectionOwners([dark])).toEqual({ darkOwner: dark.id });
+  expect(collectionOwners([BUILT_IN_THEMES[0]])).toBeNull();
+  const current = {
+    mode: "system",
+    baseThemeId: "grove",
+    lightOwner: "unresolved-published",
+    darkOwner: "old",
+  };
+  expect({ ...current, ...collectionOwners([dark]) }).toEqual({
+    ...current,
+    darkOwner: dark.id,
+  });
+});
 
 it("accepts the actual Wails nullable optional collection shape after a save", () => {
   const original = BUILT_IN_THEMES[0];

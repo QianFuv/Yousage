@@ -64,7 +64,7 @@ type Library struct {
 }
 
 func defaultLibraryValue() LibraryValue {
-	return LibraryValue{Preferences: AppearancePreferences{Mode: "system", BaseThemeId: "system", Typography: Typography{InterfaceSize: 16, CodeSize: 13}, Contrast: 100, GlassOpacity: 80, MotionMs: 200, AppliedGenerations: map[string]string{}}, CustomThemes: []Definition{}}
+	return LibraryValue{Preferences: AppearancePreferences{Mode: "system", BaseThemeId: "system", Typography: Typography{InterfaceSize: 16, CodeSize: 13}, Contrast: 100, GlassOpacity: 80, MotionMs: 0, AppliedGenerations: map[string]string{}}, CustomThemes: []Definition{}}
 }
 func (preferences AppearancePreferences) validate() error {
 	if preferences.Mode != "system" && preferences.Mode != "light" && preferences.Mode != "dark" {
