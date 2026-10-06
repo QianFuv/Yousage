@@ -189,3 +189,35 @@ func TestPriceFormNumbers(t *testing.T) {
 		t.Fatal(value, err)
 	}
 }
+
+func TestOfficialSpeedPricingWithoutCatalogSpeedRates(t *testing.T) {
+	standard := TokenRates{4e-6, 2e-5, 4e-7, 5e-6}
+	table := RateTable{"gpt-5.6-sol": {TokenRates: standard}, "gpt-6-astra": {TokenRates: standard}, "gpt-5.5": {TokenRates: standard}, "claude-opus-4-8-20260115": {TokenRates: standard}, "deepseek-v4-flash": {TokenRates: standard}}
+	record := fixtureRecord()
+	record.Speed = "standard"
+	record.Model = "gpt-5.6-sol"
+	base := Price(table, nil, record).CostUsd
+	cases := []struct {
+		model, speed string
+		factor       float64
+	}{
+		{"gpt-5.6-sol", "fast", 2},
+		{"AL/gpt-5.6-sol", "fast", 2},
+		{"gpt-5.5", "fast", 2.5},
+		{"gpt-6-astra", "ultrafast", 6},
+		{"claude-opus-4-8-20260115", "fast", 2},
+		{"deepseek-v4-flash", "fast", 1},
+		{"gpt-5.6-sol", "ultrafast", 1},
+	}
+	for _, item := range cases {
+		record.Model, record.Speed = item.model, item.speed
+		priced := Price(table, nil, record)
+		assertNear(t, priced.CostUsd, base*item.factor)
+		assertNear(t, priced.SpeedPremiumUsd, base*(item.factor-1))
+	}
+	record.Model, record.Speed = "gpt-5.6-sol", "fast"
+	overrides := OverrideRates(map[string]domain.PriceOverride{"gpt-5.6-sol": {InputCostPerMillionTokens: 1, OutputCostPerMillionTokens: 1}})
+	overridden := Price(table, overrides, record)
+	record.Speed = "standard"
+	assertNear(t, overridden.CostUsd, 2*Price(table, overrides, record).CostUsd)
+}

@@ -174,14 +174,20 @@ func (cost CategoryCost) total() float64 {
 	return cost.Input + cost.CacheRead + cost.CacheWrite + cost.Output
 }
 func recordRate(table, overrides RateTable, record domain.Record) (*ModelRate, bool) {
-	if rate, exists := overrides[strings.TrimSpace(record.Model)]; exists {
-		return &rate, true
-	}
 	model := record.Model
 	if record.RateModel != "" {
 		model = record.RateModel
 	}
-	return LookupRate(table, model), false
+	if rate, exists := overrides[strings.TrimSpace(record.Model)]; exists {
+		rate = withOfficialSpeeds(rate, model)
+		return &rate, true
+	}
+	rate := LookupRate(table, model)
+	if rate == nil {
+		return nil, false
+	}
+	priced := withOfficialSpeeds(*rate, model)
+	return &priced, false
 }
 
 func Price(table, overrides RateTable, record domain.Record) PricedUsage {
