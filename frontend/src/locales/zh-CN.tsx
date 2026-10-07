@@ -95,6 +95,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Colors: "颜色",
   Comfortable: "舒适",
   Compact: "紧凑",
+  Confidence: "可信度",
+  "Conflicting observations": "观测相互矛盾",
   "Connect an environment to set model prices.": "连接环境后才能设置模型价格。",
   Context: "上下文区域",
   Contrast: "对比度",
@@ -116,6 +118,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Custom model prices": "自定义模型价格",
   "Custom model prices & mappings": "自定义模型价格与映射",
   "Cycle System, Light and Dark": "在跟随系统、亮色、暗色之间切换",
+  "Cycle value": "本周期价值",
   "Daily cost": "每日费用",
   "Daily cost by provider": "各 Provider 每日费用",
   "Daily processed tokens": "每日处理 Token",
@@ -164,6 +167,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Glass opacity": "毛玻璃不透明度",
   "Hide where {label} is used": "隐藏{label}的使用位置",
   "Hide {label} usage": "隐藏{label}的使用位置",
+  "High confidence": "可信度高",
   "Highlight surface": "高亮背景",
   "History draft discarded.": "已放弃历史来源草稿。",
   "History location detected": "已检测到历史记录位置",
@@ -201,10 +205,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Loading…": "正在加载…",
   "Local font discovery is unavailable here. Enter an installed font family manually.":
     "当前无法自动查找本地字体，请手动输入已安装的字体名称。",
+  "Low confidence": "可信度低",
   "Manage usage": "管理用量",
   "Map to": "映射到",
   "Map to a different model.": "请映射到其他模型。",
   "Map {model} to model": "将 {model} 映射到模型",
+  "Medium confidence": "可信度中",
   "Merge into “{name}”": "合并到“{name}”",
   "Message Action": "消息操作",
   "Message Action Foreground": "消息操作文字",
@@ -222,6 +228,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Monospace size": "等宽字号",
   Monthly: "每月",
   "More actions for {name}": "{name} 的更多操作",
+  "More usage in this cycle is needed before the value can be bounded.":
+    "本周期需要更多用量才能确定价值区间。",
   "Most downloaded": "下载最多",
   "Most relevant": "最相关",
   "Move the window back onto the primary display.": "将窗口移回主显示器。",
@@ -250,10 +258,13 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "未识别到。请安装该 Provider 或配置其标准位置，然后重新识别。",
   "Not saved": "未保存",
   "Nothing to reset right now.": "当前没有需要重置的额度。",
+  "Observations disagree: quota use was not proportional to API prices, or some usage happened elsewhere.":
+    "观测结果互相矛盾：额度消耗与 API 价格不成比例，或有部分用量发生在其他设备上。",
   Offline: "离线",
   "On pace with the window": "与时间窗口节奏一致",
   "One or more color themes in that extension could not be imported safely.":
     "该扩展中有主题无法安全导入。",
+  "Only usage recorded on this device is counted.": "仅统计本设备记录的用量。",
   Open: "打开",
   "Open Appearance": "打开外观设置",
   "Open VSX returned an unexpectedly large detail response.":
@@ -304,6 +315,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Quota accounts": "额度账户",
   "Quota accounts applied.": "额度账户已应用。",
   "Quota monitoring": "额度监控",
+  "Quota was used, but no usage in this cycle was recorded on this device.":
+    "额度已被使用，但本设备没有记录本周期的用量。",
   "Raised surface": "凸起背景",
   "Read-only access": "只读访问",
   "Ready to import {count} themes": "准备导入 {count} 个主题",
@@ -319,6 +332,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Refresh while Usage is active and visible. History refreshes when stale; limits wait five minutes after completion. Settings and minimized windows never start automatic queries.":
     "在用量页面打开且可见时自动刷新。历史记录过期时刷新；额度在上次完成五分钟后刷新。设置页面和最小化窗口不会自动查询。",
   "Refreshing…": "正在刷新…",
+  Remaining: "剩余",
   Remove: "删除",
   "Remove custom themes": "删除自定义主题",
   "Remove new model": "删除新模型",
@@ -381,6 +395,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Some environments are still reporting. Totals include {count} available environments.":
     "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
   "Sources & connections": "数据来源",
+  Spent: "已花费",
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
   Standard: "标准",
   Status: "状态",
@@ -447,6 +462,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "重置结果未知。请先刷新额度，再决定是否重试。",
   'The theme "{label}" is not installed.': "未安装主题“{label}”。",
   'The theme id "{id}" is reserved.': "主题 ID“{id}”为保留 ID。",
+  "The window has reset. A new cycle starts with the next use.":
+    "窗口已重置，下次使用时开始新周期。",
   "Theme JSON copied.": "已复制主题 JSON。",
   "Theme appearance": "主题外观",
   "Theme collections need a valid id and label.":
@@ -572,6 +589,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{count} reset credits banked": "{count} 张可用重置券",
   "{count} session": "{count} 个会话",
   "{count} sessions": "{count} 个会话",
+  "{count} unpriced records are excluded, so the value may be higher.":
+    "已排除 {count} 条未定价记录，实际价值可能更高。",
+  "{count} usable observations": "{count} 次有效观测",
   "{count} use": "{count} 处使用",
   "{count} uses": "{count} 处使用",
   "{count} variants": "{count} 个变体",
@@ -596,7 +616,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{share} of cost": "占费用 {share}",
   "{share} of cost · {tokens} tokens": "占费用 {share} · {tokens} Token",
   "{share} of tokens · {cost}": "占 Token {share} · {cost}",
+  "{spent} for {low}–{high}% of the quota": "{spent}，对应额度的 {low}–{high}%",
   "{tokens} tokens have no known price": "{tokens} Token 没有已知价格",
+  "{value} API-equivalent value this cycle, {confidence}":
+    "本周期等值 API 价值 {value}，{confidence}",
+  "±{spread}% from {count} usable observations":
+    "±{spread}%（基于 {count} 次有效观测）",
   "“{name}” already has a dark palette.": "“{name}”已有暗色配色。",
   "“{name}” already has a dark palette. Pick another name.":
     "“{name}”已有暗色配色，请换一个名称。",
@@ -609,4 +634,17 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "“{name}”没有暗色配色。创建同名主题即可添加。",
   "“{name}” has no light palette. Create a theme with the same name to add one.":
     "“{name}”没有亮色配色。创建同名主题即可添加。",
+  "Estimating…": "估算中",
+  "API-equivalent value this cycle is being estimated":
+    "本周期等值 API 价值估算中",
+  "Waiting for history to cover the quota observations. The estimate appears after the next refresh.":
+    "正在等待历史记录覆盖额度观测，下次刷新后显示估算。",
+  "This cycle differs from earlier cycles, so the quota may have been adjusted. Earlier cycles are not used.":
+    "本周期与之前的周期差异较大，额度可能已调整，因此不参考之前的周期。",
+  "Codex logs": "Codex 日志",
+  "Quota checks": "额度查询",
+  "Codex logs and quota checks": "Codex 日志和额度查询",
+  "{count} earlier cycles": "参考前 {count} 个周期",
+  Basis: "依据",
+  Earlier: "之前周期",
 };

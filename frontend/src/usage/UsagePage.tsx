@@ -24,6 +24,7 @@ import {
   ToggleGroup,
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { mergeAnsweredUsage } from "./data";
+import { indexCycleValues } from "./CycleValue";
 import { msg, t } from "../i18n";
 import { useData } from "./controller";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
@@ -292,6 +293,7 @@ export function UsagePage({
             presentations={presentations}
             now={limitsNow}
             cursorPrompt={cursorPrompt}
+            cycleValues={indexCycleValues(selected)}
           />
         ) : (
           usageWindow && (

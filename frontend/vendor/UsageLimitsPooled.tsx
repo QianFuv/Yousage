@@ -13,7 +13,24 @@ import {
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
 import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
+import { formatUsd } from "@t3tools/shared/usageFormat";
 import { Fragment, type ReactNode, useState } from "react";
+
+import {
+  basisText,
+  ConfidenceDot,
+  confidenceLabel,
+  type CycleValueIndex,
+  CycleValueBadge,
+  cycleValueKey,
+  cycleValueNotice,
+  historyValueText,
+  precisionText,
+  predictionConfidence,
+  predictionPhrase,
+  rangeText,
+} from "../src/usage/CycleValue";
+import type { CycleValue } from "../src/usage/data";
 
 import { ensureLocalApi } from "../src/usage/host";
 import { usePrimarySettings } from "../src/usage/host";
@@ -159,6 +176,86 @@ function Row({
 }
 
 /**
+ * The cycle's API-equivalent value in an account popover: estimate, spend,
+ * remaining value, and how far the prediction can be trusted.
+ */
+function CycleValueSection({
+  value,
+  now,
+}: {
+  readonly value: CycleValue;
+  readonly now: number;
+}) {
+  const timestampFormat = usePrimarySettings(
+    (settings) => settings.timestampFormat,
+  );
+  const confidence = predictionConfidence(value);
+  const basis = basisText(value);
+  const earlier = value.history.slice(0, 3);
+  const range = rangeText(value.valueLowUsd, value.valueHighUsd);
+  const remaining = rangeText(value.remainingLowUsd, value.remainingHighUsd);
+  const notice = cycleValueNotice(value);
+  const isActive = value.status !== "noCycle";
+  return (
+    <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
+      {value.valueUsd !== undefined || range ? (
+        <Row label={t("Cycle value")}>
+          {value.valueUsd !== undefined
+            ? `≈ ${formatUsd(value.valueUsd)}`
+            : range}
+          {value.valueUsd !== undefined && range ? (
+            <span className="text-muted-foreground"> · {range}</span>
+          ) : null}
+        </Row>
+      ) : null}
+      {isActive ? (
+        <Row label={t("Spent")}>
+          {t("{spent} for {low}–{high}% of the quota", {
+            spent: formatUsd(value.spentUsd),
+            low: value.usedLowPercent,
+            high: value.usedHighPercent,
+          })}
+        </Row>
+      ) : null}
+      {remaining ? <Row label={t("Remaining")}>{remaining}</Row> : null}
+      {confidence ? (
+        <Row label={t("Confidence")}>
+          <span className="inline-flex items-center gap-1.5">
+            <ConfidenceDot confidence={confidence} />
+            {confidenceLabel(confidence)}
+          </span>
+          <span className="block text-muted-foreground">
+            {precisionText(value)}
+          </span>
+        </Row>
+      ) : null}
+      {basis ? <Row label={t("Basis")}>{basis}</Row> : null}
+      {earlier.length > 0 ? (
+        <Row label={t("Earlier")}>
+          {earlier.map((entry) => (
+            <span key={entry.resetsAt} className="flex gap-1.5">
+              <span className="text-muted-foreground">
+                {formatUpcomingTimestamp(entry.resetsAt, timestampFormat, now)}
+              </span>
+              <span>{historyValueText(entry)}</span>
+            </span>
+          ))}
+        </Row>
+      ) : null}
+      {notice ? <p className="text-muted-foreground">{notice}</p> : null}
+      {isActive ? (
+        <p className="text-muted-foreground">
+          {t("Only usage recorded on this device is counted.")}
+          {value.unpricedRecords > 0
+            ? ` ${t("{count} unpriced records are excluded, so the value may be higher.", { count: value.unpricedRecords })}`
+            : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Everything about one account in one window: plan, where it is signed in,
  * the email on request, reset time and share of the pool it restores, and the
  * reset-credit action. Opens on hover for a glance, on click to act.
@@ -168,6 +265,7 @@ function SegmentPopover({
   window,
   reset,
   now,
+  cycleValue,
   redeem,
   onRedeem,
 }: {
@@ -175,6 +273,7 @@ function SegmentPopover({
   readonly window: LimitPoolMember["window"];
   readonly reset: LimitPoolWindow["resets"][number] | undefined;
   readonly now: number;
+  readonly cycleValue: CycleValue | undefined;
   /** Redeem state owned by the segment, since the confirm lives outside this popover. */
   readonly redeem: ReturnType<typeof useResetCredit> | null;
   readonly onRedeem: () => void;
@@ -239,6 +338,7 @@ function SegmentPopover({
           </Row>
         ) : null}
       </div>
+      {cycleValue ? <CycleValueSection value={cycleValue} now={now} /> : null}
       {credits && redeem ? (
         <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
@@ -274,12 +374,14 @@ function PoolSegment({
   now,
   index,
   showAccountName,
+  cycleValue,
 }: {
   readonly account: LimitAccount;
   readonly window: LimitPoolMember["window"];
   readonly reset: LimitPoolWindow["resets"][number] | undefined;
   readonly color: string;
   readonly now: number;
+  readonly cycleValue: CycleValue | undefined;
   /** 1-based position in the bar, shown on the strip and its legend row to tie them together. */
   readonly index: number;
   readonly showAccountName: boolean;
@@ -289,6 +391,7 @@ function PoolSegment({
   const resetsIn = formatResetsIn(window, now);
   const resetDuration = formatResetDuration(window, now);
   const credits = account.limits.resetCredits?.availableCount ?? 0;
+  const prediction = cycleValue ? predictionPhrase(cycleValue) : null;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -297,7 +400,7 @@ function PoolSegment({
           <button
             type="button"
             style={{ gridColumn: index, gridRow: 1 }}
-            aria-label={`${account.displayName ?? (account.email ? accountInitials(account.email) : account.driver)}: ${t("{percent}% left", { percent: remaining })}${resetsIn ? `, ${resetsIn}` : ""}${credits ? `, ${creditsBanked(credits)}` : ""}`}
+            aria-label={`${account.displayName ?? (account.email ? accountInitials(account.email) : account.driver)}: ${t("{percent}% left", { percent: remaining })}${resetsIn ? `, ${resetsIn}` : ""}${credits ? `, ${creditsBanked(credits)}` : ""}${prediction ? `, ${prediction}` : ""}`}
             className="relative h-5 min-w-0 cursor-pointer overflow-hidden rounded-md bg-muted text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[popup-open]:ring-1 data-[popup-open]:ring-border @2xl/pool:h-8"
           />
         }
@@ -335,6 +438,7 @@ function PoolSegment({
           <span className="shrink-0 font-semibold text-foreground tabular-nums">
             {remaining}%
           </span>
+          {cycleValue ? <CycleValueBadge value={cycleValue} /> : null}
           {/* Countdown and badge get their own plate: fill and hatching run under them otherwise. */}
           <span className="ms-auto flex shrink-0 items-center gap-1.5 rounded-sm bg-background/85 px-1.5 py-0.5 text-2xs text-foreground tabular-nums">
             {resetDuration ? `↻ ${resetDuration}` : ""}
@@ -363,6 +467,7 @@ function PoolSegment({
         color={color}
         now={now}
         index={index}
+        cycleValue={cycleValue}
       />
       {account.redeem ? (
         <RedeemableSegmentPopup
@@ -372,6 +477,7 @@ function PoolSegment({
           now={now}
           redeemAt={account.redeem}
           closePopover={() => setOpen(false)}
+          cycleValue={cycleValue}
         />
       ) : (
         <PopoverPopup side="top" sideOffset={6}>
@@ -380,6 +486,7 @@ function PoolSegment({
             window={window}
             reset={reset}
             now={now}
+            cycleValue={cycleValue}
             redeem={null}
             onRedeem={() => {}}
           />
@@ -400,12 +507,14 @@ function LegendRow({
   color,
   now,
   index,
+  cycleValue,
 }: {
   readonly account: LimitAccount;
   readonly window: LimitPoolMember["window"];
   readonly color: string;
   readonly now: number;
   readonly index: number;
+  readonly cycleValue: CycleValue | undefined;
 }) {
   const remaining = remainingPercent(window);
   const resetsIn = formatResetDuration(window, now);
@@ -433,6 +542,7 @@ function LegendRow({
       <span className="shrink-0 font-semibold text-foreground tabular-nums">
         {remaining}%
       </span>
+      {cycleValue ? <CycleValueBadge value={cycleValue} /> : null}
       <span className="ms-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
         {resetDuration ? `↻ ${resetDuration}` : ""}
         {credits ? (
@@ -461,6 +571,7 @@ function RedeemableSegmentPopup({
   now,
   redeemAt,
   closePopover,
+  cycleValue,
 }: {
   readonly account: LimitAccount;
   readonly window: LimitPoolMember["window"];
@@ -468,6 +579,7 @@ function RedeemableSegmentPopup({
   readonly now: number;
   readonly redeemAt: NonNullable<LimitAccount["redeem"]>;
   readonly closePopover: () => void;
+  readonly cycleValue: CycleValue | undefined;
 }) {
   const redeem = useResetCredit(redeemAt.environmentId, redeemAt.input);
   return (
@@ -478,6 +590,7 @@ function RedeemableSegmentPopup({
           window={window}
           reset={reset}
           now={now}
+          cycleValue={cycleValue}
           redeem={redeem}
           onRedeem={() => {
             closePopover();
@@ -520,10 +633,12 @@ function PoolBar({
   pool,
   color,
   now,
+  cycleValues,
 }: {
   readonly pool: LimitPoolWindow;
   readonly color: string;
   readonly now: number;
+  readonly cycleValues: CycleValueIndex;
 }) {
   const restores = new Map(
     pool.resets.map((reset) => [reset.member.account.key, reset]),
@@ -547,6 +662,9 @@ function PoolBar({
               now={now}
               index={position + 1}
               showAccountName={pool.columns.length > 1}
+              cycleValue={cycleValues.get(
+                cycleValueKey(member.account.key, pool.id),
+              )}
             />
           ) : null,
         )}
@@ -565,12 +683,14 @@ function PoolWindowCard({
   now,
   label,
   description,
+  cycleValues,
 }: {
   readonly pool: LimitPoolWindow;
   readonly color: string;
   readonly now: number;
   readonly label?: string | undefined;
   readonly description?: string | undefined;
+  readonly cycleValues: CycleValueIndex;
 }) {
   // The soonest reset that hands anything back; an untouched account resets to no effect.
   const nextRefill = pool.resets.find((reset) => reset.restoresPercent > 0);
@@ -593,7 +713,7 @@ function PoolWindowCard({
           </span>
         ) : null}
       </div>
-      <PoolBar pool={pool} color={color} now={now} />
+      <PoolBar pool={pool} color={color} now={now} cycleValues={cycleValues} />
       {description ? (
         <p className="text-xs text-muted-foreground md:col-span-2">
           {description}
@@ -606,9 +726,11 @@ function PoolWindowCard({
 function PoolSection({
   pool,
   now,
+  cycleValues,
 }: {
   readonly pool: LimitPool;
   readonly now: number;
+  readonly cycleValues: CycleValueIndex;
 }) {
   const color = barColor(pool.driver);
   const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
@@ -638,6 +760,7 @@ function PoolSection({
             now={now}
             label={details?.label}
             description={details?.description}
+            cycleValues={cycleValues}
           />
         );
       })}
@@ -654,10 +777,12 @@ export function UsageLimitsPooled({
   presentations,
   now,
   cursorPrompt,
+  cycleValues = new Map(),
 }: {
   readonly presentations: Parameters<typeof collectLimitAccounts>[0];
   readonly now: number;
   readonly cursorPrompt?: ReactNode;
+  readonly cycleValues?: CycleValueIndex;
 }) {
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
   const notices = collectLimitNotices(presentations);
@@ -682,7 +807,7 @@ export function UsageLimitsPooled({
       {pools.map((pool, index) => (
         <Fragment key={pool.driver}>
           {index === cursorPromptAt ? cursorPrompt : null}
-          <PoolSection pool={pool} now={now} />
+          <PoolSection pool={pool} now={now} cycleValues={cycleValues} />
         </Fragment>
       ))}
       {cursorPromptAt === pools.length ? cursorPrompt : null}
