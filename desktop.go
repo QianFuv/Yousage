@@ -30,9 +30,20 @@ func (service *App) installDesktopHooks() {
 	}
 	for _, event := range []events.WindowEventType{events.Common.WindowShow, events.Common.WindowHide, events.Common.WindowMinimise, events.Common.WindowUnMinimise, events.Common.WindowRestore} {
 		service.window.OnWindowEvent(event, func(*application.WindowEvent) {
-			service.nativeApp.Event.Emit("window-visibility", service.window.IsVisible() && !service.window.IsMinimised())
+			service.nativeApp.Event.Emit("window-visibility", windowVisibility(event, service.window.IsVisible(), service.window.IsMinimised()))
 		})
 	}
+}
+
+// windowVisibility trusts show/hide events over IsVisible, which still reports a hidden window while Windows shows it.
+func windowVisibility(event events.WindowEventType, isVisible, isMinimised bool) bool {
+	switch event {
+	case events.Common.WindowShow:
+		return !isMinimised
+	case events.Common.WindowHide, events.Common.WindowMinimise:
+		return false
+	}
+	return isVisible && !isMinimised
 }
 
 // captureBounds retains only normal DIP geometry; maximized/minimized rectangles never replace it.

@@ -32,6 +32,7 @@ type DataContextValue = {
     isManual: boolean,
     isUsagePage: boolean,
     afterPending?: boolean,
+    shouldRefreshAll?: boolean,
   ) => Promise<void>;
 };
 const DATA_CONTEXT = createContext<DataContextValue | null>(null);
@@ -69,7 +70,9 @@ export function DataProvider({
     isManual: boolean;
     isUsagePage: boolean;
     afterPending: boolean;
+    shouldRefreshAll: boolean;
   }>(null);
+  const didRefreshAtLaunch = useRef(false);
   const currentRefresh = useRef<DataContextValue["refresh"]>(async () => {});
   const queue = useRef(Promise.resolve());
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -147,10 +150,20 @@ export function DataProvider({
   }, []);
   /** Gate automatic work on current visibility/route and coalesce explicit refreshes in Go. */
   const refresh = useCallback(
-    async (isManual: boolean, isUsagePage: boolean, afterPending = false) => {
+    async (
+      isManual: boolean,
+      isUsagePage: boolean,
+      afterPending = false,
+      shouldRefreshAll = false,
+    ) => {
       if (!snapshot) return;
       if (isRefreshing.current) {
-        pendingRefresh.current = { isManual, isUsagePage, afterPending: true };
+        pendingRefresh.current = {
+          isManual,
+          isUsagePage,
+          afterPending: true,
+          shouldRefreshAll,
+        };
         return;
       }
       if (
@@ -179,16 +192,25 @@ export function DataProvider({
         IsAutoEnabled: displayRef.current.value.shouldAutoRefresh,
         AfterPending: afterPending,
       });
+      const refreshUsage = () =>
+        nativeApi.RefreshUsage(
+          displayRef.current.value.windowDays,
+          zone,
+          targets,
+          request,
+        );
       try {
-        if (usageMetric.current === "limits")
+        if (shouldRefreshAll) {
+          const failure = (
+            await Promise.allSettled([
+              nativeApi.RefreshLimits(targets, request),
+              refreshUsage(),
+            ])
+          ).find((result) => result.status === "rejected");
+          if (failure) throw failure.reason;
+        } else if (usageMetric.current === "limits")
           await nativeApi.RefreshLimits(targets, request);
-        else
-          await nativeApi.RefreshUsage(
-            displayRef.current.value.windowDays,
-            zone,
-            targets,
-            request,
-          );
+        else await refreshUsage();
       } catch (cause) {
         setError(String(cause));
       } finally {
@@ -202,12 +224,20 @@ export function DataProvider({
             next.isManual,
             next.isUsagePage,
             next.afterPending,
+            next.shouldRefreshAll,
           );
       }
     },
     [snapshot, selected, zone, reload],
   );
   currentRefresh.current = refresh;
+  /** Refresh usage and limits together once per launch, past cooldowns, when automatic refresh is on. */
+  useEffect(() => {
+    if (!snapshot || didRefreshAtLaunch.current) return;
+    didRefreshAtLaunch.current = true;
+    if (displayRef.current.value.shouldAutoRefresh)
+      void currentRefresh.current(true, true, false, true);
+  }, [snapshot]);
   return (
     <DATA_CONTEXT.Provider
       value={{
