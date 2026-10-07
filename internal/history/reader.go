@@ -13,7 +13,7 @@ import (
 	"yousage/internal/history/grok"
 )
 
-const ParserVersion = 1
+const ParserVersion = 2
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint

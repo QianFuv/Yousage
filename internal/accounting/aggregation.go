@@ -129,6 +129,9 @@ func Aggregate(records []domain.Record, options AggregateOptions) (AggregateResu
 	location := Location(window.TimeZone)
 	seen, sessions, buckets := map[string]bool{}, map[string]bool{}, map[bucketKey]*accumulator{}
 	for _, record := range records {
+		if record.IsQuotaOnly {
+			continue
+		}
 		if record.DedupeKey != "" {
 			if seen[record.DedupeKey] {
 				result.DuplicatesDropped++

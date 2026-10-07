@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"yousage/internal/domain"
+	"yousage/internal/quota"
 	"yousage/internal/storage"
 )
 
@@ -171,11 +172,13 @@ func (collector Collector) scan(ctx context.Context, roots []Root, now time.Time
 	return results, nil
 }
 
+// scanSource reuses directory metadata and reads checkpoint state in one batch.
 func (collector Collector) scanSource(ctx context.Context, fingerprint domain.SourceFingerprint, now time.Time, shouldReadRecords bool) (SourceResult, error) {
 	result := SourceResult{Fingerprint: fingerprint, Status: "ok", Records: []domain.Record{}}
 	id := fingerprint.Id()
 	cutoff := now.Add(-90 * 24 * time.Hour)
 	paths := []string{}
+	fileInfo := map[string]os.FileInfo{}
 	walkError := filepath.WalkDir(fingerprint.ResolvedHomePath, func(path string, entry fs.DirEntry, err error) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -197,7 +200,10 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 		if fingerprint.Provider == domain.Grok && entry.Name() != "updates.jsonl" {
 			return nil
 		}
-		info, err := os.Stat(path)
+		info, err := entry.Info()
+		if entry.Type()&os.ModeSymlink != 0 {
+			info, err = os.Stat(path)
+		}
 		if err != nil {
 			result.Status = "partial"
 			return nil
@@ -210,6 +216,7 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 			return nil
 		}
 		paths = append(paths, path)
+		fileInfo[path] = info
 		return nil
 	})
 	if walkError != nil {
@@ -224,17 +231,22 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 		}
 	}
 	sort.Strings(paths)
+	checkpoints, err := collector.Store.Checkpoints(ctx, id)
+	if err != nil {
+		return result, err
+	}
+	previousByPath := map[string]domain.Checkpoint{}
+	for _, checkpoint := range checkpoints {
+		previousByPath[checkpoint.Path] = checkpoint
+	}
 	for _, path := range paths {
-		previous, err := collector.Store.Checkpoint(ctx, id, path)
-		if err != nil {
-			return result, err
+		previous, exists := previousByPath[path]
+		if !exists {
+			previous = domain.Checkpoint{SourceId: id, Path: path, Reducer: []byte(`{}`)}
 		}
-		info, err := os.Stat(path)
-		if err != nil {
-			result.Status = "partial"
-			continue
-		}
-		if previous.Revision > 0 && previous.ParserVersion == ParserVersion && previous.FileSize == info.Size() && previous.ModifiedNs == info.ModTime().UnixNano() {
+		info := fileInfo[path]
+		isCurrent := previous.ParserVersion == ParserVersion || previous.ParserVersion == 1 && (fingerprint.Provider != domain.Codex || info.ModTime().Before(now.Add(-quota.CycleFitHorizon)))
+		if previous.Revision > 0 && isCurrent && previous.FileSize == info.Size() && previous.ModifiedNs == info.ModTime().UnixNano() {
 			result.ScannedFiles++
 			continue
 		}

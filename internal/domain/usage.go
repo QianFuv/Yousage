@@ -65,19 +65,43 @@ func (tokens *Tokens) Add(other Tokens) {
 
 // Record contains usage facts, never transcript text or credentials.
 type Record struct {
-	Provider        Provider `json:"provider"`
-	TimestampMs     int64    `json:"timestampMs"`
-	Model           string   `json:"model"`
-	RateModel       string   `json:"rateModel,omitempty"`
-	SessionId       string   `json:"sessionId"`
-	Totals          Tokens   `json:"totals"`
-	ReportedCostUsd *float64 `json:"reportedCostUsd"`
-	Speed           string   `json:"speed"`
-	DedupeKey       string   `json:"dedupeKey,omitempty"`
-	SourcePath      string   `json:"sourcePath,omitempty"`
+	Provider        Provider          `json:"provider"`
+	TimestampMs     int64             `json:"timestampMs"`
+	Model           string            `json:"model"`
+	RateModel       string            `json:"rateModel,omitempty"`
+	SessionId       string            `json:"sessionId"`
+	Totals          Tokens            `json:"totals"`
+	ReportedCostUsd *float64          `json:"reportedCostUsd"`
+	Speed           string            `json:"speed"`
+	DedupeKey       string            `json:"dedupeKey,omitempty"`
+	SourcePath      string            `json:"sourcePath,omitempty"`
+	QuotaBucket     string            `json:"quotaBucket,omitempty"`
+	Quota           *QuotaObservation `json:"quota,omitempty"`
+	IsQuotaOnly     bool              `json:"quotaOnly,omitempty"`
 }
 
+// QuotaWindow retains the native identity and reset of a logged window.
+type QuotaWindow struct {
+	Id            string  `json:"id"`
+	UsedPercent   float64 `json:"usedPercent"`
+	WindowMinutes int     `json:"windowMinutes"`
+	ResetsAt      int64   `json:"resetsAt"`
+}
+
+// QuotaObservation contains quota facts without transcript content.
+type QuotaObservation struct {
+	PlanType string        `json:"planType,omitempty"`
+	Windows  []QuotaWindow `json:"windows"`
+}
+
+// Validate checks usage facts and the separate quota-only record variant.
 func (record Record) Validate() error {
+	if record.IsQuotaOnly {
+		if record.Provider != Codex || record.Quota == nil || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil {
+			return errors.New("invalid quota-only record")
+		}
+		return nil
+	}
 	if !record.Provider.Valid() || strings.TrimSpace(record.Model) == "" {
 		return errors.New("invalid usage provider or model")
 	}

@@ -76,7 +76,8 @@ func ParseClaude(data []byte) *domain.Record {
 	return result
 }
 
-func ParseCodex(data []byte, state *CodexState) *domain.Record {
+// ParseCodex retains quota observations independently of billable usage.
+func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	var record map[string]any
 	if json.Unmarshal(data, &record) != nil {
 		return nil
@@ -130,9 +131,19 @@ func ParseCodex(data []byte, state *CodexState) *domain.Record {
 	if payload["type"] != "token_count" {
 		return nil
 	}
+	instant, hasTimestamp := timestamp(record["timestamp"])
+	limits := object(payload["rate_limits"])
+	if limits != nil && hasTimestamp {
+		observation := codexQuota(limits)
+		defer func() {
+			if result == nil {
+				result = &domain.Record{Provider: domain.Codex, TimestampMs: instant, SessionId: state.SessionId, IsQuotaOnly: true}
+			}
+			result.QuotaBucket, result.Quota = text(limits["limit_id"]), observation
+		}()
+	}
 	info := object(payload["info"])
 	usage := object(info["last_token_usage"])
-	instant, hasTimestamp := timestamp(record["timestamp"])
 	if usage == nil || !hasTimestamp || state.Model == "" {
 		return nil
 	}
@@ -162,6 +173,21 @@ func ParseCodex(data []byte, state *CodexState) *domain.Record {
 		return nil
 	}
 	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, Speed: state.Speed, Totals: totals}
+}
+
+// codexQuota maps positional log windows to their live probe identities.
+func codexQuota(limits map[string]any) *domain.QuotaObservation {
+	result := &domain.QuotaObservation{PlanType: text(limits["plan_type"]), Windows: []domain.QuotaWindow{}}
+	for _, id := range []string{"primary", "secondary"} {
+		window := object(limits[id])
+		used, hasUsed := window["used_percent"].(float64)
+		minutes, reset := integer(window["window_minutes"]), integer(window["resets_at"])
+		if window == nil || !hasUsed || !domain.Finite(used) || used < 0 || used > 100 || minutes <= 0 || minutes > int64((1<<63-1)/time.Minute) || reset <= 0 {
+			continue
+		}
+		result.Windows = append(result.Windows, domain.QuotaWindow{Id: id, UsedPercent: used, WindowMinutes: int(minutes), ResetsAt: reset})
+	}
+	return result
 }
 
 // orderedSignature retains property order while normalizing JSON numeric spellings like JSON.stringify.
@@ -222,15 +248,22 @@ func DedupeMovedCodex(files [][]domain.Record) [][]domain.Record {
 	}
 	result := make([][]domain.Record, len(files))
 	for index, records := range files {
+		if len(records) > 0 {
+			result[index] = make([]domain.Record, len(records))
+		}
 		occurrences := map[string]int{}
-		for _, record := range records {
+		for recordIndex, record := range records {
 			if record.Provider == domain.Codex && shared[record.SessionId] {
-				key, _ := json.Marshal([]any{record.Provider, record.SessionId, record.TimestampMs, record.Model, record.Totals})
+				identity := []any{record.Provider, record.SessionId, record.TimestampMs, record.Model, record.Totals, record.QuotaBucket, record.IsQuotaOnly}
+				if record.IsQuotaOnly {
+					identity = append(identity, record.Quota)
+				}
+				key, _ := json.Marshal(identity)
 				occurrences[string(key)]++
 				encoded, _ := json.Marshal([]any{string(key), occurrences[string(key)]})
 				record.DedupeKey = string(encoded)
 			}
-			result[index] = append(result[index], record)
+			result[index][recordIndex] = record
 		}
 	}
 	return result
