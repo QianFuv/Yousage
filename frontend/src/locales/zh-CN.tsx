@@ -618,8 +618,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{share} of tokens · {cost}": "占 Token {share} · {cost}",
   "{spent} for {low}–{high}% of the quota": "{spent}，对应额度的 {low}–{high}%",
   "{tokens} tokens have no known price": "{tokens} Token 没有已知价格",
-  "{value} API-equivalent value this cycle, {confidence}":
-    "本周期等值 API 价值 {value}，{confidence}",
+  "{spent} API-equivalent used of {value} this cycle, {confidence}":
+    "本周期已用等值 API {spent}，预计总价值 {value}，{confidence}",
   "±{spread}% from {count} usable observations":
     "±{spread}%（基于 {count} 次有效观测）",
   "“{name}” already has a dark palette.": "“{name}”已有暗色配色。",
@@ -635,8 +635,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "“{name}” has no light palette. Create a theme with the same name to add one.":
     "“{name}”没有亮色配色。创建同名主题即可添加。",
   "Estimating…": "估算中",
-  "API-equivalent value this cycle is being estimated":
-    "本周期等值 API 价值估算中",
+  "{spent} API-equivalent used this cycle, value being estimated":
+    "本周期已用等值 API {spent}，总价值估算中",
+  "Used {spent}": "已用 {spent}",
   "Waiting for history to cover the quota observations. The estimate appears after the next refresh.":
     "正在等待历史记录覆盖额度观测，下次刷新后显示估算。",
   "This cycle differs from earlier cycles, so the quota may have been adjusted. Earlier cycles are not used.":

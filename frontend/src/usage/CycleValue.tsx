@@ -115,6 +115,16 @@ export function predictionText(value: CycleValue): string | null {
 }
 
 /**
+ * The API-equivalent amount already used in the cycle, shown before its prediction.
+ *
+ * @param value - Cycle value.
+ * @returns The formatted amount used.
+ */
+export function usedText(value: CycleValue): string {
+  return t("Used {spent}", { spent: formatUsd(value.spentUsd) });
+}
+
+/**
  * Grade a prediction: narrow consistent intervals are trustworthy, open or wide ones are not.
  *
  * @param value - Cycle value.
@@ -175,7 +185,7 @@ export function ConfidenceDot({
 }
 
 /**
- * The prediction as it sits on a quota bar: confidence dot and amount.
+ * The prediction as it sits on a quota bar: confidence dot, amount used and predicted value.
  *
  * @param props - Cycle value to show.
  * @returns The badge, or null when nothing can be predicted.
@@ -185,16 +195,16 @@ export function CycleValueBadge({ value }: { readonly value: CycleValue }) {
   const confidence = predictionConfidence(value);
   if (isPredictionPending(value))
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground">
+      <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground tabular-nums">
         <PendingDot />
-        {t("Estimating…")}
+        {usedText(value)} · {t("Estimating…")}
       </span>
     );
   if (prediction === null || confidence === null) return null;
   return (
     <span className="inline-flex shrink-0 items-center gap-1 text-foreground tabular-nums">
       <ConfidenceDot confidence={confidence} />
-      {prediction}
+      {usedText(value)} / {prediction}
     </span>
   );
 }
@@ -218,10 +228,14 @@ export function PendingDot() {
 export function predictionPhrase(value: CycleValue): string | null {
   const prediction = predictionText(value);
   const confidence = predictionConfidence(value);
+  const spent = formatUsd(value.spentUsd);
   if (isPredictionPending(value))
-    return t("API-equivalent value this cycle is being estimated");
+    return t("{spent} API-equivalent used this cycle, value being estimated", {
+      spent,
+    });
   if (prediction === null || confidence === null) return null;
-  return t("{value} API-equivalent value this cycle, {confidence}", {
+  return t("{spent} API-equivalent used of {value} this cycle, {confidence}", {
+    spent,
     value: prediction,
     confidence: confidenceLabel(confidence),
   });

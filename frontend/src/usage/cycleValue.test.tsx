@@ -5,9 +5,11 @@ import {
   cycleValueKey,
   indexCycleValues,
   predictionConfidence,
+  predictionPhrase,
   predictionText,
   rangeText,
   relativeSpread,
+  usedText,
 } from "./CycleValue";
 
 /**
@@ -83,6 +85,33 @@ describe("predictionText", () => {
   it("predicts nothing without local usage or a running cycle", () => {
     expect(predictionText(cycleValue({ status: "noLocalUsage" }))).toBeNull();
     expect(predictionText(cycleValue({ status: "noCycle" }))).toBeNull();
+  });
+});
+
+describe("usedText", () => {
+  it("shows the API-equivalent amount already used in the cycle", () => {
+    expect(usedText(cycleValue())).toBe("Used $41.60");
+  });
+});
+
+describe("predictionPhrase", () => {
+  it("states the amount used alongside the prediction", () => {
+    expect(predictionPhrase(cycleValue())).toBe(
+      "$41.60 API-equivalent used of ≈ $180.00 this cycle, High confidence",
+    );
+  });
+
+  it("states the amount used while the value is still being estimated", () => {
+    expect(
+      predictionPhrase(
+        cycleValue({
+          status: "insufficientData",
+          valueUsd: undefined,
+          valueLowUsd: undefined,
+          valueHighUsd: undefined,
+        }),
+      ),
+    ).toBe("$41.60 API-equivalent used this cycle, value being estimated");
   });
 });
 
