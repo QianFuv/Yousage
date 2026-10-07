@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -27,6 +29,12 @@ type sourceIndex struct {
 	ShouldExcludeRecords bool          `json:"excludeRecords,omitempty"`
 }
 
+// localSummaryCache retains aggregates while their source facts and pricing are unchanged.
+type localSummaryCache struct {
+	key   [32]byte
+	value remote.Summary
+}
+
 func (service *Service) sourceIndex(ctx context.Context) ([]sourceIndex, int64, error) {
 	entries := []sourceIndex{}
 	revision, err := service.Store.ReadSetting(ctx, "history-index", &entries)
@@ -49,14 +57,25 @@ func (service *Service) fingerprint(provider domain.Provider, path string) domai
 	return history.PhysicalFingerprint(service.hostId(), provider, path)
 }
 
-// RefreshHistory coalesces scans and keeps full retention independent of the current viewer window.
+// RefreshHistory coalesces full-retention scans and preserves deferred notifications.
 func (service *Service) RefreshHistory(ctx context.Context, request refresh.Request) error {
-	_, err := service.history.Run(ctx, "local-history", request, service.scanHistory)
+	_, err := service.history.Run(ctx, "local-history", request, func(owner context.Context) (bool, error) {
+		owner, cancel := context.WithCancel(owner)
+		stop := context.AfterFunc(service.owner, cancel)
+		defer stop()
+		defer cancel()
+		if ctx.Value(deferredUsageInvalidationKey{}) == true {
+			owner = context.WithValue(owner, deferredUsageInvalidationKey{}, true)
+		}
+		return service.scanHistory(owner)
+	})
 	if errors.Is(err, refresh.ErrSkipped) {
 		return nil
 	}
 	return err
 }
+
+// scanHistory persists source coverage and emits unless an enclosing refresh defers it.
 func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	sources, _, err := service.Preferences.Sources(ctx)
 	if err != nil {
@@ -234,7 +253,9 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	if _, err = service.Store.WriteSetting(ctx, "history-index", revision, entries); err != nil {
 		return false, err
 	}
-	service.emit("usage-invalidated", nil)
+	if ctx.Value(deferredUsageInvalidationKey{}) != true {
+		service.emit("usage-invalidated", nil)
+	}
 	return true, nil
 }
 
@@ -276,6 +297,8 @@ func windowStart(window accounting.Window) time.Time {
 
 // localSummary applies window mtime rules before cross-file deduplication and per-source sessions.
 func (service *Service) localSummary(ctx context.Context, window accounting.Window) (remote.Summary, error) {
+	service.summaryMutex.Lock()
+	defer service.summaryMutex.Unlock()
 	now := service.Now()
 	summary := remote.Summary{ContractVersion: 6, ReadAt: now.UTC().Format(time.RFC3339Nano), TimeZone: window.TimeZone, SinceDay: window.SinceDay, UntilDay: window.UntilDay, Buckets: []accounting.Bucket{}, Sources: []remote.Source{}}
 	entries, _, err := service.sourceIndex(ctx)
@@ -291,11 +314,64 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		return summary, err
 	}
 	summary.Pricing = rates.Provenance(now)
+	inputs := []any{window, entries, pricing, rates.encodedRates, rates.FetchedAtMs, service.Scope, now.UTC().Format(time.DateOnly)}
+	for _, entry := range entries {
+		key, err := service.Store.HistoryCacheKey(ctx, entry.Source.Fingerprint.Id())
+		if err != nil {
+			return summary, err
+		}
+		inputs = append(inputs, sha256.Sum256([]byte(key)))
+	}
+	encoded, _ := json.Marshal(inputs)
+	key := sha256.Sum256(encoded)
+	if service.summaryCache.value.ContractVersion != 0 && service.summaryCache.key == key {
+		cached := service.summaryCache.value
+		cached.ReadAt, cached.Pricing = summary.ReadAt, summary.Pricing
+		cached.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
+		return cached, nil
+	}
 	options := accounting.AggregateOptions{Window: window, Rates: rates.Rates, Overrides: accounting.OverrideRates(pricing.Value.Overrides), Aliases: accounting.ResolveAliases(pricing.Value.Aliases)}
+	since := windowStart(window).Add(-36 * time.Hour)
+	recordSince := since
+	if window.Resolution == "hour" {
+		recordSince = windowStart(window)
+	}
+	sources, bySource, err := service.localHistoryRecordsBetween(ctx, entries, since, recordSince, now, false)
+	if err != nil {
+		return summary, err
+	}
+	summary.Sources = sources
+	for index, records := range bySource {
+		aggregate, err := accounting.Aggregate(records, options)
+		if err != nil {
+			return summary, err
+		}
+		summary.Sources[index].DistinctSessions = aggregate.DistinctSessions
+		summary.Buckets = append(summary.Buckets, aggregate.Buckets...)
+	}
+	summary.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
+	service.summaryCache = localSummaryCache{key: key, value: summary}
+	return summary, nil
+}
+
+// localRecords shares source filtering and cross-file deduplication with cycle accounting.
+func (service *Service) localRecords(ctx context.Context, entries []sourceIndex, since, now time.Time) ([]remote.Source, [][]domain.Record, error) {
+	return service.localHistoryRecords(ctx, entries, since, now, false)
+}
+
+// localHistoryRecords optionally includes quota-only facts for cycle estimation.
+func (service *Service) localHistoryRecords(ctx context.Context, entries []sourceIndex, since, now time.Time, shouldIncludeQuota bool) ([]remote.Source, [][]domain.Record, error) {
+	return service.localHistoryRecordsBetween(ctx, entries, since, since, now, shouldIncludeQuota)
+}
+
+// localHistoryRecordsBetween preserves file eligibility while bounding Codex timestamp reads.
+func (service *Service) localHistoryRecordsBetween(ctx context.Context, entries []sourceIndex, since, recordSince, now time.Time, shouldIncludeQuota bool) ([]remote.Source, [][]domain.Record, error) {
+	sources := []remote.Source{}
+	cutoff := max(since.UnixNano(), now.Add(-90*24*time.Hour).UnixNano())
+	recordCutoff := max(recordSince.UnixMilli(), now.Add(-90*24*time.Hour).UnixMilli())
 	files := [][]domain.Record{}
 	owners := []int{}
 	seen := map[string]bool{}
-	cutoff := max(windowStart(window).Add(-36*time.Hour).UnixNano(), now.Add(-90*24*time.Hour).UnixNano())
 	for _, entry := range entries {
 		if entry.IsHidden || !service.isProviderInScope(entry.Source.Fingerprint.Provider) {
 			continue
@@ -305,19 +381,29 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 			continue
 		}
 		seen[id] = true
-		position := len(summary.Sources)
-		summary.Sources = append(summary.Sources, entry.Source)
+		position := len(sources)
+		sources = append(sources, entry.Source)
 		if entry.ShouldExcludeRecords {
-			summary.Sources[position].DistinctSessions = 0
+			sources[position].DistinctSessions = 0
 			continue
 		}
 		modifiedSince := cutoff
 		if entry.IsSnapshot {
 			modifiedSince = now.Add(-90 * 24 * time.Hour).UnixNano()
 		}
-		fileRecords, err := service.Store.FileRecordsSince(ctx, id, modifiedSince)
+		read := service.Store.FileUsageRecordsSince
+		if shouldIncludeQuota {
+			read = service.Store.FileRecordsSince
+		}
+		var fileRecords map[string][]domain.Record
+		var err error
+		if entry.Source.Fingerprint.Provider == domain.Codex {
+			fileRecords, err = service.Store.FileCodexRecordsBetween(ctx, id, modifiedSince, recordCutoff, now.UnixMilli(), shouldIncludeQuota)
+		} else {
+			fileRecords, err = read(ctx, id, modifiedSince)
+		}
 		if err != nil {
-			return summary, err
+			return nil, nil, err
 		}
 		paths := make([]string, 0, len(fileRecords))
 		for path := range fileRecords {
@@ -330,31 +416,34 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		}
 	}
 	deduped := history.DedupeMovedCodex(files)
-	bySource := make([][]domain.Record, len(summary.Sources))
+	bySource := make([][]domain.Record, len(sources))
+	counts := make([]int, len(sources))
+	for index, records := range deduped {
+		counts[owners[index]] += len(records)
+	}
+	for index, count := range counts {
+		if count > 0 {
+			bySource[index] = make([]domain.Record, 0, count)
+		}
+	}
 	seenRecords := map[string]bool{}
 	for index, records := range deduped {
 		owner := owners[index]
 		for _, record := range records {
+			if !shouldIncludeQuota && record.IsQuotaOnly {
+				continue
+			}
 			if record.DedupeKey != "" {
 				if seenRecords[record.DedupeKey] {
 					continue
 				}
 				seenRecords[record.DedupeKey] = true
 			}
-			record.SourcePath = summary.Sources[owner].Fingerprint.ResolvedHomePath
+			record.SourcePath = sources[owner].Fingerprint.ResolvedHomePath
 			bySource[owner] = append(bySource[owner], record)
 		}
 	}
-	for index, records := range bySource {
-		aggregate, err := accounting.Aggregate(records, options)
-		if err != nil {
-			return summary, err
-		}
-		summary.Sources[index].DistinctSessions = aggregate.DistinctSessions
-		summary.Buckets = append(summary.Buckets, aggregate.Buckets...)
-	}
-	summary.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
-	return summary, nil
+	return sources, bySource, nil
 }
 
 // Sources reports configured roots; source paths remain private to the local settings and aggregate contract.

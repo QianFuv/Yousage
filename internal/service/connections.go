@@ -214,8 +214,15 @@ func (service *Service) Usage(ctx context.Context, days int, zone string) (Snaps
 		return result, err
 	}
 	result.Environments = append(result.Environments, EnvironmentState{Id: service.LocalId, Label: "This device", IsLocal: true, IsConnected: true, CanOperate: true, Config: &config, Summary: &local})
+	result.Environments[0].CycleValues = service.localCycleValues(ctx, config)
 	if observation, _, err := service.quotas(ctx); err == nil {
 		result.Environments[0].Error = observation.Error
+	}
+	if service.history.Snapshot("local-history").Error != nil {
+		result.Environments[0].Error = strings.TrimSpace(result.Environments[0].Error + " Local history could not be refreshed. Cached history is retained.")
+	}
+	if service.rates.Snapshot("public").Error != nil {
+		result.Environments[0].Error = strings.TrimSpace(result.Environments[0].Error + " Public model prices could not be refreshed. Cached prices are retained.")
 	}
 	saved, err := service.Configuration(ctx)
 	if err != nil {

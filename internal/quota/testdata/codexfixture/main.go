@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -26,6 +27,8 @@ func child(argument string) {
 	command.Stderr = os.Stderr
 	_ = command.Start()
 }
+
+// main serves configurable native quota responses without sending model turns.
 func main() {
 	recordPid()
 	if len(os.Args) > 1 && os.Args[1] == "grandchild" {
@@ -46,6 +49,10 @@ func main() {
 		time.Sleep(5 * time.Millisecond)
 	}
 	scenario := os.Getenv("YOUSAGE_CODEX_SCENARIO")
+	resetAt := int64(1800000000)
+	if configured, err := strconv.ParseInt(os.Getenv("YOUSAGE_CODEX_RESET_AT"), 10, 64); err == nil {
+		resetAt = configured
+	}
 	encoder := json.NewEncoder(os.Stdout)
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -82,7 +89,7 @@ func main() {
 			}
 			_ = encoder.Encode(map[string]any{"id": 9999, "result": map[string]bool{"unmatched": true}})
 			_ = encoder.Encode(map[string]any{"method": "account/rateLimits/updated", "params": map[string]any{"rateLimits": map[string]any{"limitId": "spark", "primary": map[string]any{"usedPercent": 99}}}})
-			result = map[string]any{"rateLimits": map[string]any{"limitId": "spark", "primary": map[string]any{"usedPercent": 90}}, "rateLimitsByLimitId": map[string]any{"codex": map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "resetsAt": 1800000000}}}, "rateLimitResetCredits": map[string]any{"availableCount": 2, "credits": []any{map[string]any{"status": "available", "expiresAt": 1800000300}}}}
+			result = map[string]any{"rateLimits": map[string]any{"limitId": "spark", "primary": map[string]any{"usedPercent": 90}}, "rateLimitsByLimitId": map[string]any{"codex": map[string]any{"limitId": "codex", "primary": map[string]any{"usedPercent": 25, "resetsAt": resetAt}}}, "rateLimitResetCredits": map[string]any{"availableCount": 2, "credits": []any{map[string]any{"status": "available", "expiresAt": 1800000300}}}}
 		case "account/rateLimitResetCredit/consume":
 			if scenario == "reset-hang" {
 				time.Sleep(time.Hour)

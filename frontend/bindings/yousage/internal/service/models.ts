@@ -100,6 +100,9 @@ export class ConnectionPreference {
     }
 }
 
+/**
+ * EnvironmentState presents local or remote usage and local cycle estimates.
+ */
 export class EnvironmentState {
     "environmentId": string;
     "label": string;
@@ -110,6 +113,7 @@ export class EnvironmentState {
     "summary": remote$0.Summary | null;
     "error"?: string;
     "refreshing": boolean;
+    "cycleValues"?: quota$0.CycleValue[];
 
     /** Creates a new EnvironmentState instance. */
     constructor($$source: Partial<EnvironmentState> = {}) {
@@ -147,12 +151,16 @@ export class EnvironmentState {
     static createFrom($$source: any = {}): EnvironmentState {
         const $$createField5_0 = $$createType8;
         const $$createField6_0 = $$createType10;
+        const $$createField9_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("serverConfig" in $$parsedSource) {
             $$parsedSource["serverConfig"] = $$createField5_0($$parsedSource["serverConfig"]);
         }
         if ("summary" in $$parsedSource) {
             $$parsedSource["summary"] = $$createField6_0($$parsedSource["summary"]);
+        }
+        if ("cycleValues" in $$parsedSource) {
+            $$parsedSource["cycleValues"] = $$createField9_0($$parsedSource["cycleValues"]);
         }
         return new EnvironmentState($$parsedSource as Partial<EnvironmentState>);
     }
@@ -259,7 +267,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType11;
+        const $$createField1_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -288,8 +296,8 @@ export class Snapshot {
      * Creates a new Snapshot instance from a string or object.
      */
     static createFrom($$source: any = {}): Snapshot {
-        const $$createField0_0 = $$createType12;
-        const $$createField1_0 = $$createType14;
+        const $$createField0_0 = $$createType14;
+        const $$createField1_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -313,7 +321,9 @@ const $$createType7 = remote$0.Config.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
 const $$createType9 = remote$0.Summary.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
-const $$createType11 = Configuration.createFrom;
-const $$createType12 = accounting$0.Window.createFrom;
-const $$createType13 = EnvironmentState.createFrom;
-const $$createType14 = $Create.Array($$createType13);
+const $$createType11 = quota$0.CycleValue.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = Configuration.createFrom;
+const $$createType14 = accounting$0.Window.createFrom;
+const $$createType15 = EnvironmentState.createFrom;
+const $$createType16 = $Create.Array($$createType15);

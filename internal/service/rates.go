@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -14,11 +15,19 @@ import (
 // ratesUrl is the models.dev catalog, which also prices models served through gateways and other providers.
 const ratesUrl = "https://models.dev/api.json"
 
+// RateSnapshot retains public prices with their persisted provenance.
 type RateSnapshot struct {
-	Rates       accounting.RateTable `json:"rates"`
-	FetchedAtMs int64                `json:"fetchedAtMs"`
-	Source      string               `json:"source"`
-	IsFresh     bool                 `json:"-"`
+	Rates        accounting.RateTable `json:"rates"`
+	FetchedAtMs  int64                `json:"fetchedAtMs"`
+	Source       string               `json:"source"`
+	IsFresh      bool                 `json:"-"`
+	encodedRates json.RawMessage
+}
+
+// savedRateCache avoids decoding unchanged persisted prices.
+type savedRateCache struct {
+	revision int64
+	value    RateSnapshot
 }
 
 func (snapshot RateSnapshot) Provenance(now time.Time) remote.Pricing {
@@ -33,21 +42,37 @@ func (snapshot RateSnapshot) Provenance(now time.Time) remote.Pricing {
 	}
 	return value
 }
+
+// Rates reuses persisted prices until their setting revision changes.
 func (service *Service) Rates(ctx context.Context) (RateSnapshot, error) {
 	if current := service.rates.Snapshot("public"); current.HasValue {
 		value := current.Value
+		if value.encodedRates == nil {
+			value.encodedRates, _ = json.Marshal(value.Rates)
+		}
 		value.IsFresh = current.Error == nil
 		return value, nil
 	}
-	value := RateSnapshot{Rates: accounting.RateTable{}}
-	_, err := service.Store.ReadSetting(ctx, "public-model-rates", &value)
+	service.rateMutex.Lock()
+	defer service.rateMutex.Unlock()
+	revision, err := service.Store.SettingRevision(ctx, "public-model-rates")
 	if err != nil {
 		return RateSnapshot{Rates: accounting.RateTable{}}, nil
 	}
+	if service.savedRates.value.Rates != nil && service.savedRates.revision == revision {
+		return service.savedRates.value, nil
+	}
+	value := RateSnapshot{Rates: accounting.RateTable{}}
+	revision, err = service.Store.ReadSetting(ctx, "public-model-rates", &value)
+	if err != nil {
+		return RateSnapshot{Rates: accounting.RateTable{}}, nil
+	}
+	value.encodedRates, _ = json.Marshal(value.Rates)
+	service.savedRates = savedRateCache{revision: revision, value: value}
 	return value, nil
 }
 
-// RefreshRates honors persisted freshness after restart and retains the previous rates on failure.
+// RefreshRates honors persisted freshness, retains failed rates and respects deferred notifications.
 func (service *Service) RefreshRates(ctx context.Context, request refresh.Request) error {
 	current, err := service.Rates(ctx)
 	if err != nil {
@@ -58,6 +83,10 @@ func (service *Service) RefreshRates(ctx context.Context, request refresh.Reques
 		return nil
 	}
 	_, err = service.rates.Run(ctx, "public", request, func(owner context.Context) (RateSnapshot, error) {
+		owner, cancelOwner := context.WithCancel(owner)
+		stop := context.AfterFunc(service.owner, cancelOwner)
+		defer stop()
+		defer cancelOwner()
 		deadline, cancel := context.WithTimeout(owner, 10*time.Second)
 		defer cancel()
 		request, err := http.NewRequestWithContext(deadline, http.MethodGet, ratesUrl, nil)
@@ -85,10 +114,13 @@ func (service *Service) RefreshRates(ctx context.Context, request refresh.Reques
 			return RateSnapshot{}, errors.New("Public model price document is invalid.")
 		}
 		value := RateSnapshot{Rates: rates, FetchedAtMs: service.Now().UnixMilli(), Source: ratesUrl, IsFresh: true}
+		value.encodedRates, _ = json.Marshal(value.Rates)
 		var previous RateSnapshot
 		revision, _ := service.Store.ReadSetting(owner, "public-model-rates", &previous)
 		_, _ = service.Store.WriteSetting(owner, "public-model-rates", revision, value)
-		service.emit("usage-invalidated", nil)
+		if ctx.Value(deferredUsageInvalidationKey{}) != true {
+			service.emit("usage-invalidated", nil)
+		}
 		return value, nil
 	})
 	if errors.Is(err, refresh.ErrSkipped) {

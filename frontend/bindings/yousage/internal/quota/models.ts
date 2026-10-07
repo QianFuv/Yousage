@@ -5,6 +5,191 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+/**
+ * CycleValue estimates full-cycle API-equivalent USD with an empirically calibrated nominal 80% band.
+ */
+export class CycleValue {
+    "instanceId": string;
+    "driver": string;
+    "windowId": string;
+    "status": string;
+    "cycleStartedAt"?: string;
+    "resetsAt"?: string;
+    "resetDetected": boolean;
+    "usedPercent": number;
+    "usedLowPercent": number;
+    "usedHighPercent": number;
+    "spentUsd": number;
+    "records": number;
+    "unpricedRecords": number;
+    "valueUsd"?: number | null;
+    "valueLowUsd"?: number | null;
+    "valueHighUsd"?: number | null;
+    "remainingLowUsd"?: number | null;
+    "remainingHighUsd"?: number | null;
+    "constraintCount": number;
+    "samples": CycleValueSample[];
+    "observationSource": string;
+    "priorUsed": boolean;
+    "priorCycleCount": number;
+    "adjustmentSuspected": boolean;
+    "history": CycleValueHistory[];
+
+    /** Creates a new CycleValue instance. */
+    constructor($$source: Partial<CycleValue> = {}) {
+        if (!("instanceId" in $$source)) {
+            this["instanceId"] = "";
+        }
+        if (!("driver" in $$source)) {
+            this["driver"] = "";
+        }
+        if (!("windowId" in $$source)) {
+            this["windowId"] = "";
+        }
+        if (!("status" in $$source)) {
+            this["status"] = "";
+        }
+        if (!("resetDetected" in $$source)) {
+            this["resetDetected"] = false;
+        }
+        if (!("usedPercent" in $$source)) {
+            this["usedPercent"] = 0;
+        }
+        if (!("usedLowPercent" in $$source)) {
+            this["usedLowPercent"] = 0;
+        }
+        if (!("usedHighPercent" in $$source)) {
+            this["usedHighPercent"] = 0;
+        }
+        if (!("spentUsd" in $$source)) {
+            this["spentUsd"] = 0;
+        }
+        if (!("records" in $$source)) {
+            this["records"] = 0;
+        }
+        if (!("unpricedRecords" in $$source)) {
+            this["unpricedRecords"] = 0;
+        }
+        if (!("constraintCount" in $$source)) {
+            this["constraintCount"] = 0;
+        }
+        if (!("samples" in $$source)) {
+            this["samples"] = [];
+        }
+        if (!("observationSource" in $$source)) {
+            this["observationSource"] = "";
+        }
+        if (!("priorUsed" in $$source)) {
+            this["priorUsed"] = false;
+        }
+        if (!("priorCycleCount" in $$source)) {
+            this["priorCycleCount"] = 0;
+        }
+        if (!("adjustmentSuspected" in $$source)) {
+            this["adjustmentSuspected"] = false;
+        }
+        if (!("history" in $$source)) {
+            this["history"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CycleValue instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CycleValue {
+        const $$createField19_0 = $$createType1;
+        const $$createField24_0 = $$createType3;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("samples" in $$parsedSource) {
+            $$parsedSource["samples"] = $$createField19_0($$parsedSource["samples"]);
+        }
+        if ("history" in $$parsedSource) {
+            $$parsedSource["history"] = $$createField24_0($$parsedSource["history"]);
+        }
+        return new CycleValue($$parsedSource as Partial<CycleValue>);
+    }
+}
+
+/**
+ * CycleValueHistory exposes one completed cycle and its prior selection.
+ */
+export class CycleValueHistory {
+    "cycleStartedAt": string;
+    "resetsAt": string;
+    "status": string;
+    "valueUsd"?: number | null;
+    "valueLowUsd"?: number | null;
+    "valueHighUsd"?: number | null;
+    "planType"?: string;
+    "usedForPrior": boolean;
+
+    /** Creates a new CycleValueHistory instance. */
+    constructor($$source: Partial<CycleValueHistory> = {}) {
+        if (!("cycleStartedAt" in $$source)) {
+            this["cycleStartedAt"] = "";
+        }
+        if (!("resetsAt" in $$source)) {
+            this["resetsAt"] = "";
+        }
+        if (!("status" in $$source)) {
+            this["status"] = "";
+        }
+        if (!("usedForPrior" in $$source)) {
+            this["usedForPrior"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CycleValueHistory instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CycleValueHistory {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CycleValueHistory($$parsedSource as Partial<CycleValueHistory>);
+    }
+}
+
+/**
+ * CycleValueSample exposes transition endpoints; implied bounds cover tick rounding and lag, not fit uncertainty.
+ */
+export class CycleValueSample {
+    "at": string;
+    "usedPercent": number;
+    "spentUsd": number;
+    "impliedLowUsd"?: number | null;
+    "impliedHighUsd"?: number | null;
+    "usable": boolean;
+
+    /** Creates a new CycleValueSample instance. */
+    constructor($$source: Partial<CycleValueSample> = {}) {
+        if (!("at" in $$source)) {
+            this["at"] = "";
+        }
+        if (!("usedPercent" in $$source)) {
+            this["usedPercent"] = 0;
+        }
+        if (!("spentUsd" in $$source)) {
+            this["spentUsd"] = 0;
+        }
+        if (!("usable" in $$source)) {
+            this["usable"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CycleValueSample instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CycleValueSample {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CycleValueSample($$parsedSource as Partial<CycleValueSample>);
+    }
+}
+
 export class ExternalUsage {
     "label": string;
     "url": string;
@@ -56,7 +241,7 @@ export class HubAccount {
      * Creates a new HubAccount instance from a string or object.
      */
     static createFrom($$source: any = {}): HubAccount {
-        const $$createField4_0 = $$createType0;
+        const $$createField4_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("usageLimits" in $$parsedSource) {
             $$parsedSource["usageLimits"] = $$createField4_0($$parsedSource["usageLimits"]);
@@ -135,7 +320,7 @@ export class HubSnapshot {
      * Creates a new HubSnapshot instance from a string or object.
      */
     static createFrom($$source: any = {}): HubSnapshot {
-        const $$createField4_0 = $$createType2;
+        const $$createField4_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("accounts" in $$parsedSource) {
             $$parsedSource["accounts"] = $$createField4_0($$parsedSource["accounts"]);
@@ -168,10 +353,10 @@ export class Limits {
      * Creates a new Limits instance from a string or object.
      */
     static createFrom($$source: any = {}): Limits {
-        const $$createField1_0 = $$createType4;
-        const $$createField3_0 = $$createType6;
-        const $$createField4_0 = $$createType8;
-        const $$createField5_0 = $$createType10;
+        const $$createField1_0 = $$createType8;
+        const $$createField3_0 = $$createType10;
+        const $$createField4_0 = $$createType12;
+        const $$createField5_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("windows" in $$parsedSource) {
             $$parsedSource["windows"] = $$createField1_0($$parsedSource["windows"]);
@@ -318,14 +503,18 @@ export class Window {
 }
 
 // Private type creation functions
-const $$createType0 = Limits.createFrom;
-const $$createType1 = HubAccount.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = Window.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = ResetCredits.createFrom;
-const $$createType6 = $Create.Nullable($$createType5);
-const $$createType7 = ExternalUsage.createFrom;
-const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = Unavailable.createFrom;
+const $$createType0 = CycleValueSample.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = CycleValueHistory.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = Limits.createFrom;
+const $$createType5 = HubAccount.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = Window.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = ResetCredits.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = ExternalUsage.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);
+const $$createType13 = Unavailable.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);

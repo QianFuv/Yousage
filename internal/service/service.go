@@ -48,51 +48,64 @@ type SavedConfiguration struct {
 	Revision int64         `json:"revision"`
 	Value    Configuration `json:"value"`
 }
+
+// EnvironmentState presents local or remote usage and local cycle estimates.
 type EnvironmentState struct {
-	Id           string          `json:"environmentId"`
-	Label        string          `json:"label"`
-	IsLocal      bool            `json:"local"`
-	IsConnected  bool            `json:"connected"`
-	CanOperate   bool            `json:"canOperate"`
-	Config       *remote.Config  `json:"serverConfig"`
-	Summary      *remote.Summary `json:"summary"`
-	Error        string          `json:"error,omitempty"`
-	IsRefreshing bool            `json:"refreshing"`
+	Id           string             `json:"environmentId"`
+	Label        string             `json:"label"`
+	IsLocal      bool               `json:"local"`
+	IsConnected  bool               `json:"connected"`
+	CanOperate   bool               `json:"canOperate"`
+	Config       *remote.Config     `json:"serverConfig"`
+	Summary      *remote.Summary    `json:"summary"`
+	Error        string             `json:"error,omitempty"`
+	IsRefreshing bool               `json:"refreshing"`
+	CycleValues  []quota.CycleValue `json:"cycleValues,omitempty"`
 }
 type Snapshot struct {
 	Window       accounting.Window  `json:"window"`
 	Environments []EnvironmentState `json:"environments"`
 }
 type Service struct {
-	Store            *storage.Store
-	Preferences      *preferences.Service
-	Themes           *theme.Library
-	Secrets          secrets.Store
-	Connector        remote.Connector
-	LocalId          string
-	Home             string
-	Platform         string
-	Environment      map[string]string
-	Scope            []domain.Provider
-	mutex            sync.Mutex
-	themeSync        sync.Mutex
-	credentialMutex  sync.Mutex
-	viewWindows      map[string]accounting.Window
-	RateClient       *http.Client
-	owner            context.Context
-	cancel           context.CancelFunc
-	workers          sync.WaitGroup
-	pendingWrites    int
-	isStopping       bool
-	draftCredentials map[string]draftCredential
-	connections      map[string]*connectionState
-	history          *refresh.Coordinator[bool]
-	limits           *refresh.Coordinator[bool]
-	rates            *refresh.Coordinator[RateSnapshot]
-	keychain         *secrets.CachedReader
-	gate             quota.Gate
-	Emit             func(string, any)
-	Now              func() time.Time
+	Store             *storage.Store
+	Preferences       *preferences.Service
+	Themes            *theme.Library
+	Secrets           secrets.Store
+	Connector         remote.Connector
+	LocalId           string
+	Home              string
+	Platform          string
+	Environment       map[string]string
+	Scope             []domain.Provider
+	mutex             sync.Mutex
+	themeSync         sync.Mutex
+	credentialMutex   sync.Mutex
+	cycleMutex        sync.Mutex
+	cycleCache        cycleValueCache
+	cycleHistories    cycleHistoryCache
+	summaryMutex      sync.Mutex
+	summaryCache      localSummaryCache
+	rateMutex         sync.Mutex
+	savedRates        savedRateCache
+	installationMutex sync.Mutex
+	installations     map[string]nativeInstallation
+	viewWindows       map[string]accounting.Window
+	RateClient        *http.Client
+	owner             context.Context
+	cancel            context.CancelFunc
+	workers           sync.WaitGroup
+	pendingWrites     int
+	limitsFollowup    chan struct{}
+	isStopping        bool
+	draftCredentials  map[string]draftCredential
+	connections       map[string]*connectionState
+	history           *refresh.Coordinator[bool]
+	limits            *refresh.Coordinator[bool]
+	rates             *refresh.Coordinator[RateSnapshot]
+	keychain          *secrets.CachedReader
+	gate              quota.Gate
+	Emit              func(string, any)
+	Now               func() time.Time
 }
 type connectionState struct {
 	preference ConnectionPreference

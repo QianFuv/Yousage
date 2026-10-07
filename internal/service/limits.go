@@ -49,7 +49,7 @@ func (service *Service) localConfig(ctx context.Context) (remote.Config, error) 
 		provider.InstanceId, provider.Driver, provider.DisplayName = target.Id, target.Driver, target.Label
 		provider.IsEnabled, provider.IsInstalled = target.IsEnabled, true
 		if target.Driver == "codex" || target.Driver == "claudeAgent" {
-			provider.IsInstalled = service.resolveExecutable(target.Driver, target.Executable) != ""
+			provider.IsInstalled = service.isNativeInstalled(target)
 		}
 		if provider.SlashCommands == nil {
 			provider.SlashCommands = []remote.SlashCommand{}
@@ -92,7 +92,10 @@ func (service *Service) nativeOptions(target NativeProvider) quota.NativeOptions
 	return quota.NativeOptions{Process: managedprocess.Options{Executable: service.resolveExecutable(target.Driver, target.Executable), Environment: environment}, IsEnabled: target.IsEnabled, Version: "0.1.0"}
 }
 
-// RefreshLimits applies completion-based cooldown and serializes probes with credit redemption.
+// deferredUsageInvalidationKey leaves notification to the enclosing limits refresh.
+type deferredUsageInvalidationKey struct{}
+
+// RefreshLimits returns after limits work and schedules coalesced local history and rates.
 func (service *Service) RefreshLimits(ctx context.Context, selected []string, request refresh.Request) error {
 	configuration, err := service.Configuration(ctx)
 	if err != nil {
@@ -105,7 +108,11 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 	isSelected := func(identity string) bool { return selected == nil || identities[identity] }
 	operations := map[string]func(context.Context) (bool, error){}
 	if isSelected(service.LocalId) {
-		operations["local"] = service.scanLimits
+		operations["local"] = func(owner context.Context) (bool, error) {
+			value, err := service.scanLimits(owner)
+			service.startLimitsFollowup(request)
+			return value, err
+		}
 	}
 	for _, preference := range configuration.Value.Connections {
 		identity := preference.Connection.EnvironmentId
@@ -139,6 +146,9 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 		go func() {
 			defer pending.Done()
 			_, err := service.limits.Run(ctx, identity, request, operation)
+			if identity == "local" && errors.Is(err, refresh.ErrSkipped) {
+				service.startLimitsFollowup(request)
+			}
 			if err != nil && !errors.Is(err, refresh.ErrSkipped) {
 				failures <- err
 			}
@@ -150,9 +160,61 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 	for err := range failures {
 		joined = append(joined, err)
 	}
-	service.emit("usage-invalidated", nil)
+	if !isSelected(service.LocalId) {
+		service.emit("usage-invalidated", nil)
+	}
 	return errors.Join(joined...)
 }
+
+// startLimitsFollowup coalesces local scans under the service lifetime.
+func (service *Service) startLimitsFollowup(request refresh.Request) {
+	service.mutex.Lock()
+	if service.limitsFollowup != nil || service.isStopping || service.owner.Err() != nil {
+		service.mutex.Unlock()
+		return
+	}
+	done := make(chan struct{})
+	service.limitsFollowup = done
+	service.workers.Add(1)
+	service.pendingWrites++
+	service.mutex.Unlock()
+	go func() {
+		defer service.workers.Done()
+		defer func() {
+			service.mutex.Lock()
+			service.limitsFollowup = nil
+			service.pendingWrites--
+			close(done)
+			service.mutex.Unlock()
+		}()
+		ctx := context.WithValue(service.owner, deferredUsageInvalidationKey{}, true)
+		historyError := service.RefreshHistory(ctx, request)
+		rateError := service.RefreshRates(ctx, request)
+		if ctx.Err() == nil {
+			service.recordFollowupFailure(ctx, historyError, rateError)
+			service.emit("usage-invalidated", nil)
+		}
+	}()
+}
+
+// recordFollowupFailure retains history failures alongside coordinator notices.
+func (service *Service) recordFollowupFailure(ctx context.Context, historyError, rateError error) {
+	if historyError == nil && rateError == nil {
+		return
+	}
+	if historyError != nil {
+		entries, _, err := service.sourceIndex(ctx)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsHidden && service.isProviderInScope(entry.Source.Fingerprint.Provider) {
+					_ = service.Store.Observe(ctx, domain.Observation{SourceId: entry.Source.Fingerprint.Id(), Status: "failed", AttemptedAt: service.Now().UnixMilli(), Notice: "Local history could not be refreshed. Cached history is retained."})
+				}
+			}
+		}
+	}
+}
+
+// scanLimits persists resolved limits and records only fresh native quota observations.
 func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 	err := service.gate.WithRefresh(ctx, "local-quotas", func() error {
 		configuration, err := service.Configuration(ctx)
@@ -170,6 +232,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 		}
 		providers := make([]remote.Provider, len(configuration.Value.Providers))
 		notices := make([]string, len(providers))
+		isFresh := make([]bool, len(providers))
 		var workers sync.WaitGroup
 		for index, target := range configuration.Value.Providers {
 			workers.Add(1)
@@ -218,6 +281,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 				if isProbeFailed {
 					notices[index] = target.Label + ": " + account.Limits.Unavailable.Message + " Last successful limits are retained."
 				}
+				isFresh[index] = !isProbeFailed && account.Limits.Unavailable == nil
 				account.Limits = quota.ResolveProbe(old.Limits, account.Limits)
 				if account.Email == "" && isProbeFailed {
 					account.Email = old.Auth.Email
@@ -254,6 +318,9 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 			next.Sources = append(next.Sources, snapshot)
 		}
 		_, err = service.Store.WriteSetting(ctx, "local-quotas", revision, next)
+		if err == nil {
+			service.recordQuotaSamples(ctx, configuration.Value.Providers, providers, isFresh)
+		}
 		return err
 	})
 	return err == nil, err

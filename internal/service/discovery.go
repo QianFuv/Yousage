@@ -2,14 +2,44 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	"yousage/internal/domain"
 	"yousage/internal/history/cursor"
 	"yousage/internal/preferences"
 )
+
+// nativeInstallation bounds repeated executable discovery during usage reads.
+type nativeInstallation struct {
+	path       string
+	validUntil time.Time
+}
+
+// isNativeInstalled revalidates discovered executables and expires PATH searches.
+func (service *Service) isNativeInstalled(target NativeProvider) bool {
+	inputs := []string{target.Driver, target.Executable, service.Platform, service.Home}
+	for _, name := range []string{"PATH", "APPDATA", "LOCALAPPDATA", "PNPM_HOME"} {
+		inputs = append(inputs, service.environmentValue(name))
+	}
+	encoded, _ := json.Marshal(inputs)
+	key := string(encoded)
+	service.installationMutex.Lock()
+	defer service.installationMutex.Unlock()
+	previous, exists := service.installations[key]
+	if exists && service.Now().Before(previous.validUntil) && (previous.path == "" || nativeExecutable(previous.path, service.Platform)) {
+		return previous.path != ""
+	}
+	path := service.resolveExecutable(target.Driver, target.Executable)
+	if service.installations == nil {
+		service.installations = map[string]nativeInstallation{}
+	}
+	service.installations[key] = nativeInstallation{path: path, validUntil: service.Now().Add(time.Minute)}
+	return path != ""
+}
 
 // ProviderDetection separates filesystem availability from account authorization.
 type ProviderDetection struct {
@@ -165,6 +195,10 @@ func (service *Service) resolveExecutable(driver, explicit string) string {
 				return path
 			}
 		} else if driver == "codex" {
+			packageDirectory := filepath.Join(directory, "node_modules", "@openai")
+			if info, err := os.Stat(packageDirectory); err != nil || !info.IsDir() {
+				continue
+			}
 			architecture, triple := "x64", "x86_64-pc-windows-msvc"
 			if runtime.GOARCH == "arm64" {
 				architecture, triple = "arm64", "aarch64-pc-windows-msvc"

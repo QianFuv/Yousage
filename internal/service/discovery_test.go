@@ -6,9 +6,39 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 	"yousage/internal/domain"
 	"yousage/internal/preferences"
 )
+
+// TestInstallationCacheRevalidatesPaths bounds lookup caching without hiding removal.
+func TestInstallationCacheRevalidatesPaths(test *testing.T) {
+	service := testService(test)
+	service.Platform = "windows"
+	service.Environment = map[string]string{}
+	path := filepath.Join(test.TempDir(), "codex.exe")
+	if err := os.WriteFile(path, []byte("fixture"), 0700); err != nil {
+		test.Fatal(err)
+	}
+	target := NativeProvider{Driver: "codex", Executable: path}
+	if !service.isNativeInstalled(target) {
+		test.Fatal("installation missing")
+	}
+	if err := os.Remove(path); err != nil {
+		test.Fatal(err)
+	}
+	if service.isNativeInstalled(target) {
+		test.Fatal("removed executable remained installed")
+	}
+	if err := os.WriteFile(path, []byte("fixture"), 0700); err != nil {
+		test.Fatal(err)
+	}
+	instant := service.Now().Add(2 * time.Minute)
+	service.Now = func() time.Time { return instant }
+	if !service.isNativeInstalled(target) {
+		test.Fatal("installation lookup did not expire")
+	}
+}
 
 func TestAutomaticSourcesFollowEnvironmentWithoutChangingLegacyRoots(test *testing.T) {
 	service := testService(test)
