@@ -1,3 +1,6 @@
+import "culori/css";
+import { converter, parse } from "culori/fn";
+
 /** Native fixture DTO comes directly from Wails generated Go bindings. */
 export type Bootstrap = import("../bindings/yousage/models").Bootstrap;
 
@@ -16,16 +19,23 @@ export function effectiveAppearance(
     : "light";
 }
 
-/** Convert a browser-rendered CSS color to opaque sRGB channels for Wails. */
-function opaqueChannels(color: string): [number, number, number] {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 1;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas color conversion unavailable");
-  context.fillStyle = color;
-  context.fillRect(0, 0, 1, 1);
-  const channels = context.getImageData(0, 0, 1, 1).data;
-  return [channels[0], channels[1], channels[2]];
+const TO_RGB = converter("rgb");
+
+/**
+ * Convert a computed CSS color to opaque sRGB channels for Wails.
+ *
+ * Parsing avoids a canvas: its first pixel read in the hidden startup WebView takes seconds.
+ *
+ * @param color - Computed CSS color in any CSS color syntax.
+ * @returns Red, green and blue channels clamped to 0–255.
+ */
+export function opaqueChannels(color: string): [number, number, number] {
+  const parsed = parse(color);
+  if (!parsed) throw new Error("Unsupported background color");
+  const { r, g, b } = TO_RGB(parsed);
+  const channel = (value: number) =>
+    Math.round(Math.min(1, Math.max(0, value || 0)) * 255);
+  return [channel(r), channel(g), channel(b)];
 }
 
 /** Page canvas color, used for the native window background. */
