@@ -82,7 +82,7 @@ func TestTransactionFailurePreservesRecordsCheckpointAndSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.database.Exec(`CREATE TRIGGER reject_bad BEFORE INSERT ON records WHEN json_extract(NEW.data,'$.model')='bad' BEGIN SELECT RAISE(ABORT,'injected failure'); END`); err != nil {
+	if _, err := store.database.Exec(`CREATE TRIGGER reject_bad BEFORE INSERT ON records WHEN NEW.ordinal=1 BEGIN SELECT RAISE(ABORT,'injected failure'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.CommitFile(ctx, checkpoint, []domain.Record{usageRecord("new"), usageRecord("bad")}, true); err == nil {
