@@ -10,6 +10,7 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as domain$0 from "../domain/models.js";
 
 export class Display {
+    "receiptDayStartHour": number;
     "density": string;
     "zoom": number;
     "metric": string;
@@ -22,6 +23,9 @@ export class Display {
 
     /** Creates a new Display instance. */
     constructor($$source: Partial<Display> = {}) {
+        if (!("receiptDayStartHour" in $$source)) {
+            this["receiptDayStartHour"] = 0;
+        }
         if (!("density" in $$source)) {
             this["density"] = "";
         }

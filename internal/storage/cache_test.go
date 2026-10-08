@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"sync"
 	"testing"
 	"yousage/internal/domain"
@@ -66,6 +67,10 @@ func TestHistoryKeysObserveOtherWriters(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	firstMutation, err := store.CompletedHistoryKey(ctx, id, math.MaxInt64)
+	if err != nil {
+		test.Fatal(err)
+	}
 	for range 5 {
 		warm, err := store.HistoryCacheKey(ctx, id)
 		if err != nil || warm != first {
@@ -90,5 +95,13 @@ func TestHistoryKeysObserveOtherWriters(test *testing.T) {
 	pruned, err := store.HistoryCacheKey(ctx, id)
 	if err != nil || pruned != "" {
 		test.Fatal("external retention was hidden by the revision cache", err)
+	}
+	checkpoint.Revision = 0
+	if _, err := other.CommitFile(ctx, checkpoint, []domain.Record{usageRecord("recreated")}, true); err != nil {
+		test.Fatal(err)
+	}
+	recreatedMutation, err := store.CompletedHistoryKey(ctx, id, math.MaxInt64)
+	if err != nil || recreatedMutation <= firstMutation {
+		test.Fatal("recreated checkpoint reused an old mutation identity", err)
 	}
 }

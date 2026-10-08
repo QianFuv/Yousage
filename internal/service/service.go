@@ -84,7 +84,7 @@ type Service struct {
 	cycleCache        cycleValueCache
 	cycleHistories    cycleHistoryCache
 	summaryMutex      sync.Mutex
-	summaryCache      localSummaryCache
+	summaryCaches     map[[32]byte]localSummaryCache
 	rateMutex         sync.Mutex
 	savedRates        savedRateCache
 	installationMutex sync.Mutex

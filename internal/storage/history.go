@@ -127,21 +127,17 @@ func (store *Store) FileRecords(ctx context.Context, sourceId string) (map[strin
 
 // FileRecordsSince filters by file modification time before decoding facts.
 func (store *Store) FileRecordsSince(ctx context.Context, sourceId string, modifiedSinceNs int64) (map[string][]domain.Record, error) {
-	return store.fileRecords(ctx, fileRecordSelect+` JOIN checkpoints c ON c.file_id=f.id WHERE f.source_id=? AND c.modified_ns>=? ORDER BY f.path,r.is_tail,r.ordinal`, sourceId, modifiedSinceNs)
+	return store.cachedFileRecords(ctx, sourceId, modifiedSinceNs, 0, 0, false, false, false)
 }
 
 // FileUsageRecordsSince excludes quota-only events before decoding usage facts.
 func (store *Store) FileUsageRecordsSince(ctx context.Context, sourceId string, modifiedSinceNs int64) (map[string][]domain.Record, error) {
-	return store.fileRecords(ctx, fileRecordSelect+` JOIN checkpoints c ON c.file_id=f.id WHERE f.source_id=? AND c.modified_ns>=? AND r.quota_only=0 ORDER BY f.path,r.is_tail,r.ordinal`, sourceId, modifiedSinceNs)
+	return store.cachedFileRecords(ctx, sourceId, modifiedSinceNs, 0, 0, false, true, false)
 }
 
 // FileCodexRecordsBetween preserves replay order within the requested timestamp range.
 func (store *Store) FileCodexRecordsBetween(ctx context.Context, sourceId string, modifiedSinceNs, sinceMs, untilMs int64, isMainBucketOnly bool) (map[string][]domain.Record, error) {
-	query := `SELECT f.path,` + recordColumns + ` FROM files f CROSS JOIN checkpoints c ON c.file_id=f.id CROSS JOIN records r ON r.file_id=f.id CROSS JOIN strings b ON b.id=r.bucket_id LEFT JOIN quotas q ON q.file_id=r.file_id AND q.is_tail=r.is_tail AND q.ordinal=r.ordinal WHERE f.source_id=? AND c.modified_ns>=? AND r.timestamp_ms>=? AND r.timestamp_ms<=?`
-	if isMainBucketOnly {
-		query += ` AND b.value IN ('','codex')`
-	}
-	return store.fileRecords(ctx, query+` ORDER BY f.path,r.is_tail,r.ordinal`, sourceId, modifiedSinceNs, sinceMs, untilMs)
+	return store.cachedFileRecords(ctx, sourceId, modifiedSinceNs, sinceMs, untilMs, true, false, isMainBucketOnly)
 }
 
 // latestQuotaCache remains valid until facts change or a future observation becomes eligible.
@@ -159,6 +155,11 @@ func (store *Store) LatestCodexQuota(ctx context.Context, sourceId string, until
 	if err != nil {
 		return nil, err
 	}
+	mutation, err := store.CompletedHistoryKey(ctx, sourceId, math.MaxInt64)
+	if err != nil {
+		return nil, err
+	}
+	key = fmt.Sprintf("%s:%d", key, mutation)
 	cached, exists := store.latestQuotas[sourceId]
 	if exists && cached.key == key && untilMs >= cached.sinceMs && untilMs < cached.untilMs {
 		return cloneQuotaRecord(cached.record), nil
@@ -191,7 +192,13 @@ func cloneQuotaRecord(record *domain.Record) *domain.Record {
 	if record == nil {
 		return nil
 	}
-	cloned := *record
+	cloned := cloneRecord(*record)
+	return &cloned
+}
+
+// cloneRecord copies mutable optional fields without allocating a second record container.
+func cloneRecord(record domain.Record) domain.Record {
+	cloned := record
 	if record.ReportedCostUsd != nil {
 		cost := *record.ReportedCostUsd
 		cloned.ReportedCostUsd = &cost
@@ -203,7 +210,7 @@ func cloneQuotaRecord(record *domain.Record) *domain.Record {
 		}
 		cloned.Quota = &observation
 	}
-	return &cloned
+	return cloned
 }
 
 // HistoryCacheKey identifies file revisions without decoding their usage or observations.
@@ -365,7 +372,17 @@ func (store *Store) pruneHistory(ctx context.Context, sourceId string, cutoffNs 
 	if err := interner.flush(ctx, transaction); err != nil {
 		return err
 	}
-	return transaction.Commit()
+	if err := transaction.Commit(); err != nil {
+		return err
+	}
+	store.fileCacheMutex.Lock()
+	for identity, file := range store.fileCache {
+		if file.modifiedNs < cutoffNs && (isGlobal || file.sourceId == sourceId) {
+			delete(store.fileCache, identity)
+		}
+	}
+	store.fileCacheMutex.Unlock()
+	return nil
 }
 
 // recordPrunedCycleChanges records removal boundaries before facts are deleted.

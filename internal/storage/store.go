@@ -28,6 +28,8 @@ type Store struct {
 	historyConnection *sql.Conn
 	historyVersion    int64
 	historyKeys       map[string]string
+	fileCacheMutex    sync.Mutex
+	fileCache         map[int64]decodedFile
 }
 
 // Open configures every pooled connection and refuses unknown future schema versions.

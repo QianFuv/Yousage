@@ -15,11 +15,13 @@ type selection struct {
 }
 
 var allFields = &selection{all: true}
+var errorFields = &selection{children: map[string]*selection{"type": allFields, "code": allFields, "status": allFields, "message": allFields}}
 var transcriptFields = &selection{children: map[string]*selection{
 	"params": {children: map[string]*selection{"sessionId": allFields, "_meta": {children: map[string]*selection{"agentTimestampMs": allFields}}, "update": {children: map[string]*selection{"sessionUpdate": allFields, "prompt_id": allFields, "usage": allFields}}}},
-	"type":   allFields, "timestamp": allFields, "costUSD": allFields, "sessionId": allFields, "requestId": allFields,
+	"reason": allFields, "subtype": allFields, "isApiErrorMessage": allFields, "error": errorFields,
+	"type": allFields, "timestamp": allFields, "costUSD": allFields, "sessionId": allFields, "requestId": allFields,
 	"message": {children: map[string]*selection{"id": allFields, "model": allFields, "usage": allFields}},
-	"payload": {children: map[string]*selection{"type": allFields, "id": allFields, "session_id": allFields, "forked_from_id": allFields, "source": {children: map[string]*selection{"subagent": {children: map[string]*selection{"thread_spawn": {children: map[string]*selection{"parent_thread_id": allFields}}}}}}, "model": allFields, "thread_settings": {children: map[string]*selection{"service_tier": allFields}}, "rate_limits": {children: map[string]*selection{"limit_id": allFields, "plan_type": allFields, "primary": {children: map[string]*selection{"used_percent": allFields, "window_minutes": allFields, "resets_at": allFields}}, "secondary": {children: map[string]*selection{"used_percent": allFields, "window_minutes": allFields, "resets_at": allFields}}}}, "info": {children: map[string]*selection{"last_token_usage": allFields}}}},
+	"payload": {children: map[string]*selection{"reason": allFields, "message": allFields, "error": errorFields, "type": allFields, "id": allFields, "session_id": allFields, "forked_from_id": allFields, "source": {children: map[string]*selection{"subagent": {children: map[string]*selection{"thread_spawn": {children: map[string]*selection{"parent_thread_id": allFields}}}}}}, "model": allFields, "thread_settings": {children: map[string]*selection{"service_tier": allFields}}, "rate_limits": {children: map[string]*selection{"limit_id": allFields, "plan_type": allFields, "primary": {children: map[string]*selection{"used_percent": allFields, "window_minutes": allFields, "resets_at": allFields}}, "secondary": {children: map[string]*selection{"used_percent": allFields, "window_minutes": allFields, "resets_at": allFields}}}}, "info": {children: map[string]*selection{"last_token_usage": allFields}}}},
 }}
 var jsonNumberPattern = regexp.MustCompile(`^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$`)
 
@@ -200,6 +202,22 @@ func projectString(stream *lineStream, shouldKeep bool, maxBytes int) ([]byte, e
 		result = append(result, '"')
 	}
 	for {
+		if !stream.hasPending && !stream.isEnded {
+			chunk, err := stream.stringBytes()
+			if err != nil {
+				return nil, err
+			}
+			if len(chunk) > 0 {
+				if shouldKeep {
+					if maxBytes > 0 && len(result)+len(chunk) > maxBytes {
+						shouldKeep, result = false, nil
+					} else {
+						result = append(result, chunk...)
+					}
+				}
+				continue
+			}
+		}
 		value, err := stream.read()
 		if err != nil {
 			return nil, err
@@ -249,4 +267,31 @@ func projectString(stream *lineStream, shouldKeep bool, maxBytes int) ([]byte, e
 			return nil, errors.New("invalid JSON escape")
 		}
 	}
+}
+
+// stringBytes advances ordinary string bytes in bounded spans without retaining skipped text.
+// Quotes, escapes and control bytes remain with the validating scalar parser.
+func (stream *lineStream) stringBytes() ([]byte, error) {
+	if err := stream.ctx.Err(); err != nil {
+		return nil, err
+	}
+	if stream.reader.Buffered() == 0 {
+		if _, err := stream.reader.Peek(1); err != nil {
+			return nil, err
+		}
+	}
+	data, err := stream.reader.Peek(min(stream.reader.Buffered(), 4096))
+	if err != nil {
+		return nil, err
+	}
+	length := 0
+	for _, value := range data {
+		if value < 0x20 || value == '"' || value == '\\' {
+			break
+		}
+		length++
+	}
+	stream.reader.Discard(length)
+	stream.bytes += int64(length)
+	return data[:length], nil
 }

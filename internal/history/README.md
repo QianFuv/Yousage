@@ -32,3 +32,12 @@ only), unzoned ISO using the host zone, and standard RFC/ANSIC forms are accepte
 Numeric timestamp values are rejected. Locale-specific implementation-dependent
 JavaScript Date.parse strings are not a provider format contract or a compatibility
 claim. Raw sources/oracles remain unchanged at t3code51f7f77.
+
+Parser version 3 replays all retained older checkpoints for redacted error events
+and explicit Claude cache TTL observations. Claude system `api_error` and
+`isApiErrorMessage` markers, Codex `turn_aborted`, transport errors and failed
+`task_complete` records retain only timestamp, provider, session, known model and
+a closed error classification. Interruptions remain separate from failures.
+Usage and quota-cycle pricing exclude these error facts. Arbitrary diagnostics,
+prompts and response text are never persisted. Error facts use the same atomic
+checkpoint/tail replacement and file-mtime retention as usage.

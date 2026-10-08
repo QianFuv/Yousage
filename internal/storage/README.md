@@ -55,14 +55,17 @@ own `quotas` row. No observations are deduplicated or compressed into runs.
 legacy rowid tie break for the latest quota observation. There is no duplicate
 record primary-key index.
 
-Payload version 1 starts with a version byte. Record payloads contain seven
+Payloads start with a version byte. Record payload v1 contains seven
 interned string identities, five signed token varints, and a cost-presence marker
 with an optional little-endian IEEE 754 float64. Timestamp, bucket and quota-only
 status live in relational columns. Quota payloads contain an interned plan,
 signed window count (`-1` means nil), and each window's interned identity, exact
 float64 percentage, signed duration and reset varints. Nil and empty observations,
 nil and zero cost pointers, window order and floating point bits are preserved.
-Unknown versions and malformed payloads are rejected.
+Record payload v2 appends a closed error-kind enum code and cache TTL varint to
+v1's fields; existing v1 rows remain readable without a relational migration.
+The enum stores no diagnostic text or extra dictionary identities. Quota payloads
+remain v1. Unknown versions and malformed payloads are rejected.
 
 The `strings` dictionary uses stable, never-reused integer identities. Reference
 counts change in the same transaction as records and quota observations; rewrites,

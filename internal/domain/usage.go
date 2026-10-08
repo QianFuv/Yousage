@@ -63,7 +63,8 @@ func (tokens *Tokens) Add(other Tokens) {
 	tokens.ReasoningTokens += other.ReasoningTokens
 }
 
-// Record contains usage facts, never transcript text or credentials.
+// Record contains usage facts or a redacted error variant, never transcript text or credentials.
+// Error facts populate only provider, timestamp, model, session and a closed error kind.
 type Record struct {
 	Provider        Provider          `json:"provider"`
 	TimestampMs     int64             `json:"timestampMs"`
@@ -77,6 +78,8 @@ type Record struct {
 	SourcePath      string            `json:"sourcePath,omitempty"`
 	QuotaBucket     string            `json:"quotaBucket,omitempty"`
 	Quota           *QuotaObservation `json:"quota,omitempty"`
+	ErrorKind       string            `json:"errorKind,omitempty"`
+	CacheTtlMs      int64             `json:"cacheTtlMs,omitempty"`
 	IsQuotaOnly     bool              `json:"quotaOnly,omitempty"`
 }
 
@@ -96,6 +99,15 @@ type QuotaObservation struct {
 
 // Validate checks usage facts and the separate quota-only record variant.
 func (record Record) Validate() error {
+	if record.ErrorKind != "" {
+		if (record.Provider != Codex && record.Provider != Claude) || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 {
+			return errors.New("invalid error fact")
+		}
+		return nil
+	}
+	if record.CacheTtlMs != 0 && record.CacheTtlMs != 300000 && record.CacheTtlMs != 3600000 {
+		return errors.New("invalid prompt cache TTL")
+	}
 	if record.IsQuotaOnly {
 		if record.Provider != Codex || record.Quota == nil || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil {
 			return errors.New("invalid quota-only record")
@@ -169,4 +181,17 @@ type Observation struct {
 
 func AccountId(provider Provider, email string) string {
 	return string(provider) + ":" + strings.ToLower(strings.TrimSpace(email))
+}
+
+// ErrorKinds is the closed set of redacted history error classifications.
+var ErrorKinds = [...]string{"rateLimit", "overloaded", "server", "streamDisconnected", "interrupted", "aborted", "auth", "other"}
+
+// ValidErrorKind rejects arbitrary provider error text.
+func ValidErrorKind(kind string) bool {
+	for _, candidate := range ErrorKinds {
+		if kind == candidate {
+			return true
+		}
+	}
+	return false
 }

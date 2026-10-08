@@ -5,8 +5,15 @@ export {
     Configuration,
     ConnectionPreference,
     EnvironmentState,
+    LossDay,
+    LossEvent,
+    LossKindCount,
+    LossReport,
+    LossTotals,
     NativeProvider,
     ProviderDetection,
+    Receipt,
+    ReceiptItem,
     SavedConfiguration,
     Snapshot
 } from "./models.js";

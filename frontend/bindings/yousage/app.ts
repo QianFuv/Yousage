@@ -162,11 +162,29 @@ export function GetLocalEnvironmentId(): $CancellablePromise<string> {
 }
 
 /**
+ * GetLossReport returns local cache expiry and redacted error observations.
+ */
+export function GetLossReport(days: number, timeZone: string): $CancellablePromise<service$0.LossReport> {
+    return $Call.ByID(4060904650, days, timeZone).then(($result: any) => {
+        return $$createType9($result);
+    });
+}
+
+/**
+ * GetReceipt returns a local calendar receipt using the Usage pricing pipeline.
+ */
+export function GetReceipt(period: string, date: string, timeZone: string, dayStartHour: number): $CancellablePromise<service$0.Receipt> {
+    return $Call.ByID(2732409345, period, date, timeZone, dayStartHour).then(($result: any) => {
+        return $$createType10($result);
+    });
+}
+
+/**
  * GetSources returns saved source choices independently of quota enablement.
  */
 export function GetSources(): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(3791071355).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     });
 }
 
@@ -175,7 +193,7 @@ export function GetSources(): $CancellablePromise<$models.SavedSources> {
  */
 export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
     return $Call.ByID(2234764926, days, timeZone).then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     });
 }
 
@@ -198,7 +216,7 @@ export function OpenExternal(destination: string): $CancellablePromise<void> {
  */
 export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
     return $Call.ByID(1066918238, origin, label, bootstrap, isReadOnly).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType13($result);
     });
 }
 
@@ -207,7 +225,7 @@ export function PairEnvironment(origin: string, label: string, bootstrap: string
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(1388571440).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType15($result);
     });
 }
 
@@ -216,7 +234,7 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3002950989, paths).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType15($result);
     });
 }
 
@@ -273,7 +291,7 @@ export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellableProm
  */
 export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(23962130, saved).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     });
 }
 
@@ -308,8 +326,10 @@ const $$createType5 = theme$0.LibrarySnapshot.createFrom;
 const $$createType6 = $models.Bootstrap.createFrom;
 const $$createType7 = service$0.SavedConfiguration.createFrom;
 const $$createType8 = preferences$0.SavedDisplay.createFrom;
-const $$createType9 = $models.SavedSources.createFrom;
-const $$createType10 = service$0.Snapshot.createFrom;
-const $$createType11 = service$0.ConnectionPreference.createFrom;
-const $$createType12 = $models.ThemeFileInput.createFrom;
-const $$createType13 = $Create.Array($$createType12);
+const $$createType9 = service$0.LossReport.createFrom;
+const $$createType10 = service$0.Receipt.createFrom;
+const $$createType11 = $models.SavedSources.createFrom;
+const $$createType12 = service$0.Snapshot.createFrom;
+const $$createType13 = service$0.ConnectionPreference.createFrom;
+const $$createType14 = $models.ThemeFileInput.createFrom;
+const $$createType15 = $Create.Array($$createType14);

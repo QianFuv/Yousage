@@ -68,12 +68,26 @@ func (interner *stringInterner) flush(ctx context.Context, transaction *sql.Tx) 
 	}
 	defer statement.Close()
 	for identity, delta := range interner.references {
+		if delta == 0 {
+			continue
+		}
 		if _, err := statement.ExecContext(ctx, delta, identity); err != nil {
 			return err
 		}
 	}
-	_, err = transaction.ExecContext(ctx, `DELETE FROM strings WHERE refs=0 AND id<>0`)
-	return err
+	remove, err := transaction.PrepareContext(ctx, `DELETE FROM strings WHERE id=? AND refs=0 AND id<>0`)
+	if err != nil {
+		return err
+	}
+	defer remove.Close()
+	for identity, delta := range interner.references {
+		if delta < 0 {
+			if _, err := remove.ExecContext(ctx, identity); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // releaseRecordStrings counts identities before atomic replacement or retention deletion.

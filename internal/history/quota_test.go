@@ -14,7 +14,7 @@ import (
 	"yousage/internal/storage"
 )
 
-// TestQuotaReparseHorizon preserves old checkpoints until their files change.
+// TestQuotaReparseHorizon replays all retained legacy checkpoints for error facts.
 func TestQuotaReparseHorizon(test *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
@@ -48,16 +48,6 @@ func TestQuotaReparseHorizon(test *testing.T) {
 			test.Fatal(err)
 		}
 		actual, _ := store.Checkpoint(ctx, id, path)
-		if age > quota.CycleFitHorizon {
-			if actual.Revision != checkpoint.Revision || actual.ParserVersion != 1 {
-				test.Fatal("old unchanged file was reparsed")
-			}
-			writeHistory(test, path, turnContext+"\n"+quotaEvent("codex", nil, nil)+"\n{}\n")
-			if _, err := collector.Synchronize(ctx, roots, now); err != nil {
-				test.Fatal(err)
-			}
-			actual, _ = store.Checkpoint(ctx, id, path)
-		}
 		if actual.ParserVersion != ParserVersion || actual.Revision != checkpoint.Revision+1 {
 			test.Fatal("eligible or later modified file was not reparsed")
 		}

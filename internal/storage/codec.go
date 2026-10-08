@@ -24,8 +24,9 @@ func (writer *payloadWriter) number(value float64) {
 
 // payloadReader rejects truncated, unknown and trailing payloads.
 type payloadReader struct {
-	data []byte
-	err  error
+	data    []byte
+	err     error
+	version byte
 }
 
 // integer reads a signed varint.
@@ -53,10 +54,11 @@ func (reader *payloadReader) number() float64 {
 // newPayloadReader checks the payload format version.
 func newPayloadReader(data []byte) payloadReader {
 	reader := payloadReader{data: data}
-	if len(data) == 0 || data[0] != 1 {
+	if len(data) == 0 || (data[0] != 1 && data[0] != 2) {
 		reader.err = errors.New("unsupported storage payload version")
 		return reader
 	}
+	reader.version = data[0]
 	reader.data = data[1:]
 	return reader
 }
@@ -72,9 +74,9 @@ func (reader *payloadReader) finish() error {
 	return nil
 }
 
-// encodeRecord stores every nonrelational field using interned string identities.
+// encodeRecord writes payload v2 with the original seven interned strings and closed error/TTL codes.
 func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]byte, error) {
-	writer := payloadWriter{data: []byte{1}}
+	writer := payloadWriter{data: []byte{2}}
 	for _, value := range []string{string(record.Provider), record.Model, record.RateModel, record.SessionId, record.Speed, record.DedupeKey, record.SourcePath} {
 		identity, err := intern(value)
 		if err != nil {
@@ -91,10 +93,24 @@ func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]b
 		writer.integer(1)
 		writer.number(*record.ReportedCostUsd)
 	}
+	// Closed enum codes keep arbitrary error strings out of the dictionary.
+	kindCode := int64(0)
+	if record.ErrorKind != "" {
+		for index, kind := range domain.ErrorKinds {
+			if kind == record.ErrorKind {
+				kindCode = int64(index + 1)
+			}
+		}
+		if kindCode == 0 {
+			return nil, errors.New("invalid error kind")
+		}
+	}
+	writer.integer(kindCode)
+	writer.integer(record.CacheTtlMs)
 	return writer.data, nil
 }
 
-// decodeRecord restores facts with relational timestamp, bucket and observation fields.
+// decodeRecord restores v1/v2 facts with relational timestamp, bucket and observation fields.
 func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool, quota []byte, lookup func(int64) (string, bool)) (domain.Record, error) {
 	reader := newPayloadReader(data)
 	values := make([]string, 7)
@@ -115,6 +131,15 @@ func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool,
 		record.ReportedCostUsd = &value
 	default:
 		reader.err = errors.New("invalid storage cost marker")
+	}
+	if reader.version == 2 {
+		kindCode := reader.integer()
+		if kindCode < 0 || kindCode > int64(len(domain.ErrorKinds)) {
+			reader.err = errors.New("invalid error kind code")
+		} else if kindCode > 0 {
+			record.ErrorKind = domain.ErrorKinds[kindCode-1]
+		}
+		record.CacheTtlMs = reader.integer()
 	}
 	if err := reader.finish(); err != nil {
 		return record, err
@@ -156,6 +181,9 @@ func encodeQuota(observation domain.QuotaObservation, intern func(string) (int64
 // decodeQuota restores all window facts in their original order.
 func decodeQuota(data []byte, lookup func(int64) (string, bool)) (domain.QuotaObservation, error) {
 	reader := newPayloadReader(data)
+	if reader.version != 1 {
+		return domain.QuotaObservation{}, errors.New("unsupported quota payload version")
+	}
 	plan, exists := lookup(reader.integer())
 	if !exists {
 		reader.err = errUnknownString

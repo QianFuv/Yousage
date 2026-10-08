@@ -127,9 +127,10 @@ func Aggregate(records []domain.Record, options AggregateOptions) (AggregateResu
 		return result, errors.New("hourly usage requires exact increasing time bounds")
 	}
 	location := Location(window.TimeZone)
+	pricer := NewPricer(options.Rates, options.Overrides)
 	seen, sessions, buckets := map[string]bool{}, map[string]bool{}, map[bucketKey]*accumulator{}
 	for _, record := range records {
-		if record.IsQuotaOnly {
+		if record.IsQuotaOnly || record.ErrorKind != "" {
 			continue
 		}
 		if record.DedupeKey != "" {
@@ -141,7 +142,7 @@ func Aggregate(records []domain.Record, options AggregateOptions) (AggregateResu
 		}
 		instant := time.UnixMilli(record.TimestampMs)
 		day := instant.In(location).Format(time.DateOnly)
-		if (window.Resolution == "hour" && (record.TimestampMs < window.SinceTimeMs || record.TimestampMs >= window.UntilTimeMs)) || (window.Resolution != "hour" && (day < window.SinceDay || day > window.UntilDay)) {
+		if (window.SinceTimeMs != 0 && (record.TimestampMs < window.SinceTimeMs || record.TimestampMs >= window.UntilTimeMs)) || (window.Resolution != "hour" && (day < window.SinceDay || day > window.UntilDay)) {
 			result.OutOfWindow++
 			continue
 		}
@@ -159,10 +160,10 @@ func Aggregate(records []domain.Record, options AggregateOptions) (AggregateResu
 			held = &accumulator{Bucket: Bucket{Day: day, HourStart: hour, Provider: record.Provider, Model: record.Model, SourcePath: record.SourcePath}, sessions: map[string]bool{}}
 			buckets[key] = held
 		}
-		priced := Price(options.Rates, options.Overrides, record)
+		priced := pricer.Price(record)
 		held.Totals.Add(record.Totals)
 		held.CostUsd += priced.CostUsd
-		held.CacheSavingsUsd += CacheSavings(options.Rates, options.Overrides, record)
+		held.CacheSavingsUsd += pricer.CacheSavings(record)
 		held.SpeedPremiumUsd += priced.SpeedPremiumUsd
 		if priced.CategoryCostUsd != nil {
 			if held.CategoryCostUsd == nil {

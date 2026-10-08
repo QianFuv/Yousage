@@ -13,7 +13,8 @@ import (
 	"yousage/internal/history/grok"
 )
 
-const ParserVersion = 2
+// ParserVersion forces retained transcripts to be replayed for redacted errors and cache TTL facts.
+const ParserVersion = 3
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -57,7 +58,7 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 	state, start := InitialCodexState(), int64(0)
 	if previous.ParserVersion == ParserVersion && info.Size() > previous.FileSize && previous.Offset > 0 && previous.GuardLength > 0 {
 		actual, err := guard(file, previous.Offset, previous.GuardLength)
-		if err == nil && actual == previous.Guard && (provider != domain.Codex || (json.Unmarshal(previous.Reducer, &state) == nil && state.Speed != "")) {
+		if err == nil && actual == previous.Guard && (provider == domain.Grok || (json.Unmarshal(previous.Reducer, &state) == nil && state.Speed != "")) {
 			start, result.IsResumed = previous.Offset, true
 		}
 	}
@@ -99,6 +100,18 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 				record = ParseCodex(projected, &lineState)
 			} else if provider == domain.Claude {
 				record = ParseClaude(projected)
+				if record != nil {
+					if record.ErrorKind != "" {
+						if record.Model == "" {
+							record.Model = lineState.Model
+						}
+						if record.SessionId == "" {
+							record.SessionId = lineState.SessionId
+						}
+					} else {
+						lineState.Model, lineState.SessionId = record.Model, record.SessionId
+					}
+				}
 			} else {
 				parsedRecords = grok.Parse(projected)
 			}

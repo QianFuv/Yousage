@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"strings"
 	"time"
 	"yousage/internal/domain"
 )
@@ -49,9 +50,21 @@ func timestamp(value any) (int64, bool) {
 	return 0, false
 }
 
+// ParseClaude retains billable usage or a redacted error classification, including explicit cache TTL.
 func ParseClaude(data []byte) *domain.Record {
 	var record map[string]any
-	if json.Unmarshal(data, &record) != nil || record["type"] != "assistant" {
+	if json.Unmarshal(data, &record) != nil {
+		return nil
+	}
+	if record["subtype"] == "api_error" || record["isApiErrorMessage"] == true {
+		instant, ok := timestamp(record["timestamp"])
+		if !ok {
+			return nil
+		}
+		message := object(record["message"])
+		return &domain.Record{Provider: domain.Claude, TimestampMs: instant, SessionId: text(record["sessionId"]), Model: text(message["model"]), ErrorKind: classifyError(errorDetail(record["error"]), "other")}
+	}
+	if record["type"] != "assistant" {
 		return nil
 	}
 	message := object(record["message"])
@@ -62,6 +75,12 @@ func ParseClaude(data []byte) *domain.Record {
 		return nil
 	}
 	result := &domain.Record{Provider: domain.Claude, TimestampMs: instant, Model: model, SessionId: text(record["sessionId"]), Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: integer(usage["input_tokens"]), CachedInputTokens: integer(usage["cache_read_input_tokens"]), CacheCreationTokens: integer(usage["cache_creation_input_tokens"]), OutputTokens: integer(usage["output_tokens"])}}
+	creation := object(usage["cache_creation"])
+	if integer(creation["ephemeral_1h_input_tokens"]) > 0 {
+		result.CacheTtlMs = time.Hour.Milliseconds()
+	} else if integer(creation["ephemeral_5m_input_tokens"]) > 0 {
+		result.CacheTtlMs = (5 * time.Minute).Milliseconds()
+	}
 	messageId, hasMessageId := message["id"].(string)
 	requestId, hasRequestId := record["requestId"].(string)
 	if hasMessageId || hasRequestId {
@@ -84,7 +103,10 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	}
 	payload := object(record["payload"])
 	if payload == nil {
-		return nil
+		if record["type"] != "turn_aborted" {
+			return nil
+		}
+		payload = record
 	}
 	if record["type"] == "session_meta" {
 		if state.SawSessionMeta {
@@ -127,6 +149,18 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 			}
 		}
 		return nil
+	}
+	if record["type"] == "turn_aborted" || payload["type"] == "turn_aborted" || payload["type"] == "error" || ((payload["type"] == "task_complete" || payload["type"] == "turn_complete") && payload["error"] != nil) {
+		instant, ok := timestamp(record["timestamp"])
+		if !ok {
+			return nil
+		}
+		fallback := "other"
+		if record["type"] == "turn_aborted" || payload["type"] == "turn_aborted" {
+			fallback = "aborted"
+		}
+		detail := text(payload["reason"]) + " " + text(payload["message"]) + " " + errorDetail(payload["error"])
+		return &domain.Record{Provider: domain.Codex, TimestampMs: instant, SessionId: state.SessionId, Model: state.Model, ErrorKind: classifyError(detail, fallback)}
 	}
 	if payload["type"] != "token_count" {
 		return nil
@@ -248,13 +282,24 @@ func DedupeMovedCodex(files [][]domain.Record) [][]domain.Record {
 	}
 	result := make([][]domain.Record, len(files))
 	for index, records := range files {
+		hasShared := false
+		for _, record := range records {
+			if record.Provider == domain.Codex && shared[record.SessionId] {
+				hasShared = true
+				break
+			}
+		}
+		if !hasShared {
+			result[index] = records
+			continue
+		}
 		if len(records) > 0 {
 			result[index] = make([]domain.Record, len(records))
 		}
 		occurrences := map[string]int{}
 		for recordIndex, record := range records {
 			if record.Provider == domain.Codex && shared[record.SessionId] {
-				identity := []any{record.Provider, record.SessionId, record.TimestampMs, record.Model, record.Totals, record.QuotaBucket, record.IsQuotaOnly}
+				identity := []any{record.Provider, record.SessionId, record.TimestampMs, record.Model, record.Totals, record.QuotaBucket, record.IsQuotaOnly, record.ErrorKind, record.CacheTtlMs}
 				if record.IsQuotaOnly {
 					identity = append(identity, record.Quota)
 				}
@@ -267,4 +312,45 @@ func DedupeMovedCodex(files [][]domain.Record) [][]domain.Record {
 		}
 	}
 	return result
+}
+
+// classifyError reduces transport diagnostics to a closed vocabulary without retaining their text.
+func classifyError(detail, fallback string) string {
+	detail = strings.ToLower(detail)
+	switch {
+	case strings.Contains(detail, "stream disconnected"):
+		return "streamDisconnected"
+	case strings.Contains(detail, "rate_limit"), strings.Contains(detail, "rate limit"), strings.Contains(detail, "429"):
+		return "rateLimit"
+	case strings.Contains(detail, "overloaded"), strings.Contains(detail, "529"):
+		return "overloaded"
+	case strings.Contains(detail, "authentication"), strings.Contains(detail, "unauthorized"), strings.Contains(detail, "401"):
+		return "auth"
+	case strings.Contains(detail, "server_error"), strings.Contains(detail, "server error"), strings.Contains(detail, "500"), strings.Contains(detail, "503"):
+		return "server"
+	case strings.Contains(detail, "interrupt"), strings.Contains(detail, "cancel"), strings.Contains(detail, "user_requested"):
+		return "interrupted"
+	}
+	return fallback
+}
+
+// errorDetail inspects only error classification fields and is never persisted.
+func errorDetail(value any) string {
+	if detail, ok := value.(string); ok {
+		return detail
+	}
+	details := object(value)
+	status := integer(details["status"])
+	code := ""
+	switch status {
+	case 401, 403:
+		code = "authentication_failed"
+	case 429:
+		code = "rate_limit"
+	case 529:
+		code = "overloaded"
+	case 500, 502, 503, 504:
+		code = "server_error"
+	}
+	return code + " " + text(details["type"]) + " " + text(details["code"]) + " " + text(details["message"])
 }

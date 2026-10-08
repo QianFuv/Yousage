@@ -166,6 +166,243 @@ export class EnvironmentState {
     }
 }
 
+/**
+ * LossDay includes every calendar day in a report, even when no loss was observed.
+ */
+export class LossDay {
+    "day": string;
+    "cacheExpiryUsd": number;
+    "errorUsd": number;
+    "cacheExpiryCount": number;
+    "errorCount": number;
+
+    /** Creates a new LossDay instance. */
+    constructor($$source: Partial<LossDay> = {}) {
+        if (!("day" in $$source)) {
+            this["day"] = "";
+        }
+        if (!("cacheExpiryUsd" in $$source)) {
+            this["cacheExpiryUsd"] = 0;
+        }
+        if (!("errorUsd" in $$source)) {
+            this["errorUsd"] = 0;
+        }
+        if (!("cacheExpiryCount" in $$source)) {
+            this["cacheExpiryCount"] = 0;
+        }
+        if (!("errorCount" in $$source)) {
+            this["errorCount"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossDay instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossDay {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossDay($$parsedSource as Partial<LossDay>);
+    }
+}
+
+/**
+ * LossEvent contains only request metadata and derived costs, never diagnostic or transcript text.
+ */
+export class LossEvent {
+    "kind": string;
+    "errorKind"?: string;
+    "provider": string;
+    "model": string;
+    "sessionId": string;
+    "atMs": number;
+    "idleMs": number;
+    "tokens": number;
+    "costUsd": number;
+    "followUpMs": number;
+    "precision": string;
+
+    /** Creates a new LossEvent instance. */
+    constructor($$source: Partial<LossEvent> = {}) {
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("sessionId" in $$source)) {
+            this["sessionId"] = "";
+        }
+        if (!("atMs" in $$source)) {
+            this["atMs"] = 0;
+        }
+        if (!("idleMs" in $$source)) {
+            this["idleMs"] = 0;
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+        if (!("followUpMs" in $$source)) {
+            this["followUpMs"] = 0;
+        }
+        if (!("precision" in $$source)) {
+            this["precision"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossEvent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossEvent {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossEvent($$parsedSource as Partial<LossEvent>);
+    }
+}
+
+/**
+ * LossKindCount separates user interruptions from provider failure kinds.
+ */
+export class LossKindCount {
+    "kind": string;
+    "count": number;
+    "costUsd": number;
+
+    /** Creates a new LossKindCount instance. */
+    constructor($$source: Partial<LossKindCount> = {}) {
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossKindCount instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossKindCount {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossKindCount($$parsedSource as Partial<LossKindCount>);
+    }
+}
+
+/**
+ * LossReport summarizes local cache rewrites and redacted errors.
+ */
+export class LossReport {
+    "window": accounting$0.Window;
+    "cacheExpiry": LossTotals;
+    "errors": LossTotals;
+    "errorKinds": LossKindCount[];
+    "days": LossDay[];
+    "events": LossEvent[];
+    "cacheWriteTokens": number;
+
+    /** Creates a new LossReport instance. */
+    constructor($$source: Partial<LossReport> = {}) {
+        if (!("window" in $$source)) {
+            this["window"] = (new accounting$0.Window());
+        }
+        if (!("cacheExpiry" in $$source)) {
+            this["cacheExpiry"] = (new LossTotals());
+        }
+        if (!("errors" in $$source)) {
+            this["errors"] = (new LossTotals());
+        }
+        if (!("errorKinds" in $$source)) {
+            this["errorKinds"] = [];
+        }
+        if (!("days" in $$source)) {
+            this["days"] = [];
+        }
+        if (!("events" in $$source)) {
+            this["events"] = [];
+        }
+        if (!("cacheWriteTokens" in $$source)) {
+            this["cacheWriteTokens"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossReport instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossReport {
+        const $$createField0_0 = $$createType13;
+        const $$createField1_0 = $$createType14;
+        const $$createField2_0 = $$createType14;
+        const $$createField3_0 = $$createType16;
+        const $$createField4_0 = $$createType18;
+        const $$createField5_0 = $$createType20;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("window" in $$parsedSource) {
+            $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
+        }
+        if ("cacheExpiry" in $$parsedSource) {
+            $$parsedSource["cacheExpiry"] = $$createField1_0($$parsedSource["cacheExpiry"]);
+        }
+        if ("errors" in $$parsedSource) {
+            $$parsedSource["errors"] = $$createField2_0($$parsedSource["errors"]);
+        }
+        if ("errorKinds" in $$parsedSource) {
+            $$parsedSource["errorKinds"] = $$createField3_0($$parsedSource["errorKinds"]);
+        }
+        if ("days" in $$parsedSource) {
+            $$parsedSource["days"] = $$createField4_0($$parsedSource["days"]);
+        }
+        if ("events" in $$parsedSource) {
+            $$parsedSource["events"] = $$createField5_0($$parsedSource["events"]);
+        }
+        return new LossReport($$parsedSource as Partial<LossReport>);
+    }
+}
+
+/**
+ * LossTotals counts events including zero-cost and unpriced observations.
+ */
+export class LossTotals {
+    "events": number;
+    "tokens": number;
+    "costUsd": number;
+
+    /** Creates a new LossTotals instance. */
+    constructor($$source: Partial<LossTotals> = {}) {
+        if (!("events" in $$source)) {
+            this["events"] = 0;
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossTotals instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossTotals {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossTotals($$parsedSource as Partial<LossTotals>);
+    }
+}
+
 export class NativeProvider {
     "id": string;
     "driver": string;
@@ -247,6 +484,174 @@ export class ProviderDetection {
     }
 }
 
+/**
+ * Receipt presents a local calendar period with the same pricing as Usage.
+ */
+export class Receipt {
+    "startsAtMs": number;
+    "endsAtMs": number;
+    "dayStartHour": number;
+    "period": string;
+    "label": string;
+    "number": string;
+    "timeZone": string;
+    "sinceDay": string;
+    "untilDay": string;
+    "items": ReceiptItem[];
+    "totalUsd": number;
+    "subscriptionUsd": number;
+    "paidUsd": number;
+    "tokens": number;
+    "sessions": number;
+    "cacheSavingsUsd": number;
+    "unpricedRecords": number;
+    "activeDays": number;
+    "firstAtMs": number | null;
+    "lastAtMs": number | null;
+    "previousDate": string;
+    "nextDate": string;
+    "qrText": string;
+    "qrModules": string[];
+
+    /** Creates a new Receipt instance. */
+    constructor($$source: Partial<Receipt> = {}) {
+        if (!("startsAtMs" in $$source)) {
+            this["startsAtMs"] = 0;
+        }
+        if (!("endsAtMs" in $$source)) {
+            this["endsAtMs"] = 0;
+        }
+        if (!("dayStartHour" in $$source)) {
+            this["dayStartHour"] = 0;
+        }
+        if (!("period" in $$source)) {
+            this["period"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("number" in $$source)) {
+            this["number"] = "";
+        }
+        if (!("timeZone" in $$source)) {
+            this["timeZone"] = "";
+        }
+        if (!("sinceDay" in $$source)) {
+            this["sinceDay"] = "";
+        }
+        if (!("untilDay" in $$source)) {
+            this["untilDay"] = "";
+        }
+        if (!("items" in $$source)) {
+            this["items"] = [];
+        }
+        if (!("totalUsd" in $$source)) {
+            this["totalUsd"] = 0;
+        }
+        if (!("subscriptionUsd" in $$source)) {
+            this["subscriptionUsd"] = 0;
+        }
+        if (!("paidUsd" in $$source)) {
+            this["paidUsd"] = 0;
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("sessions" in $$source)) {
+            this["sessions"] = 0;
+        }
+        if (!("cacheSavingsUsd" in $$source)) {
+            this["cacheSavingsUsd"] = 0;
+        }
+        if (!("unpricedRecords" in $$source)) {
+            this["unpricedRecords"] = 0;
+        }
+        if (!("activeDays" in $$source)) {
+            this["activeDays"] = 0;
+        }
+        if (!("firstAtMs" in $$source)) {
+            this["firstAtMs"] = null;
+        }
+        if (!("lastAtMs" in $$source)) {
+            this["lastAtMs"] = null;
+        }
+        if (!("previousDate" in $$source)) {
+            this["previousDate"] = "";
+        }
+        if (!("nextDate" in $$source)) {
+            this["nextDate"] = "";
+        }
+        if (!("qrText" in $$source)) {
+            this["qrText"] = "";
+        }
+        if (!("qrModules" in $$source)) {
+            this["qrModules"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Receipt instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Receipt {
+        const $$createField9_0 = $$createType22;
+        const $$createField23_0 = $$createType23;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("items" in $$parsedSource) {
+            $$parsedSource["items"] = $$createField9_0($$parsedSource["items"]);
+        }
+        if ("qrModules" in $$parsedSource) {
+            $$parsedSource["qrModules"] = $$createField23_0($$parsedSource["qrModules"]);
+        }
+        return new Receipt($$parsedSource as Partial<Receipt>);
+    }
+}
+
+/**
+ * ReceiptItem combines a provider/model's priced and unpriced usage.
+ */
+export class ReceiptItem {
+    "provider": string;
+    "model": string;
+    "tokens": number;
+    "costUsd": number;
+    "unpricedRecords": number;
+    "isSubscription": boolean;
+
+    /** Creates a new ReceiptItem instance. */
+    constructor($$source: Partial<ReceiptItem> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+        if (!("unpricedRecords" in $$source)) {
+            this["unpricedRecords"] = 0;
+        }
+        if (!("isSubscription" in $$source)) {
+            this["isSubscription"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReceiptItem instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReceiptItem {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ReceiptItem($$parsedSource as Partial<ReceiptItem>);
+    }
+}
+
 export class SavedConfiguration {
     "revision": number;
     "value": Configuration;
@@ -267,7 +672,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType13;
+        const $$createField1_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -296,8 +701,8 @@ export class Snapshot {
      * Creates a new Snapshot instance from a string or object.
      */
     static createFrom($$source: any = {}): Snapshot {
-        const $$createField0_0 = $$createType14;
-        const $$createField1_0 = $$createType16;
+        const $$createField0_0 = $$createType13;
+        const $$createField1_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -323,7 +728,17 @@ const $$createType9 = remote$0.Summary.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
 const $$createType11 = quota$0.CycleValue.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = Configuration.createFrom;
-const $$createType14 = accounting$0.Window.createFrom;
-const $$createType15 = EnvironmentState.createFrom;
+const $$createType13 = accounting$0.Window.createFrom;
+const $$createType14 = LossTotals.createFrom;
+const $$createType15 = LossKindCount.createFrom;
 const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = LossDay.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = LossEvent.createFrom;
+const $$createType20 = $Create.Array($$createType19);
+const $$createType21 = ReceiptItem.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = $Create.Array($Create.Any);
+const $$createType24 = Configuration.createFrom;
+const $$createType25 = EnvironmentState.createFrom;
+const $$createType26 = $Create.Array($$createType25);

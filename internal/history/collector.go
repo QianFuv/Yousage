@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"yousage/internal/domain"
-	"yousage/internal/quota"
 	"yousage/internal/storage"
 )
 
@@ -239,63 +239,66 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 	for _, checkpoint := range checkpoints {
 		previousByPath[checkpoint.Path] = checkpoint
 	}
+	changed := []string{}
 	for _, path := range paths {
-		previous, exists := previousByPath[path]
-		if !exists {
-			previous = domain.Checkpoint{SourceId: id, Path: path, Reducer: []byte(`{}`)}
-		}
+		previous := previousByPath[path]
 		info := fileInfo[path]
-		isCurrent := previous.ParserVersion == ParserVersion || previous.ParserVersion == 1 && (fingerprint.Provider != domain.Codex || info.ModTime().Before(now.Add(-quota.CycleFitHorizon)))
-		if previous.Revision > 0 && isCurrent && previous.FileSize == info.Size() && previous.ModifiedNs == info.ModTime().UnixNano() {
+		if previous.Revision > 0 && previous.ParserVersion == ParserVersion && previous.FileSize == info.Size() && previous.ModifiedNs == info.ModTime().UnixNano() {
 			result.ScannedFiles++
 			continue
 		}
-		read, err := ReadTranscript(ctx, path, fingerprint.Provider, previous)
-		if err != nil {
-			if ctx.Err() != nil {
-				return result, ctx.Err()
-			}
-			result.Status = "partial"
-			result.Notice = "A history read failed; saved facts were retained."
-			continue
-		}
-		seenRecords := map[string]bool{}
-		if read.IsResumed {
-			committed, err := collector.Store.CommittedFileRecords(ctx, id, path)
-			if err != nil {
-				return result, err
-			}
-			for _, record := range committed {
-				if record.DedupeKey != "" {
-					seenRecords[record.DedupeKey] = true
+		changed = append(changed, path)
+	}
+	for offset := 0; offset < len(changed); offset += 4 {
+		batch := changed[offset:min(offset+4, len(changed))]
+		reads := readTranscriptBatch(ctx, fingerprint.Provider, id, batch, previousByPath)
+		for index, path := range batch {
+			read, readError := reads[index].value, reads[index].err
+			if readError != nil {
+				if ctx.Err() != nil {
+					return result, ctx.Err()
 				}
-			}
-		}
-		unique := func(records []domain.Record) []domain.Record {
-			output := []domain.Record{}
-			for _, record := range records {
-				if record.DedupeKey != "" {
-					if seenRecords[record.DedupeKey] {
-						continue
-					}
-					seenRecords[record.DedupeKey] = true
-				}
-				output = append(output, record)
-			}
-			return output
-		}
-		read.Records = unique(read.Records)
-		read.Tail = unique(read.Tail)
-		if _, err := collector.Store.CommitFileWithTail(ctx, read.Checkpoint, read.Records, read.Tail, !read.IsResumed); err != nil {
-			if errors.Is(err, storage.ErrConflict) {
-				result.Status = "partial"
-				result.Notice = "A newer scan completed first; its saved usage was retained."
+				result.Status, result.Notice = "partial", "A history read failed; saved facts were retained."
 				continue
 			}
-			return result, err
+			seenRecords := map[string]bool{}
+			if read.IsResumed {
+				committed, err := collector.Store.CommittedFileRecords(ctx, id, path)
+				if err != nil {
+					return result, err
+				}
+				for _, record := range committed {
+					if record.DedupeKey != "" {
+						seenRecords[record.DedupeKey] = true
+					}
+				}
+			}
+			unique := func(records []domain.Record) []domain.Record {
+				output := []domain.Record{}
+				for _, record := range records {
+					if record.DedupeKey != "" {
+						if seenRecords[record.DedupeKey] {
+							continue
+						}
+						seenRecords[record.DedupeKey] = true
+					}
+					output = append(output, record)
+				}
+				return output
+			}
+			read.Records = unique(read.Records)
+			read.Tail = unique(read.Tail)
+			if _, err := collector.Store.CommitFileWithTail(ctx, read.Checkpoint, read.Records, read.Tail, !read.IsResumed); err != nil {
+				if errors.Is(err, storage.ErrConflict) {
+					result.Status = "partial"
+					result.Notice = "A newer scan completed first; its saved usage was retained."
+					continue
+				}
+				return result, err
+			}
+			result.ScannedFiles++
+			result.MalformedLines += read.Malformed
 		}
-		result.ScannedFiles++
-		result.MalformedLines += read.Malformed
 	}
 	if err := collector.Store.PruneHistory(ctx, id, cutoff.UnixNano()); err != nil {
 		return result, err
@@ -341,4 +344,25 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 		return result, err
 	}
 	return result, nil
+}
+
+// transcriptResult retains only projected facts until the ordered commit consumes them.
+type transcriptResult struct {
+	value FileRead
+	err   error
+}
+
+// readTranscriptBatch parses at most four files concurrently and preserves commit order.
+func readTranscriptBatch(ctx context.Context, provider domain.Provider, sourceId string, paths []string, checkpoints map[string]domain.Checkpoint) []transcriptResult {
+	results := make([]transcriptResult, len(paths))
+	var pending sync.WaitGroup
+	for index, path := range paths {
+		previous, exists := checkpoints[path]
+		if !exists {
+			previous = domain.Checkpoint{SourceId: sourceId, Path: path, Reducer: []byte(`{}`)}
+		}
+		pending.Go(func() { results[index].value, results[index].err = ReadTranscript(ctx, path, provider, previous) })
+	}
+	pending.Wait()
+	return results
 }

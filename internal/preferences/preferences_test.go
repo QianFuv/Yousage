@@ -10,6 +10,46 @@ import (
 	"yousage/internal/storage"
 )
 
+// TestReceiptDayStartPreference preserves midnight defaults and rejects invalid saved hours.
+func TestReceiptDayStartPreference(test *testing.T) {
+	store, err := storage.Open(filepath.Join(test.TempDir(), "display.sqlite"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer store.Close()
+	service := New(store)
+	ctx := context.Background()
+	saved, err := service.Display(ctx)
+	if err != nil || saved.Value.ReceiptDayStartHour != 0 {
+		test.Fatal(saved, err)
+	}
+	legacy := map[string]any{"density": "comfortable", "zoom": 1, "metric": "tokens", "windowDays": 30}
+	if _, err := store.WriteSetting(ctx, "display", 0, legacy); err != nil {
+		test.Fatal(err)
+	}
+	saved, err = service.Display(ctx)
+	if err != nil || saved.Value.ReceiptDayStartHour != 0 {
+		test.Fatal("legacy default", saved, err)
+	}
+	for _, hour := range []int{4, 23, 0} {
+		saved.Value.ReceiptDayStartHour = hour
+		saved, err = service.SaveDisplay(ctx, saved)
+		if err != nil {
+			test.Fatal(err)
+		}
+		loaded, err := service.Display(ctx)
+		if err != nil || loaded.Value.ReceiptDayStartHour != hour {
+			test.Fatal(loaded, err)
+		}
+	}
+	for _, hour := range []int{-1, 24} {
+		saved.Value.ReceiptDayStartHour = hour
+		if _, err := service.SaveDisplay(ctx, saved); err == nil {
+			test.Fatal("invalid preference persisted", hour)
+		}
+	}
+}
+
 func TestSavedDisplayPricingAndSources(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "preferences.sqlite"))
 	if err != nil {

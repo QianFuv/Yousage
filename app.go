@@ -143,6 +143,16 @@ func (service *App) GetUsage(days int, timeZone string) (dataservice.Snapshot, e
 	return service.usage.Usage(service.context, days, timeZone)
 }
 
+// GetReceipt returns a local calendar receipt using the Usage pricing pipeline.
+func (service *App) GetReceipt(period string, date string, timeZone string, dayStartHour int) (dataservice.Receipt, error) {
+	return service.usage.Receipt(service.context, period, date, timeZone, dayStartHour)
+}
+
+// GetLossReport returns local cache expiry and redacted error observations.
+func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossReport, error) {
+	return service.usage.LossReport(service.context, days, timeZone)
+}
+
 // EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
 func (service *App) EnableCursorKeychain(identities []string) []remote.SaveOutcome {
 	return service.usage.EnableCursorKeychain(service.context, identities)

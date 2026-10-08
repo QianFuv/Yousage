@@ -190,8 +190,14 @@ func recordRate(table, overrides RateTable, record domain.Record) (*ModelRate, b
 	return &priced, false
 }
 
+// Price computes exact request costs using model, override and reported-cost precedence.
 func Price(table, overrides RateTable, record domain.Record) PricedUsage {
 	rate, hasOverride := recordRate(table, overrides, record)
+	return priceWithRate(rate, hasOverride, record)
+}
+
+// priceWithRate applies the original arithmetic to a resolved rate.
+func priceWithRate(rate *ModelRate, hasOverride bool, record domain.Record) PricedUsage {
 	reported := record.ReportedCostUsd
 	if hasOverride || (reported != nil && !domain.Finite(*reported)) {
 		reported = nil
@@ -220,8 +226,15 @@ func Price(table, overrides RateTable, record domain.Record) PricedUsage {
 	category.Output *= scale
 	return PricedUsage{cost, source, &category, premium * scale}
 }
+
+// CacheSavings prices cached reads against their uncached equivalent.
 func CacheSavings(table, overrides RateTable, record domain.Record) float64 {
 	rate, _ := recordRate(table, overrides, record)
+	return savingsWithRate(rate, record)
+}
+
+// savingsWithRate preserves cache savings arithmetic for a resolved rate.
+func savingsWithRate(rate *ModelRate, record domain.Record) float64 {
 	if rate == nil {
 		return 0
 	}
@@ -246,4 +259,69 @@ func ResolveAliases(aliases map[string]string) map[string]string {
 		}
 	}
 	return resolved
+}
+
+// CacheRewriteCost prices rewritten tokens above cache reads using Usage's rate resolution and speed tiers.
+// Cache creation uses the write/read difference; uncached resends use the input/read difference.
+func CacheRewriteCost(table, overrides RateTable, record domain.Record, tokens int64, isCreation bool) float64 {
+	rate, _ := recordRate(table, overrides, record)
+	return rewriteWithRate(rate, record, tokens, isCreation)
+}
+
+// rewriteWithRate prices rewritten tokens using a resolved rate.
+func rewriteWithRate(rate *ModelRate, record domain.Record, tokens int64, isCreation bool) float64 {
+	if rate == nil {
+		return 0
+	}
+	rates := ratesAt(*rate, record.Speed)
+	difference := rates.Input - rates.CacheRead
+	if isCreation {
+		difference = rates.CacheCreation - rates.CacheRead
+	}
+	return float64(tokens) * max(0, difference)
+}
+
+// Pricer memoizes rate resolution for one immutable catalog and override snapshot.
+// It is owned by one aggregation and requires no shared mutable pricing state.
+type Pricer struct {
+	rates, overrides RateTable
+	resolved         map[rateKey]resolvedRate
+}
+
+type rateKey struct{ model, rateModel string }
+type resolvedRate struct {
+	rate        *ModelRate
+	hasOverride bool
+}
+
+// NewPricer binds exact pricing operations to a request's rates and overrides.
+func NewPricer(rates, overrides RateTable) *Pricer {
+	return &Pricer{rates: rates, overrides: overrides, resolved: map[rateKey]resolvedRate{}}
+}
+
+// resolve reuses model normalization and official speed multipliers across requests.
+func (pricer *Pricer) resolve(record domain.Record) resolvedRate {
+	key := rateKey{record.Model, record.RateModel}
+	held, exists := pricer.resolved[key]
+	if !exists {
+		held.rate, held.hasOverride = recordRate(pricer.rates, pricer.overrides, record)
+		pricer.resolved[key] = held
+	}
+	return held
+}
+
+// Price preserves request arithmetic and reported-cost precedence after rate resolution.
+func (pricer *Pricer) Price(record domain.Record) PricedUsage {
+	held := pricer.resolve(record)
+	return priceWithRate(held.rate, held.hasOverride, record)
+}
+
+// CacheSavings reuses the resolved model while preserving exact savings arithmetic.
+func (pricer *Pricer) CacheSavings(record domain.Record) float64 {
+	return savingsWithRate(pricer.resolve(record).rate, record)
+}
+
+// CacheRewriteCost prices rewritten tokens with the same resolved Usage rate.
+func (pricer *Pricer) CacheRewriteCost(record domain.Record, tokens int64, isCreation bool) float64 {
+	return rewriteWithRate(pricer.resolve(record).rate, record, tokens, isCreation)
 }

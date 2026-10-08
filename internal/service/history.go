@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,10 +30,10 @@ type sourceIndex struct {
 	ShouldExcludeRecords bool          `json:"excludeRecords,omitempty"`
 }
 
-// localSummaryCache retains aggregates while their source facts and pricing are unchanged.
+// localSummaryCache bounds unchanged aggregates by revision and time eligibility.
 type localSummaryCache struct {
-	key   [32]byte
-	value remote.Summary
+	value        remote.Summary
+	since, until time.Time
 }
 
 func (service *Service) sourceIndex(ctx context.Context) ([]sourceIndex, int64, error) {
@@ -314,18 +315,22 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		return summary, err
 	}
 	summary.Pricing = rates.Provenance(now)
-	inputs := []any{window, entries, pricing, rates.encodedRates, rates.FetchedAtMs, service.Scope, now.UTC().Format(time.DateOnly)}
+	inputs := []any{window, entries, pricing, rates.encodedRates, service.Scope, now.UTC().Format(time.DateOnly)}
 	for _, entry := range entries {
 		key, err := service.Store.HistoryCacheKey(ctx, entry.Source.Fingerprint.Id())
 		if err != nil {
 			return summary, err
 		}
-		inputs = append(inputs, sha256.Sum256([]byte(key)))
+		mutation, err := service.Store.CompletedHistoryKey(ctx, entry.Source.Fingerprint.Id(), math.MaxInt64)
+		if err != nil {
+			return summary, err
+		}
+		inputs = append(inputs, sha256.Sum256([]byte(key)), mutation)
 	}
 	encoded, _ := json.Marshal(inputs)
 	key := sha256.Sum256(encoded)
-	if service.summaryCache.value.ContractVersion != 0 && service.summaryCache.key == key {
-		cached := service.summaryCache.value
+	if service.summaryCaches != nil && service.summaryCaches[key].value.ContractVersion != 0 && !now.Before(service.summaryCaches[key].since) && now.Before(service.summaryCaches[key].until) {
+		cached := service.summaryCaches[key].value
 		cached.ReadAt, cached.Pricing = summary.ReadAt, summary.Pricing
 		cached.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
 		return cached, nil
@@ -350,7 +355,14 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		summary.Buckets = append(summary.Buckets, aggregate.Buckets...)
 	}
 	summary.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
-	service.summaryCache = localSummaryCache{key: key, value: summary}
+	if service.summaryCaches == nil || len(service.summaryCaches) >= 16 {
+		service.summaryCaches = map[[32]byte]localSummaryCache{}
+	}
+	ids := []string{}
+	for _, entry := range entries {
+		ids = append(ids, entry.Source.Fingerprint.Id())
+	}
+	service.summaryCaches[key] = localSummaryCache{value: summary, since: now, until: service.Store.CachedHistoryValidUntil(ids, now)}
 	return summary, nil
 }
 
@@ -430,7 +442,7 @@ func (service *Service) localHistoryRecordsBetween(ctx context.Context, entries 
 	for index, records := range deduped {
 		owner := owners[index]
 		for _, record := range records {
-			if !shouldIncludeQuota && record.IsQuotaOnly {
+			if !shouldIncludeQuota && (record.IsQuotaOnly || record.ErrorKind != "") {
 				continue
 			}
 			if record.DedupeKey != "" {

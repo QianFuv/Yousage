@@ -10,6 +10,7 @@ require (
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/sys v0.48.0
 	modernc.org/sqlite v1.60.1
+	rsc.io/qr v0.2.0
 )
 
 require (

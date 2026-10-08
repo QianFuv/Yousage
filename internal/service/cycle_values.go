@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ func (service *Service) recordQuotaSamples(ctx context.Context, configured []Nat
 type cycleValueCache struct {
 	key        [32]byte
 	validUntil time.Time
+	validSince time.Time
 	values     []quota.CycleValue
 }
 
@@ -66,6 +68,7 @@ type cycleHistoryCache struct {
 	key        [32]byte
 	liveKey    [32]byte
 	validUntil time.Time
+	validSince time.Time
 	histories  map[string]quota.CostHistory
 	logs       map[string][]quota.CycleObservation
 	completed  map[string][]quota.FittedCycle
@@ -183,6 +186,10 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 	service.cycleMutex.Lock()
 	defer service.cycleMutex.Unlock()
 	now := service.Now()
+	if now.Before(service.cycleHistories.validSince) {
+		service.cycleHistories = cycleHistoryCache{}
+		service.cycleCache = cycleValueCache{}
+	}
 	configuration, err := service.Configuration(ctx)
 	if err != nil {
 		return nil
@@ -253,6 +260,8 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 		}
 	}
 	liveInputs := []any{}
+	coverageInputs := []any{}
+	coverage := map[string]domain.Observation{}
 	for _, entry := range entries {
 		if !selectedIds[entry.Source.Fingerprint.Id()] {
 			continue
@@ -301,23 +310,27 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 		}
 		completedKey, completedError := service.Store.CompletedHistoryKey(ctx, id, boundary.UnixMilli())
 		key, keyError := service.Store.HistoryCacheKey(ctx, id)
+		mutation, mutationError := service.Store.CompletedHistoryKey(ctx, id, math.MaxInt64)
 		observation, observationError := service.Store.Observation(ctx, id)
-		if completedError != nil || keyError != nil || observationError != nil {
+		if completedError != nil || keyError != nil || mutationError != nil || observationError != nil {
 			return nil
 		}
 		historyInputs = append(historyInputs, entry.Source.Fingerprint, entry.IsSnapshot, entry.ShouldExcludeRecords, completedKey)
-		liveInputs = append(liveInputs, sha256.Sum256([]byte(key)), observation)
+		liveInputs = append(liveInputs, sha256.Sum256([]byte(key)), mutation)
+		coverageInputs = append(coverageInputs, id, observation)
+		coverage[id] = observation
 	}
 	encoded, _ := json.Marshal(historyInputs)
 	historyKey := sha256.Sum256(encoded)
 	encoded, _ = json.Marshal(liveInputs)
 	liveKey := sha256.Sum256(encoded)
-	encoded, _ = json.Marshal([]any{historyKey, liveKey, config.Providers, series})
+	encoded, _ = json.Marshal([]any{historyKey, liveKey, coverageInputs, config.Providers, series})
 	cacheKey := sha256.Sum256(encoded)
-	if service.cycleCache.values != nil && service.cycleCache.key == cacheKey && now.Before(service.cycleCache.validUntil) {
+	if service.cycleCache.values != nil && service.cycleCache.key == cacheKey && !now.Before(service.cycleCache.validSince) && now.Before(service.cycleCache.validUntil) {
 		return service.cycleCache.values
 	}
 	overrides, aliases := accounting.OverrideRates(pricing.Value.Overrides), accounting.ResolveAliases(pricing.Value.Aliases)
+	pricer := accounting.NewPricer(rates.Rates, overrides)
 	histories := map[string]quota.CostHistory{}
 	logSeries := map[string][]quota.CycleObservation{}
 	completed := map[string][]quota.FittedCycle{}
@@ -410,7 +423,7 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 			usageCount, observationCount := 0, 0
 			for _, sourceRecords := range bySource {
 				for _, record := range sourceRecords {
-					if !record.IsQuotaOnly {
+					if !record.IsQuotaOnly && record.ErrorKind == "" {
 						usageCount++
 					}
 					if record.Quota != nil && record.QuotaBucket == "codex" {
@@ -453,13 +466,13 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 							logSeries[key] = append(logSeries[key], quota.CycleObservation{CycleSample: quota.CycleSample{CheckedAt: time.UnixMilli(record.TimestampMs).UTC().Format(time.RFC3339Nano), UsedPercent: window.UsedPercent, ResetsAt: time.Unix(window.ResetsAt, 0).UTC().Format(time.RFC3339Nano), WindowDurationMins: &minutes}, WindowId: window.Id, PlanType: record.Quota.PlanType, WindowStructure: structure, Source: "logs"})
 						}
 					}
-					if record.IsQuotaOnly || provider.Driver == "codex" && record.QuotaBucket != "" && record.QuotaBucket != "codex" {
+					if record.IsQuotaOnly || record.ErrorKind != "" || provider.Driver == "codex" && record.QuotaBucket != "" && record.QuotaBucket != "codex" {
 						continue
 					}
 					if model, exists := aliases[record.Model]; exists {
 						record.Model, record.RateModel = model, ""
 					}
-					priced := accounting.Price(rates.Rates, overrides, record)
+					priced := pricer.Price(record)
 					records = append(records, quota.BucketCostRecord{CostRecord: quota.CostRecord{At: time.UnixMilli(record.TimestampMs), CostUsd: priced.CostUsd, IsUnpriced: priced.CostSource == "unpriced"}, Bucket: record.QuotaBucket})
 				}
 			}
@@ -546,6 +559,28 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 				_, _ = service.Store.WriteSetting(ctx, settingKey, persistedRevision, persisted)
 			}
 		}
+		covered := now
+		hasCoverage := false
+		for _, entry := range selectedSources[provider.InstanceId] {
+			if entry.ShouldExcludeRecords {
+				continue
+			}
+			hasCoverage = true
+			observation, exists := coverage[entry.Source.Fingerprint.Id()]
+			if !exists || observation.SucceededAt == nil {
+				covered = time.Time{}
+			} else if success := time.UnixMilli(*observation.SucceededAt); success.Before(covered) {
+				covered = success
+			}
+		}
+		if !hasCoverage {
+			covered = time.Time{}
+		}
+		costHistory.CoveredThrough = covered
+		if retained := now.Add(-90 * 24 * time.Hour); retained.After(costHistory.RetainedSince) {
+			costHistory.RetainedSince = retained
+		}
+		histories[key] = costHistory
 		if provider.Limits == nil || provider.Limits.Unavailable != nil {
 			logged, hasLogs := latestLimits[key]
 			if !hasLogs {
@@ -583,7 +618,18 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 			}
 		}
 	}
-	service.cycleCache = cycleValueCache{key: cacheKey, validUntil: validUntil, values: result}
-	service.cycleHistories = cycleHistoryCache{key: historyKey, liveKey: liveKey, validUntil: historyValidUntil, histories: histories, logs: logSeries, completed: completed, latest: latestLimits}
+	ids := []string{}
+	for id := range selectedIds {
+		ids = append(ids, id)
+	}
+	eligibilityUntil := service.Store.CachedHistoryValidUntil(ids, now)
+	if eligibilityUntil.Before(validUntil) {
+		validUntil = eligibilityUntil
+	}
+	if eligibilityUntil.Before(historyValidUntil) {
+		historyValidUntil = eligibilityUntil
+	}
+	service.cycleCache = cycleValueCache{key: cacheKey, validSince: now, validUntil: validUntil, values: result}
+	service.cycleHistories = cycleHistoryCache{key: historyKey, liveKey: liveKey, validSince: now, validUntil: historyValidUntil, histories: histories, logs: logSeries, completed: completed, latest: latestLimits}
 	return result
 }

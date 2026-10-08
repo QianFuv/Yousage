@@ -384,6 +384,19 @@
     },
     {
       "ecosystem": "go",
+      "name": "rsc.io/qr",
+      "version": "v0.2.0",
+      "license": "See notice text",
+      "source": "https://pkg.go.dev/rsc.io/qr@v0.2.0",
+      "licenses": [
+        {
+          "file": "LICENSE",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+        }
+      ]
+    },
+    {
+      "ecosystem": "go",
       "name": "Go standard library",
       "version": "go1.26.2",
       "license": "BSD-3-Clause",
