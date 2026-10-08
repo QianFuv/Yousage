@@ -15,5 +15,9 @@ export {
     Receipt,
     ReceiptItem,
     SavedConfiguration,
-    Snapshot
+    Snapshot,
+    SpeedBucket,
+    SpeedBucketModel,
+    SpeedModel,
+    SpeedReport
 } from "./models.js";

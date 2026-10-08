@@ -148,6 +148,11 @@ func (service *App) GetReceipt(period string, date string, timeZone string, dayS
 	return service.usage.Receipt(service.context, period, date, timeZone, dayStartHour)
 }
 
+// GetSpeedReport returns local generation throughput separated by billing speed tier.
+func (service *App) GetSpeedReport(days int, timeZone string) (dataservice.SpeedReport, error) {
+	return service.usage.SpeedReport(service.context, days, timeZone)
+}
+
 // GetLossReport returns local cache expiry and redacted error observations.
 func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossReport, error) {
 	return service.usage.LossReport(service.context, days, timeZone)

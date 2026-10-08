@@ -714,6 +714,207 @@ export class Snapshot {
     }
 }
 
+/**
+ * SpeedBucket includes every Usage time bucket, including empty ones.
+ */
+export class SpeedBucket {
+    "label": string;
+    "models": SpeedBucketModel[];
+
+    /** Creates a new SpeedBucket instance. */
+    constructor($$source: Partial<SpeedBucket> = {}) {
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("models" in $$source)) {
+            this["models"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedBucket instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedBucket {
+        const $$createField1_0 = $$createType28;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("models" in $$parsedSource) {
+            $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
+        }
+        return new SpeedBucket($$parsedSource as Partial<SpeedBucket>);
+    }
+}
+
+/**
+ * SpeedBucketModel contains only measured requests for a provider/model/billing tier.
+ */
+export class SpeedBucketModel {
+    "provider": string;
+    "model": string;
+    "speed": string;
+    "requests": number;
+    "outputTokens": number;
+    "generationMs": number;
+    "tokensPerSecond": number;
+
+    /** Creates a new SpeedBucketModel instance. */
+    constructor($$source: Partial<SpeedBucketModel> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("speed" in $$source)) {
+            this["speed"] = "";
+        }
+        if (!("requests" in $$source)) {
+            this["requests"] = 0;
+        }
+        if (!("outputTokens" in $$source)) {
+            this["outputTokens"] = 0;
+        }
+        if (!("generationMs" in $$source)) {
+            this["generationMs"] = 0;
+        }
+        if (!("tokensPerSecond" in $$source)) {
+            this["tokensPerSecond"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedBucketModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedBucketModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SpeedBucketModel($$parsedSource as Partial<SpeedBucketModel>);
+    }
+}
+
+/**
+ * SpeedModel separates billing tiers and includes request-rate percentiles.
+ */
+export class SpeedModel {
+    "provider": string;
+    "model": string;
+    "speed": string;
+    "requests": number;
+    "unmeasuredRequests": number;
+    "outputTokens": number;
+    "generationMs": number;
+    "tokensPerSecond": number;
+    "medianTokensPerSecond": number;
+    "p10TokensPerSecond": number;
+    "p90TokensPerSecond": number;
+
+    /** Creates a new SpeedModel instance. */
+    constructor($$source: Partial<SpeedModel> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("speed" in $$source)) {
+            this["speed"] = "";
+        }
+        if (!("requests" in $$source)) {
+            this["requests"] = 0;
+        }
+        if (!("unmeasuredRequests" in $$source)) {
+            this["unmeasuredRequests"] = 0;
+        }
+        if (!("outputTokens" in $$source)) {
+            this["outputTokens"] = 0;
+        }
+        if (!("generationMs" in $$source)) {
+            this["generationMs"] = 0;
+        }
+        if (!("tokensPerSecond" in $$source)) {
+            this["tokensPerSecond"] = 0;
+        }
+        if (!("medianTokensPerSecond" in $$source)) {
+            this["medianTokensPerSecond"] = 0;
+        }
+        if (!("p10TokensPerSecond" in $$source)) {
+            this["p10TokensPerSecond"] = 0;
+        }
+        if (!("p90TokensPerSecond" in $$source)) {
+            this["p90TokensPerSecond"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedModel instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedModel {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SpeedModel($$parsedSource as Partial<SpeedModel>);
+    }
+}
+
+/**
+ * SpeedReport summarizes inclusive output throughput from local retained request facts.
+ * OpenCode uses native assistant creation/completion times; Codex uses explicit request
+ * boundaries and model response timestamps, excluding intervening tool execution; Claude
+ * runs from the prompt or tool result that started a message to its final content block.
+ * These elapsed intervals include time to first token. Missing, nonpositive, over-ten-minute
+ * and implausibly fast intervals are unmeasured; providers without reliable timing stay unmeasured.
+ */
+export class SpeedReport {
+    "window": accounting$0.Window;
+    "models": SpeedModel[];
+    "buckets": SpeedBucket[];
+    "measuredRequests": number;
+    "unmeasuredRequests": number;
+
+    /** Creates a new SpeedReport instance. */
+    constructor($$source: Partial<SpeedReport> = {}) {
+        if (!("window" in $$source)) {
+            this["window"] = (new accounting$0.Window());
+        }
+        if (!("models" in $$source)) {
+            this["models"] = [];
+        }
+        if (!("buckets" in $$source)) {
+            this["buckets"] = [];
+        }
+        if (!("measuredRequests" in $$source)) {
+            this["measuredRequests"] = 0;
+        }
+        if (!("unmeasuredRequests" in $$source)) {
+            this["unmeasuredRequests"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedReport instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedReport {
+        const $$createField0_0 = $$createType13;
+        const $$createField1_0 = $$createType30;
+        const $$createField2_0 = $$createType32;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("window" in $$parsedSource) {
+            $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
+        }
+        if ("models" in $$parsedSource) {
+            $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
+        }
+        if ("buckets" in $$parsedSource) {
+            $$parsedSource["buckets"] = $$createField2_0($$parsedSource["buckets"]);
+        }
+        return new SpeedReport($$parsedSource as Partial<SpeedReport>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = ConnectionPreference.createFrom;
 const $$createType1 = $Create.Array($$createType0);
@@ -742,3 +943,9 @@ const $$createType23 = $Create.Array($Create.Any);
 const $$createType24 = Configuration.createFrom;
 const $$createType25 = EnvironmentState.createFrom;
 const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = SpeedBucketModel.createFrom;
+const $$createType28 = $Create.Array($$createType27);
+const $$createType29 = SpeedModel.createFrom;
+const $$createType30 = $Create.Array($$createType29);
+const $$createType31 = SpeedBucket.createFrom;
+const $$createType32 = $Create.Array($$createType31);
