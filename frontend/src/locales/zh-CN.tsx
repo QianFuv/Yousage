@@ -685,6 +685,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{count} errors · {tokens} tokens resent":
     "出错 {count} 次 · 重发 {tokens} Token",
   "Daily extra spend": "每日额外花费",
+  "Hourly extra spend": "每小时额外花费",
   "Errors by kind": "错误类型",
   Events: "事件",
   "Loss events table": "损耗事件表",
@@ -708,4 +709,22 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{start} to {end} the next day": "{start} 至次日 {end}",
   "Days start at {time}": "每日 {time} 起算",
   "Starts {time}": "{time} 起",
+  Speed: "速度",
+  "Speed period": "速度统计时间段",
+  "{rate} tok/s": "{rate} tok/s",
+  "Average output speed · {count} measured requests":
+    "平均输出速度 · 已测量 {count} 次请求",
+  "Median {median} · P10–P90 {low}–{high}":
+    "中位数 {median} · P10–P90 {low}–{high}",
+  "{count} requests have no usable timing and are excluded.":
+    "{count} 次请求缺少可用计时，未计入统计。",
+  "Hourly speed": "每小时速度",
+  "Daily speed": "每日速度",
+  "No measured requests in this window.": "该时间段内没有可测量的请求。",
+  "No measured requests": "没有可测量的请求",
+  Models: "模型",
+  Requests: "请求数",
+  Median: "中位数",
+  "Model speed table": "模型速度表",
+  "{count} without timing": "{count} 次无计时",
 };

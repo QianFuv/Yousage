@@ -44,6 +44,7 @@ import {
   SettingsIcon,
   SlidersHorizontalIcon,
   TagsIcon,
+  TimerIcon,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
@@ -79,6 +80,11 @@ const ReceiptPage = lazy(() =>
 const LossPage = lazy(() =>
   import("./loss/LossPage").then((module) => ({
     default: module.LossPage,
+  })),
+);
+const SpeedPage = lazy(() =>
+  import("./speed/SpeedPage").then((module) => ({
+    default: module.SpeedPage,
   })),
 );
 const PricingPanel = lazy(() =>
@@ -227,6 +233,9 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       } else if ((event.ctrlKey || event.metaKey) && event.key === "4") {
         event.preventDefault();
         navigate("loss");
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "5") {
+        event.preventDefault();
+        navigate("speed");
       } else if (
         (event.ctrlKey || event.metaKey) &&
         event.altKey &&
@@ -364,6 +373,13 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
                 isCurrent={route === "loss"}
                 onClick={() => navigate("loss")}
               />
+              <NavItem
+                icon={TimerIcon}
+                label={t("Speed")}
+                title={`${t("Speed")} (Ctrl+5)`}
+                isCurrent={route === "speed"}
+                onClick={() => navigate("speed")}
+              />
             </div>
             <div className="sidebar-footer">
               <NavItem
@@ -402,6 +418,11 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
           {visitedPages.has("loss") && (
             <div hidden={route !== "loss"}>
               <LossPage isActive={route === "loss"} />
+            </div>
+          )}
+          {visitedPages.has("speed") && (
+            <div hidden={route !== "speed"}>
+              <SpeedPage isActive={route === "speed"} />
             </div>
           )}
         </Suspense>
@@ -496,7 +517,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
 }
 
 /** Top-level pages outside Settings. */
-type PageRoute = "statistics" | "quota" | "receipts" | "loss";
+type PageRoute = "statistics" | "quota" | "receipts" | "loss" | "speed";
 
 /** Settings destinations in sidebar order. */
 type SettingsSection =

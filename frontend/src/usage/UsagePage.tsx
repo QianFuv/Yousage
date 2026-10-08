@@ -29,8 +29,9 @@ import {
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { mergeAnsweredUsage } from "./data";
 import { indexCycleValues } from "./CycleValue";
-import { msg, t } from "../i18n";
+import { t } from "../i18n";
 import { useData } from "./controller";
+import { PeriodToggle } from "./PeriodToggle";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
 import * as nativeApi from "../../bindings/yousage/app";
 
@@ -237,24 +238,7 @@ export function UsagePage({
             <Toggle value="tokens">{t("Tokens")}</Toggle>
           </ToggleGroup>
         )}
-        {view === "statistics" && (
-          <ToggleGroup
-            aria-label={t("Usage period")}
-            variant="segmented"
-            value={[String(data.display.value.windowDays)]}
-            onValueChange={(next) => {
-              const value = Number(next[0]);
-              if (value)
-                void data.patchDisplay({ windowDays: value }).catch(() => {});
-            }}
-          >
-            {WINDOW_OPTIONS.map((option) => (
-              <Toggle key={option.days} value={String(option.days)}>
-                {t(option.label)}
-              </Toggle>
-            ))}
-          </ToggleGroup>
-        )}
+        {view === "statistics" && <PeriodToggle label={t("Usage period")} />}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -395,14 +379,6 @@ export function UsagePage({
     </section>
   );
 }
-
-/** Period choices matching the original Usage page labels. */
-const WINDOW_OPTIONS = [
-  { days: 1, label: msg("24h") },
-  { days: 7, label: msg("7d") },
-  { days: 30, label: msg("30d") },
-  { days: 90, label: msg("90d") },
-] as const;
 
 /**
  * Centered placeholder for pages without displayable data.

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"time"
 	"yousage/internal/accounting"
@@ -58,7 +57,7 @@ type LossKindCount struct {
 	CostUsd float64 `json:"costUsd"`
 }
 
-// LossDay includes every calendar day in a report, even when no loss was observed.
+// LossDay includes every daily or hourly bucket, even when no loss was observed.
 type LossDay struct {
 	Day              string  `json:"day"`
 	CacheExpiryUsd   float64 `json:"cacheExpiryUsd"`
@@ -84,9 +83,6 @@ type LossEvent struct {
 
 // LossReport reads the same local retained and deduplicated facts as Usage, with errors included.
 func (service *Service) LossReport(ctx context.Context, days int, timeZone string) (LossReport, error) {
-	if days != 7 && days != 30 && days != 90 {
-		return LossReport{}, errors.New("unsupported loss period")
-	}
 	now := service.Now()
 	window, err := accounting.BuildWindow(now, days, timeZone)
 	if err != nil {
@@ -149,9 +145,9 @@ func cacheTtl(previous domain.Record) int64 {
 	return CacheDefaultTtl.Milliseconds()
 }
 
+// analyzeLoss classifies retained context and assigns losses to the selected window buckets.
 func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, now time.Time) LossReport {
 	result := LossReport{Window: options.Window, ErrorKinds: []LossKindCount{}, Days: []LossDay{}, Events: []LossEvent{}}
-	location := accounting.Location(options.Window.TimeZone)
 	pricer := accounting.NewPricer(options.Rates, options.Overrides)
 	dayPositions := map[string]int{}
 	for _, label := range options.Window.BucketLabels() {
@@ -159,8 +155,8 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 		result.Days = append(result.Days, LossDay{Day: label})
 	}
 	inWindow := func(record domain.Record) bool {
-		day := time.UnixMilli(record.TimestampMs).In(location).Format(time.DateOnly)
-		return day >= options.Window.SinceDay && day <= options.Window.UntilDay && record.TimestampMs <= now.UnixMilli()
+		_, isIncluded := reportBucket(options.Window, record.TimestampMs, now)
+		return isIncluded
 	}
 	sessions := map[string][]domain.Record{}
 	for _, record := range records {
@@ -238,7 +234,7 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 	}
 	kinds := map[string]*LossKindCount{}
 	for _, event := range result.Events {
-		day := time.UnixMilli(event.AtMs).In(location).Format(time.DateOnly)
+		day, _ := reportBucket(options.Window, event.AtMs, now)
 		daily := &result.Days[dayPositions[day]]
 		totals := &result.CacheExpiry
 		if event.Kind == "error" {

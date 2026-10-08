@@ -9,6 +9,38 @@ import (
 	"yousage/internal/domain"
 )
 
+// TestLossRolling24Hours keeps all hourly buckets and excludes exact boundary instants.
+func TestLossRolling24Hours(test *testing.T) {
+	service := testService(test)
+	now := time.Date(2026, 11, 1, 14, 5, 42, 0, time.UTC)
+	service.Now = func() time.Time { return now }
+	window, _ := accounting.BuildWindow(now, 1, "America/New_York")
+	start, end := window.SinceTimeMs, window.UntilTimeMs
+	before := domain.Record{Provider: domain.Claude, Model: "fixture", SessionId: "session", TimestampMs: start - 10*time.Minute.Milliseconds(), Speed: "standard", Totals: domain.Tokens{CachedInputTokens: 100000}}
+	write := before
+	write.TimestampMs, write.Totals = start, domain.Tokens{CacheCreationTokens: 100000}
+	records := []domain.Record{before, write}
+	for _, instant := range []int64{start - 1, start, start + time.Hour.Milliseconds(), end - 1, end, now.UnixMilli()} {
+		records = append(records, domain.Record{Provider: domain.Claude, TimestampMs: instant, ErrorKind: "server"})
+	}
+	outside := write
+	outside.SessionId, outside.TimestampMs = "outside", end
+	records = append(records, outside)
+	seedReportRecords(test, service, records)
+	report, err := service.LossReport(context.Background(), 1, "America/New_York")
+	if err != nil || report.Window != window || len(report.Days) != 24 || report.Errors.Events != 3 || report.CacheExpiry.Events != 1 || report.CacheWriteTokens != 100000 {
+		test.Fatal(report, err)
+	}
+	for index, day := range report.Days {
+		if day.Day != window.BucketLabels()[index] {
+			test.Fatal(day, index)
+		}
+	}
+	if report.Days[0].ErrorCount != 1 || report.Days[0].CacheExpiryCount != 1 || report.Days[1].ErrorCount != 1 || report.Days[23].ErrorCount != 1 || report.Days[2].ErrorCount != 0 {
+		test.Fatal(report.Days)
+	}
+}
+
 func lossFixture() (domain.Record, domain.Record, accounting.AggregateOptions, time.Time) {
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
 	before := domain.Record{Provider: domain.Claude, Model: "fixture", SessionId: "session", TimestampMs: now.Add(-20 * time.Minute).UnixMilli(), Speed: "standard", Totals: domain.Tokens{CachedInputTokens: 100000, OutputTokens: 100}}
@@ -160,7 +192,7 @@ func TestLossReportLocalFactsAndAliases(t *testing.T) {
 	if err != nil || report.Errors.Events != 1 || report.Errors.Tokens != 100000 || math.Abs(report.Errors.CostUsd-0.23) > 1e-12 || report.CacheWriteTokens != 100000 {
 		t.Fatal(report, err)
 	}
-	if _, err := service.LossReport(ctx, 1, "UTC"); err == nil {
+	if _, err := service.LossReport(ctx, 2, "UTC"); err == nil {
 		t.Fatal("accepted unsupported loss window")
 	}
 	empty, err := service.LossReport(ctx, 30, "Asia/Shanghai")

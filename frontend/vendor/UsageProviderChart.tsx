@@ -119,7 +119,7 @@ interface CurveSegment {
   readonly to: Point;
 }
 
-function smoothCurve(points: readonly Point[]): readonly CurveSegment[] {
+export function smoothCurve(points: readonly Point[]): readonly CurveSegment[] {
   if (points.length < 2) return [];
   const tangents = monotoneTangents(points);
   const segments: CurveSegment[] = [];
@@ -139,7 +139,7 @@ function smoothCurve(points: readonly Point[]): readonly CurveSegment[] {
   return segments;
 }
 
-function curvePath(segments: readonly CurveSegment[]): string {
+export function curvePath(segments: readonly CurveSegment[]): string {
   const first = segments[0];
   if (first === undefined) return "";
   let path = `M${first.from.x.toFixed(2)},${first.from.y.toFixed(2)}`;

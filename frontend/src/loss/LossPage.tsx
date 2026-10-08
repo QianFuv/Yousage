@@ -1,5 +1,5 @@
 /** Extra spend caused by expired prompt caches and by errors followed by a full resend. */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Events } from "@wailsio/runtime";
 import { RefreshCwIcon } from "lucide-react";
 import {
@@ -9,27 +9,15 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-import {
-  Toggle,
-  ToggleGroup,
-} from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
-import {
-  Tooltip,
-  TooltipPopup,
-  TooltipTrigger,
-} from "../../../tools/parity/upstream/apps/web/src/components/ui/tooltip";
 import { UsageShareBar } from "../../vendor/UsageShareBar";
 import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { Notice, PageBody, PageHeader } from "../ui";
-import {
-  formatDateTimeShort,
-  formatDayShort,
-  formatDuration,
-  msg,
-  t,
-} from "../i18n";
+import { formatDateTimeShort, formatDuration, msg, t } from "../i18n";
 import { useData } from "../usage/controller";
+import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
+import { bucketLabels } from "../usage/chartAxis";
+import { SeriesChart } from "../usage/SeriesChart";
 import type { UsageProviderKind } from "../usage/contracts";
 import * as nativeApi from "../../bindings/yousage/app";
 import type {
@@ -37,6 +25,7 @@ import type {
   LossEvent,
   LossReport,
 } from "../../bindings/yousage/internal/service/models";
+import type { Window } from "../../bindings/yousage/internal/accounting/models";
 
 /** A neutral step between background and foreground, matching the usage mixes. */
 const ink = (percent: number) =>
@@ -44,13 +33,6 @@ const ink = (percent: number) =>
 
 /** Series colors shared by the totals, the daily chart and the event table. */
 const LOSS_COLORS = { cacheExpiry: ink(100), error: ink(42) } as const;
-
-/** Period choices; the loss report has no rolling 24-hour view. */
-const PERIOD_OPTIONS = [
-  { days: 7, label: msg("7d") },
-  { days: 30, label: msg("30d") },
-  { days: 90, label: msg("90d") },
-] as const;
 
 /** Labels of the error kinds reported by the history collectors. */
 const ERROR_KIND_LABELS: Record<string, string> = {
@@ -88,7 +70,7 @@ function errorKindLabel(kind: string | undefined): string {
 export function LossPage({ isActive }: { isActive: boolean }) {
   const data = useData();
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const [days, setDays] = useState(30);
+  const days = usePeriodDays();
   const [report, setReport] = useState<LossReport | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -123,21 +105,7 @@ export function LossPage({ isActive }: { isActive: boolean }) {
         title={t("Loss")}
         status={data.isBusy ? t("Refreshing…") : !report ? t("Loading…") : null}
       >
-        <ToggleGroup
-          aria-label={t("Loss period")}
-          variant="segmented"
-          value={[String(days)]}
-          onValueChange={(next) => {
-            const value = Number(next[0]);
-            if (value) setDays(value);
-          }}
-        >
-          {PERIOD_OPTIONS.map((option) => (
-            <Toggle key={option.days} value={String(option.days)}>
-              {t(option.label)}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+        <PeriodToggle label={t("Loss period")} />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -204,8 +172,12 @@ function LossContent({ report }: { report: LossReport }) {
           />
         </div>
         <div className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-sm font-medium">{t("Daily extra spend")}</h2>
-          <LossChart days={report.days} />
+          <h2 className="text-sm font-medium">
+            {report.window.resolution === "hour"
+              ? t("Hourly extra spend")
+              : t("Daily extra spend")}
+          </h2>
+          <LossChart days={report.days} reportWindow={report.window} />
         </div>
       </section>
       {report.errorKinds.length > 0 && (
@@ -266,138 +238,98 @@ function LossTotal({
   );
 }
 
-/** Number of evenly spaced value gridlines above zero. */
-const TICK_COUNT = 4;
-
 /**
- * Round a maximum up to a readable axis ceiling (1, 2, 2.5 or 5 times a power of ten).
+ * Cache-expiry and error spend per day, or per hour in a 24-hour window, as layered lines.
  *
- * @param maximum - Largest plotted value.
- * @returns The axis ceiling.
+ * @param props - Every bucket of the window, ascending, and the report window.
+ * @returns The chart element.
  */
-function niceCeiling(maximum: number): number {
-  if (maximum <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(maximum));
-  const step = [1, 2, 2.5, 5, 10].find(
-    (factor) => factor * magnitude >= maximum,
-  )!;
-  return step * magnitude;
+function LossChart({
+  days,
+  reportWindow,
+}: {
+  days: readonly LossDay[];
+  reportWindow: Window;
+}) {
+  const labels = bucketLabels(reportWindow);
+  const series = useMemo(
+    () => [
+      {
+        id: "cacheExpiry",
+        color: LOSS_COLORS.cacheExpiry,
+        values: days.map((day) => day.cacheExpiryUsd),
+      },
+      {
+        id: "error",
+        color: LOSS_COLORS.error,
+        values: days.map((day) => day.errorUsd),
+      },
+    ],
+    [days],
+  );
+  return (
+    <SeriesChart
+      periods={days.map((day) => day.day)}
+      series={series}
+      format={formatUsd}
+      ariaLabel={
+        labels.isHourly ? t("Hourly extra spend") : t("Daily extra spend")
+      }
+      formatPeriod={labels.axis}
+      formatTooltipPeriod={labels.full}
+      renderTooltip={(index) => {
+        const day = days[index];
+        return (
+          <>
+            <TooltipRow
+              color={LOSS_COLORS.cacheExpiry}
+              label={`${t("Cache expiry")} · ${formatCount(day.cacheExpiryCount)}`}
+              value={formatUsd(day.cacheExpiryUsd)}
+            />
+            <TooltipRow
+              color={LOSS_COLORS.error}
+              label={`${t("Errors")} · ${formatCount(day.errorCount)}`}
+              value={formatUsd(day.errorUsd)}
+            />
+            <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-1">
+              <span className="text-muted-foreground">{t("Total")}</span>
+              <span className="text-foreground tabular-nums">
+                {formatUsd(day.cacheExpiryUsd + day.errorUsd)}
+              </span>
+            </div>
+          </>
+        );
+      }}
+    />
+  );
 }
 
 /**
- * Stacked daily columns of cache-expiry and error spend.
+ * One series in the chart readout: a color dot, its label and value.
  *
- * @param props - Every day of the window, ascending.
- * @returns The chart element.
+ * @param props - Series color, label and formatted value.
+ * @returns The readout row.
  */
-function LossChart({ days }: { days: readonly LossDay[] }) {
-  const ceiling = niceCeiling(
-    Math.max(0, ...days.map((day) => day.cacheExpiryUsd + day.errorUsd)),
-  );
-  const ticks = Array.from(
-    { length: TICK_COUNT + 1 },
-    (_, index) => (ceiling * (TICK_COUNT - index)) / TICK_COUNT,
-  );
-  const labelEvery = Math.max(1, Math.ceil(days.length / 7));
+function TooltipRow({
+  color,
+  label,
+  value,
+}: {
+  color: string;
+  label: string;
+  value: string;
+}) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex gap-2">
-        <div className="relative h-56 w-14 shrink-0">
-          {ticks.map((tick) => (
-            <span
-              key={tick}
-              className="absolute right-0 -translate-y-1/2 text-3xs text-muted-foreground tabular-nums"
-              style={{ top: `${(1 - tick / ceiling) * 100}%` }}
-            >
-              {tick === 0 ? "0" : formatUsd(tick)}
-            </span>
-          ))}
-        </div>
-        <div
-          role="img"
-          aria-label={t("Daily extra spend")}
-          className="relative h-56 flex-1"
-        >
-          {ticks.map((tick) => (
-            <div
-              key={tick}
-              aria-hidden
-              className="absolute inset-x-0 border-t border-border"
-              style={{ top: `${(1 - tick / ceiling) * 100}%` }}
-            />
-          ))}
-          <div className="absolute inset-0 flex items-end gap-px">
-            {days.map((day) => {
-              const total = day.cacheExpiryUsd + day.errorUsd;
-              return (
-                <Tooltip key={day.day}>
-                  <TooltipTrigger
-                    render={
-                      <div className="flex h-full min-w-0 flex-1 flex-col justify-end rounded-t-xs hover:bg-muted/50" />
-                    }
-                  >
-                    <div
-                      className="w-full rounded-t-xs"
-                      style={{
-                        height: `${(day.errorUsd / ceiling) * 100}%`,
-                        backgroundColor: LOSS_COLORS.error,
-                      }}
-                    />
-                    <div
-                      className={cn(
-                        "w-full",
-                        day.errorUsd === 0 && "rounded-t-xs",
-                      )}
-                      style={{
-                        height: `${(day.cacheExpiryUsd / ceiling) * 100}%`,
-                        backgroundColor: LOSS_COLORS.cacheExpiry,
-                      }}
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup>
-                    <div className="flex min-w-36 flex-col gap-0.5 text-xs">
-                      <span className="text-muted-foreground">
-                        {formatDayShort(day.day)}
-                      </span>
-                      <span className="flex justify-between gap-3">
-                        <span>
-                          {t("Cache expiry")} ·{" "}
-                          {formatCount(day.cacheExpiryCount)}
-                        </span>
-                        <span className="tabular-nums">
-                          {formatUsd(day.cacheExpiryUsd)}
-                        </span>
-                      </span>
-                      <span className="flex justify-between gap-3">
-                        <span>
-                          {t("Errors")} · {formatCount(day.errorCount)}
-                        </span>
-                        <span className="tabular-nums">
-                          {formatUsd(day.errorUsd)}
-                        </span>
-                      </span>
-                      <span className="mt-0.5 flex justify-between gap-3 border-t border-border pt-0.5">
-                        <span>{t("Total")}</span>
-                        <span className="tabular-nums">{formatUsd(total)}</span>
-                      </span>
-                    </div>
-                  </TooltipPopup>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="flex pl-16 text-3xs text-muted-foreground uppercase">
-        {days.map((day, index) => (
-          <span
-            key={day.day}
-            className="min-w-0 flex-1 overflow-visible whitespace-nowrap"
-          >
-            {index % labelEvery === 0 ? formatDayShort(day.day) : ""}
-          </span>
-        ))}
-      </div>
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        {label}
+      </span>
+      <span className="text-foreground tabular-nums">{value}</span>
     </div>
   );
 }
