@@ -63,7 +63,9 @@ signed window count (`-1` means nil), and each window's interned identity, exact
 float64 percentage, signed duration and reset varints. Nil and empty observations,
 nil and zero cost pointers, window order and floating point bits are preserved.
 Record payload v2 appends a closed error-kind enum code and cache TTL varint to
-v1's fields; existing v1 rows remain readable without a relational migration.
+v1's fields. Record payload v3 appends the optional generation duration in
+milliseconds; existing v1/v2 rows remain readable with duration zero without a
+relational migration. The original seven dictionary string slots are unchanged.
 The enum stores no diagnostic text or extra dictionary identities. Quota payloads
 remain v1. Unknown versions and malformed payloads are rejected.
 

@@ -45,7 +45,8 @@ func tokens(value any) int64 {
 	return int64(number)
 }
 
-// ParseMessage adds separately reported reasoning into the inclusive normalized output category.
+// ParseMessage adds reasoning to inclusive output and measures native assistant creation to completion.
+// SQL fallback timestamps identify usage only and never establish a generation duration.
 func ParseMessage(data []byte, fallback Fallback) *domain.Record {
 	var message map[string]any
 	if json.Unmarshal(data, &message) != nil {
@@ -85,6 +86,12 @@ func ParseMessage(data []byte, fallback Fallback) *domain.Record {
 		sessionId = text(message["sessionID"])
 	}
 	record := &domain.Record{Provider: domain.OpenCode, TimestampMs: int64(instant), Model: model, SessionId: sessionId, Totals: totals, Speed: "standard"}
+	messageTime := object(message["time"])
+	createdMs, hasCreated := messageTime["created"].(float64)
+	completedMs, hasCompleted := messageTime["completed"].(float64)
+	if hasCreated && hasCompleted && domain.Finite(createdMs) && domain.Finite(completedMs) && createdMs > 0 && completedMs > createdMs && completedMs < float64(math.MaxInt64) && math.Trunc(createdMs) == createdMs && math.Trunc(completedMs) == completedMs {
+		record.GenerationMs = domain.ReliableGenerationMs(int64(completedMs)-int64(createdMs), totals.OutputTokens)
+	}
 	if id != "" {
 		record.DedupeKey = "opencode:" + id
 	}

@@ -33,7 +33,8 @@ Numeric timestamp values are rejected. Locale-specific implementation-dependent
 JavaScript Date.parse strings are not a provider format contract or a compatibility
 claim. Raw sources/oracles remain unchanged at t3code51f7f77.
 
-Parser version 3 replays all retained older checkpoints for redacted error events
+Parser version 4 replays all retained older checkpoints for generation timing,
+redacted error events
 and explicit Claude cache TTL observations. Claude system `api_error` and
 `isApiErrorMessage` markers, Codex `turn_aborted`, transport errors and failed
 `task_complete` records retain only timestamp, provider, session, known model and
@@ -41,3 +42,29 @@ a closed error classification. Interruptions remain separate from failures.
 Usage and quota-cycle pricing exclude these error facts. Arbitrary diagnostics,
 prompts and response text are never persisted. Error facts use the same atomic
 checkpoint/tail replacement and file-mtime retention as usage.
+
+Codex generation timing starts at a timestamped task/user boundary or preceding
+tool output and ends at the latest model response item before its unique usage
+event. Turn context can tighten the start before output. Tool outputs arriving
+before usage establish the next request and do not extend the preceding response.
+Overlapping ambiguous responses, missing boundaries, failures, zero-output
+requests, intervals above ten minutes and rates above 10,000 output tokens/second
+remain unmeasured. Timing includes time to first token and local logging/scheduling
+overhead; observed tool execution and human idle gaps are excluded.
+
+OpenCode uses paired native assistant `time.created` and `time.completed` values,
+including time to first token, under the same duration/rate bounds. SQL fallback
+timestamps never establish timing. Its full snapshots are replaced on every
+successful scan.
+
+Claude Code writes each assistant message as one line per content block. Blocks
+streamed before the message ends carry a null `stop_reason` and partial usage, and
+tool results may be interleaved before the final block. The Claude reducer keeps
+only entry ids, parent ids and timestamps: it emits each message from its first
+block with a stop reason, so usage is final, and times it from the user prompt or
+tool result reached through the first block's `parentUuid` chain (skipping
+attachments) to that block. A message that never receives a final block is emitted
+untimed with its partial usage when the next message begins. Requests with an API
+error inside the interval, a parent outside the retained chain, or the shared
+duration/rate bounds remain unmeasured. Grok, Cursor and the supported
+Antigravity schema expose no reliable paired per-request times and stay unmeasured.

@@ -8,6 +8,7 @@ import (
 	"yousage/internal/domain"
 )
 
+// TestLegacyPayloadAndExtendedFacts preserves older payloads alongside optional duration facts.
 func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	values := map[int64]string{0: ""}
 	intern := func(value string) (int64, error) {
@@ -26,11 +27,21 @@ func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = data[:len(data)-2]
+	data = data[:len(data)-3]
 	data[0] = 1
 	decoded, err := decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
 	if err != nil || !reflect.DeepEqual(decoded, legacy) {
 		t.Fatal("v1 facts changed", decoded, legacy, err)
+	}
+	data, err = encodeRecord(legacy, intern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = data[:len(data)-1]
+	data[0] = 2
+	decoded, err = decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
+	if err != nil || !reflect.DeepEqual(decoded, legacy) {
+		t.Fatal("v2 facts changed", decoded, legacy, err)
 	}
 	for _, record := range []domain.Record{{Provider: domain.Claude, SessionId: "session", TimestampMs: 123, ErrorKind: "rateLimit"}, {Provider: domain.Claude, Model: "model", SessionId: "session", TimestampMs: 124, Speed: "fast", CacheTtlMs: 3600000, Totals: domain.Tokens{CacheCreationTokens: 50000}}} {
 		data, err := encodeRecord(record, intern)
@@ -44,6 +55,7 @@ func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	}
 }
 
+// TestMixedPayloadUpgradeReplacementAndRetention keeps mixed versions readable and reclaimable.
 func TestMixedPayloadUpgradeReplacementAndRetention(t *testing.T) {
 	store, _, id := openFixture(t)
 	ctx := context.Background()
@@ -57,7 +69,7 @@ func TestMixedPayloadUpgradeReplacementAndRetention(t *testing.T) {
 	if err := store.database.QueryRowContext(ctx, `SELECT data FROM records`).Scan(&payload); err != nil {
 		t.Fatal(err)
 	}
-	payload = payload[:len(payload)-2]
+	payload = payload[:len(payload)-3]
 	payload[0] = 1
 	if _, err := store.database.ExecContext(ctx, `UPDATE records SET data=?`, payload); err != nil {
 		t.Fatal(err)

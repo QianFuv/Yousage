@@ -5,12 +5,44 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
 )
+
+// TestNativeGenerationTiming requires paired native times and includes separately reported reasoning.
+func TestNativeGenerationTiming(test *testing.T) {
+	for _, fixture := range []struct {
+		timeJson string
+		output   int64
+		expected int64
+	}{
+		{`{"created":1000,"completed":3000}`, 20, 2000},
+		{`{"created":1000}`, 20, 0},
+		{`{"completed":3000}`, 20, 0},
+		{`{"created":1000,"completed":1000}`, 20, 0},
+		{`{"created":3000,"completed":1000}`, 20, 0},
+		{`{"created":1000,"completed":601001}`, 20, 0},
+		{`{"created":1000,"completed":1001}`, 20, 0},
+		{`{"created":1000.5,"completed":3000}`, 20, 0},
+		{`{"created":1000,"completed":"3000"}`, 20, 0},
+		{`{"created":1000,"completed":3000}`, 0, 0},
+	} {
+		data := []byte(`{"role":"assistant","modelID":"model","time":` + fixture.timeJson + `,"tokens":{"input":1,"output":` + fmt.Sprint(fixture.output) + `}}`)
+		fallback := int64(1000)
+		record := ParseMessage(data, Fallback{TimestampMs: &fallback})
+		if record == nil || record.GenerationMs != fixture.expected {
+			test.Fatal(fixture, record)
+		}
+	}
+	record := ParseMessage([]byte(`{"role":"assistant","modelID":"model","time":{"created":1000,"completed":3000},"tokens":{"output":20,"reasoning":10}}`), Fallback{})
+	if record == nil || record.GenerationMs != 2000 || record.Totals.OutputTokens != 30 {
+		test.Fatal(record)
+	}
+}
 
 func message(model string, input int, cost float64) string {
 	data, _ := json.Marshal(map[string]any{"role": "assistant", "modelID": model, "time": map[string]any{"created": 1000}, "tokens": map[string]any{"input": input, "output": 20, "reasoning": 5, "cache": map[string]any{"read": 30, "write": 10}}, "cost": cost, "sessionID": "json-session"})

@@ -80,6 +80,7 @@ type Record struct {
 	Quota           *QuotaObservation `json:"quota,omitempty"`
 	ErrorKind       string            `json:"errorKind,omitempty"`
 	CacheTtlMs      int64             `json:"cacheTtlMs,omitempty"`
+	GenerationMs    int64             `json:"generationMs,omitempty"`
 	IsQuotaOnly     bool              `json:"quotaOnly,omitempty"`
 }
 
@@ -99,8 +100,11 @@ type QuotaObservation struct {
 
 // Validate checks usage facts and the separate quota-only record variant.
 func (record Record) Validate() error {
+	if record.GenerationMs < 0 {
+		return errors.New("negative generation duration")
+	}
 	if record.ErrorKind != "" {
-		if (record.Provider != Codex && record.Provider != Claude) || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 {
+		if (record.Provider != Codex && record.Provider != Claude) || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 || record.GenerationMs != 0 {
 			return errors.New("invalid error fact")
 		}
 		return nil
@@ -109,7 +113,7 @@ func (record Record) Validate() error {
 		return errors.New("invalid prompt cache TTL")
 	}
 	if record.IsQuotaOnly {
-		if record.Provider != Codex || record.Quota == nil || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil {
+		if record.Provider != Codex || record.Quota == nil || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.GenerationMs != 0 {
 			return errors.New("invalid quota-only record")
 		}
 		return nil

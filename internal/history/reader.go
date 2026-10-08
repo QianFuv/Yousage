@@ -13,8 +13,8 @@ import (
 	"yousage/internal/history/grok"
 )
 
-// ParserVersion forces retained transcripts to be replayed for redacted errors and cache TTL facts.
-const ParserVersion = 3
+// ParserVersion forces retained transcripts to replay for Claude final-block usage and request timing.
+const ParserVersion = 5
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -99,17 +99,18 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 			if provider == domain.Codex {
 				record = ParseCodex(projected, &lineState)
 			} else if provider == domain.Claude {
-				record = ParseClaude(projected)
-				if record != nil {
-					if record.ErrorKind != "" {
-						if record.Model == "" {
-							record.Model = lineState.Model
+				parsedRecords = ParseClaudeLine(projected, &lineState.Claude)
+				for index := range parsedRecords {
+					parsed := &parsedRecords[index]
+					if parsed.ErrorKind != "" {
+						if parsed.Model == "" {
+							parsed.Model = lineState.Model
 						}
-						if record.SessionId == "" {
-							record.SessionId = lineState.SessionId
+						if parsed.SessionId == "" {
+							parsed.SessionId = lineState.SessionId
 						}
 					} else {
-						lineState.Model, lineState.SessionId = record.Model, record.SessionId
+						lineState.Model, lineState.SessionId = parsed.Model, parsed.SessionId
 					}
 				}
 			} else {

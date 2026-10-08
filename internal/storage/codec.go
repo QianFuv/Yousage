@@ -54,7 +54,7 @@ func (reader *payloadReader) number() float64 {
 // newPayloadReader checks the payload format version.
 func newPayloadReader(data []byte) payloadReader {
 	reader := payloadReader{data: data}
-	if len(data) == 0 || (data[0] != 1 && data[0] != 2) {
+	if len(data) == 0 || (data[0] != 1 && data[0] != 2 && data[0] != 3) {
 		reader.err = errors.New("unsupported storage payload version")
 		return reader
 	}
@@ -74,9 +74,9 @@ func (reader *payloadReader) finish() error {
 	return nil
 }
 
-// encodeRecord writes payload v2 with the original seven interned strings and closed error/TTL codes.
+// encodeRecord writes payload v3 with the original string slots and optional generation duration.
 func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]byte, error) {
-	writer := payloadWriter{data: []byte{2}}
+	writer := payloadWriter{data: []byte{3}}
 	for _, value := range []string{string(record.Provider), record.Model, record.RateModel, record.SessionId, record.Speed, record.DedupeKey, record.SourcePath} {
 		identity, err := intern(value)
 		if err != nil {
@@ -107,10 +107,11 @@ func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]b
 	}
 	writer.integer(kindCode)
 	writer.integer(record.CacheTtlMs)
+	writer.integer(record.GenerationMs)
 	return writer.data, nil
 }
 
-// decodeRecord restores v1/v2 facts with relational timestamp, bucket and observation fields.
+// decodeRecord restores v1/v2/v3 facts with relational timestamp, bucket and observation fields.
 func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool, quota []byte, lookup func(int64) (string, bool)) (domain.Record, error) {
 	reader := newPayloadReader(data)
 	values := make([]string, 7)
@@ -132,7 +133,7 @@ func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool,
 	default:
 		reader.err = errors.New("invalid storage cost marker")
 	}
-	if reader.version == 2 {
+	if reader.version >= 2 {
 		kindCode := reader.integer()
 		if kindCode < 0 || kindCode > int64(len(domain.ErrorKinds)) {
 			reader.err = errors.New("invalid error kind code")
@@ -140,6 +141,9 @@ func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool,
 			record.ErrorKind = domain.ErrorKinds[kindCode-1]
 		}
 		record.CacheTtlMs = reader.integer()
+	}
+	if reader.version >= 3 {
+		record.GenerationMs = reader.integer()
 	}
 	if err := reader.finish(); err != nil {
 		return record, err

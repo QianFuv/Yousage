@@ -10,15 +10,53 @@ import (
 	"yousage/internal/domain"
 )
 
+// CodexState checkpoints usage deduplication and scalar request timing without transcript content.
 type CodexState struct {
-	Model                 string `json:"model"`
-	Speed                 string `json:"speed"`
-	SessionId             string `json:"sessionId"`
-	LastUsageSignature    string `json:"lastUsageSignature"`
-	SawSessionMeta        bool   `json:"sawSessionMeta"`
-	SuppressingForkCopies bool   `json:"suppressingForkCopies"`
-	ForkCopyAnchorMs      int64  `json:"forkCopyAnchorMs"`
+	Model                 string      `json:"model"`
+	Speed                 string      `json:"speed"`
+	SessionId             string      `json:"sessionId"`
+	LastUsageSignature    string      `json:"lastUsageSignature"`
+	SawSessionMeta        bool        `json:"sawSessionMeta"`
+	SuppressingForkCopies bool        `json:"suppressingForkCopies"`
+	ForkCopyAnchorMs      int64       `json:"forkCopyAnchorMs"`
+	GenerationStartMs     int64       `json:"generationStartMs,omitempty"`
+	ResponseEndMs         int64       `json:"responseEndMs,omitempty"`
+	NextGenerationMs      int64       `json:"nextGenerationMs,omitempty"`
+	IsTimingAmbiguous     bool        `json:"isTimingAmbiguous,omitempty"`
+	Claude                ClaudeState `json:"claude,omitzero"`
 }
+
+// ClaudeState checkpoints request starts and unfinished messages without transcript content,
+// so Claude usage and timing come from each message's final block.
+type ClaudeState struct {
+	Entries     []ClaudeEntry   `json:"entries,omitempty"`
+	Starts      []ClaudeStart   `json:"starts,omitempty"`
+	Pending     []domain.Record `json:"pending,omitempty"`
+	LastErrorMs int64           `json:"lastErrorMs,omitempty"`
+}
+
+// ClaudeEntry links a recent non-assistant entry to its parent for request start lookups.
+type ClaudeEntry struct {
+	Uuid        string `json:"uuid"`
+	ParentUuid  string `json:"parentUuid,omitempty"`
+	IsUser      bool   `json:"isUser,omitempty"`
+	TimestampMs int64  `json:"timestampMs"`
+}
+
+// ClaudeStart is the request start of a message, or zero when it cannot be established.
+type ClaudeStart struct {
+	Key     string `json:"key"`
+	StartMs int64  `json:"startMs,omitempty"`
+}
+
+// claudeEntryLimit bounds the retained parent chain; a request's starting entry is always recent.
+const claudeEntryLimit = 64
+
+// claudeStartLimit bounds the messages whose request start is remembered.
+const claudeStartLimit = 16
+
+// claudeParentHops bounds the walk through attachments to the user entry that started a request.
+const claudeParentHops = 16
 
 func InitialCodexState() CodexState   { return CodexState{Speed: "standard"} }
 func object(value any) map[string]any { result, _ := value.(map[string]any); return result }
@@ -95,7 +133,94 @@ func ParseClaude(data []byte) *domain.Record {
 	return result
 }
 
-// ParseCodex retains quota observations independently of billable usage.
+// ParseClaudeLine emits each assistant message from its final block, timed from the user prompt or
+// tool result that started the request through that block. Claude Code writes blocks streamed before
+// the message ends with a null stop reason and partial usage; those wait for the final block and are
+// emitted untimed only when another message begins without one. A request that hit an API error is
+// not timed, because the interval would include the failed attempt and its retry delay.
+func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
+	var line struct {
+		Type       string `json:"type"`
+		Uuid       string `json:"uuid"`
+		ParentUuid string `json:"parentUuid"`
+		Timestamp  string `json:"timestamp"`
+		Message    struct {
+			StopReason json.RawMessage `json:"stop_reason"`
+		} `json:"message"`
+	}
+	json.Unmarshal(data, &line)
+	record := ParseClaude(data)
+	if record != nil && record.ErrorKind != "" {
+		state.LastErrorMs = max(state.LastErrorMs, record.TimestampMs)
+		return []domain.Record{*record}
+	}
+	if line.Type != "assistant" {
+		if instant, ok := timestamp(line.Timestamp); ok && line.Uuid != "" {
+			entries := append(state.Entries, ClaudeEntry{Uuid: line.Uuid, ParentUuid: line.ParentUuid, IsUser: line.Type == "user", TimestampMs: instant})
+			state.Entries = entries[max(0, len(entries)-claudeEntryLimit):]
+		}
+		return nil
+	}
+	if record == nil {
+		return nil
+	}
+	key := record.DedupeKey
+	if key == "" {
+		return []domain.Record{*record}
+	}
+	result, pending := []domain.Record{}, []domain.Record{}
+	for _, held := range state.Pending {
+		if held.DedupeKey == key {
+			pending = append(pending, held)
+		} else {
+			result = append(result, held)
+		}
+	}
+	start, isKnown := int64(0), false
+	for _, known := range state.Starts {
+		if known.Key == key {
+			start, isKnown = known.StartMs, true
+		}
+	}
+	if !isKnown {
+		start = state.requestStart(line.ParentUuid)
+		starts := append(state.Starts, ClaudeStart{Key: key, StartMs: start})
+		state.Starts = starts[max(0, len(starts)-claudeStartLimit):]
+	}
+	if string(line.Message.StopReason) == "null" {
+		state.Pending = []domain.Record{*record}
+		return result
+	}
+	state.Pending = nil
+	if start > 0 && (state.LastErrorMs < start || state.LastErrorMs > record.TimestampMs) {
+		record.GenerationMs = domain.ReliableGenerationMs(record.TimestampMs-start, record.Totals.OutputTokens)
+	}
+	return append(result, *record)
+}
+
+// requestStart follows a message's parent chain through attachments to the user entry that sent it.
+func (state *ClaudeState) requestStart(parentUuid string) int64 {
+	for hop := 0; hop < claudeParentHops && parentUuid != ""; hop++ {
+		var parent *ClaudeEntry
+		for index := len(state.Entries) - 1; index >= 0; index-- {
+			if state.Entries[index].Uuid == parentUuid {
+				parent = &state.Entries[index]
+				break
+			}
+		}
+		if parent == nil {
+			return 0
+		}
+		if parent.IsUser {
+			return parent.TimestampMs
+		}
+		parentUuid = parent.ParentUuid
+	}
+	return 0
+}
+
+// ParseCodex retains quota observations independently of billable usage and measures
+// timestamped request boundaries through model response items, excluding tool execution.
 func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	var record map[string]any
 	if json.Unmarshal(data, &record) != nil {
@@ -133,11 +258,15 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 		return nil
 	}
 	if record["type"] == "turn_context" {
+		if instant, ok := timestamp(record["timestamp"]); ok && state.GenerationStartMs > 0 && state.ResponseEndMs == 0 {
+			state.GenerationStartMs = max(state.GenerationStartMs, instant)
+		}
 		if model, ok := payload["model"].(string); ok {
 			state.Model = model
 		}
 		return nil
 	}
+	updateCodexTiming(record, payload, state)
 	if payload["type"] == "thread_settings_applied" {
 		if settings := object(payload["thread_settings"]); settings != nil {
 			state.Speed = "standard"
@@ -196,6 +325,7 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	state.LastUsageSignature = signature
 	if state.SuppressingForkCopies {
 		if instant-state.ForkCopyAnchorMs < 1000 {
+			clearCodexTiming(state)
 			state.ForkCopyAnchorMs = instant
 			return nil
 		}
@@ -206,7 +336,60 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	if totals.Total() == 0 {
 		return nil
 	}
-	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, Speed: state.Speed, Totals: totals}
+	duration := int64(0)
+	if !state.IsTimingAmbiguous && state.GenerationStartMs > 0 && state.ResponseEndMs <= instant {
+		duration = domain.ReliableGenerationMs(state.ResponseEndMs-state.GenerationStartMs, output)
+	}
+	if state.IsTimingAmbiguous {
+		state.GenerationStartMs = 0
+	} else {
+		state.GenerationStartMs = state.NextGenerationMs
+	}
+	state.ResponseEndMs, state.NextGenerationMs, state.IsTimingAmbiguous = 0, 0, false
+	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, Speed: state.Speed, Totals: totals, GenerationMs: duration}
+}
+
+// clearCodexTiming invalidates timing when a turn ends or fails.
+func clearCodexTiming(state *CodexState) {
+	state.GenerationStartMs, state.ResponseEndMs, state.NextGenerationMs, state.IsTimingAmbiguous = 0, 0, 0, false
+}
+
+// updateCodexTiming preserves a finished response while tool outputs establish the next request.
+// Usage emitted after a tool result belongs to the preceding model response, not the tool wait.
+func updateCodexTiming(record, payload map[string]any, state *CodexState) {
+	kind := text(payload["type"])
+	if text(record["type"]) == "turn_aborted" || kind == "turn_aborted" || kind == "error" || kind == "task_complete" || kind == "turn_complete" {
+		clearCodexTiming(state)
+		return
+	}
+	instant, ok := timestamp(record["timestamp"])
+	if !ok {
+		return
+	}
+	if kind == "task_started" || kind == "user_message" || (record["type"] == "response_item" && kind == "message" && payload["role"] == "user") {
+		clearCodexTiming(state)
+		state.GenerationStartMs = instant
+		return
+	}
+	if record["type"] != "response_item" {
+		return
+	}
+	switch kind {
+	case "function_call_output", "custom_tool_call_output":
+		if state.ResponseEndMs > 0 {
+			state.NextGenerationMs = max(state.NextGenerationMs, instant)
+		} else {
+			state.GenerationStartMs = max(state.GenerationStartMs, instant)
+		}
+	case "function_call", "custom_tool_call", "reasoning", "message":
+		if kind == "message" && payload["role"] != "assistant" {
+			return
+		}
+		if state.NextGenerationMs > 0 {
+			state.IsTimingAmbiguous = true
+		}
+		state.ResponseEndMs = max(state.ResponseEndMs, instant)
+	}
 }
 
 // codexQuota maps positional log windows to their live probe identities.
