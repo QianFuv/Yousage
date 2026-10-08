@@ -31,9 +31,6 @@
     conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg)
       top / 0.75rem 51% repeat-x;
 }
-.receipt-shadow {
-  filter: drop-shadow(0 12px 22px rgb(0 0 0 / 0.22));
-}
 .receipt-paper * {
   box-sizing: border-box;
 }

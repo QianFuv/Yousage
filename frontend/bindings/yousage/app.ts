@@ -171,10 +171,10 @@ export function GetLossReport(days: number, timeZone: string): $CancellablePromi
 }
 
 /**
- * GetReceipt returns a local calendar receipt using the Usage pricing pipeline.
+ * GetReceipt returns a local trailing-window receipt using the Usage pricing pipeline.
  */
-export function GetReceipt(period: string, date: string, timeZone: string, dayStartHour: number): $CancellablePromise<service$0.Receipt> {
-    return $Call.ByID(2732409345, period, date, timeZone, dayStartHour).then(($result: any) => {
+export function GetReceipt(days: number, timeZone: string): $CancellablePromise<service$0.Receipt> {
+    return $Call.ByID(2732409345, days, timeZone).then(($result: any) => {
         return $$createType10($result);
     });
 }

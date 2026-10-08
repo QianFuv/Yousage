@@ -47,6 +47,7 @@ import {
 import { InlineButton } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import type { EnvironmentUsageStatus } from "./data";
 import type { UsageProviderKind } from "./contracts";
+import { ReceiptButton } from "../receipt/ReceiptButton";
 
 /** Reuse the harness mark without treating model identity as a globally unique key. */
 function ProviderMark({
@@ -123,11 +124,14 @@ export function UsageStatsPanel({
       <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
-              {metric === "cost"
-                ? formatUsd(merged.costUsd)
-                : formatTokens(merged.totalTokens)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
+                {metric === "cost"
+                  ? formatUsd(merged.costUsd)
+                  : formatTokens(merged.totalTokens)}
+              </span>
+              <ReceiptButton />
+            </div>
             <span className="text-xs text-muted-foreground">
               {t(
                 merged.sessions === 1

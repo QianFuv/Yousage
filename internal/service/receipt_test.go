@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 	"yousage/internal/accounting"
@@ -11,45 +13,55 @@ import (
 	"yousage/internal/remote"
 )
 
-// TestReceiptShiftedDayFiltersAndNavigation prices the exact interval across midnight.
-func TestReceiptShiftedDayFiltersAndNavigation(test *testing.T) {
-	service := testService(test)
-	ctx := context.Background()
-	now := time.Date(2026, 10, 9, 3, 0, 0, 0, time.UTC)
-	service.Now = func() time.Time { return now }
-	start := time.Date(2026, 10, 8, 4, 0, 0, 0, time.UTC)
-	end := start.AddDate(0, 0, 1)
-	records := []domain.Record{}
-	for index, instant := range []time.Time{start.Add(-time.Millisecond), start, end.Add(-2 * time.Hour), end.Add(-time.Millisecond), end} {
-		cost := float64(index + 1)
-		records = append(records, domain.Record{Provider: domain.Codex, Model: "reported", SessionId: "shared", TimestampMs: instant.UnixMilli(), Speed: "standard", ReportedCostUsd: &cost, Totals: domain.Tokens{OutputTokens: 1}})
-	}
-	seedReportRecords(test, service, records)
-	receipt, err := service.Receipt(ctx, "day", "2026-10-08", "UTC", 4)
-	if err != nil || receipt.TotalUsd != 5 || receipt.Tokens != 2 || receipt.ActiveDays != 1 || receipt.DayStartHour != 4 || receipt.StartsAtMs != start.UnixMilli() || receipt.EndsAtMs != end.UnixMilli() || receipt.PreviousDate != "2026-10-07" || receipt.NextDate != "" {
-		test.Fatal(receipt, err)
-	}
-	now = end.Add(time.Hour)
-	receipt, err = service.Receipt(ctx, "day", "2026-10-08", "UTC", 4)
-	if err != nil || receipt.TotalUsd != 9 || receipt.Tokens != 3 || receipt.ActiveDays != 1 || receipt.Sessions != 1 || receipt.NextDate != "2026-10-09" {
-		test.Fatal(receipt, err)
-	}
-	window := accounting.Window{TimeZone: "UTC", Resolution: "hour", SinceDay: "2026-10-08", UntilDay: "2026-10-09", SinceTimeMs: start.UnixMilli(), UntilTimeMs: end.UnixMilli()}
-	aggregate, err := accounting.Aggregate(records, accounting.AggregateOptions{Window: window})
-	total := 0.0
-	for _, bucket := range aggregate.Buckets {
-		total += bucket.CostUsd
-	}
-	if err != nil || total != receipt.TotalUsd {
-		test.Fatal("exact-range Usage pricing differs", total, receipt.TotalUsd, err)
-	}
-	month, err := service.Receipt(ctx, "month", "2026-10", "UTC", 4)
-	if err != nil || month.StartsAtMs != time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC).UnixMilli() || month.EndsAtMs != time.Date(2026, 11, 1, 4, 0, 0, 0, time.UTC).UnixMilli() || month.ActiveDays != 3 {
-		test.Fatal("shifted month", month, err)
-	}
-	for _, hour := range []int{-1, 24} {
-		if _, err := service.Receipt(ctx, "day", "2026-10-08", "UTC", hour); err == nil {
-			test.Fatal("invalid hour accepted", hour)
+// TestReceiptTrailingWindows prices the exact covered interval and counts local active days.
+func TestReceiptTrailingWindows(test *testing.T) {
+	for _, days := range []int{1, 7, 30, 90} {
+		for _, zone := range []string{"UTC", "Asia/Shanghai", "America/New_York"} {
+			service := testService(test)
+			ctx := context.Background()
+			now := time.Date(2026, 10, 9, 14, 5, 37, 0, time.UTC)
+			service.Now = func() time.Time { return now }
+			window, _ := accounting.BuildWindow(now, days, zone)
+			start, _ := time.ParseInLocation(time.DateOnly, window.SinceDay, accounting.Location(zone))
+			end := now
+			if days == 1 {
+				start, end = time.UnixMilli(window.SinceTimeMs), time.UnixMilli(window.UntilTimeMs)
+			}
+			records := []domain.Record{}
+			for index, instant := range []time.Time{start.Add(-time.Millisecond), start, end.Add(-time.Millisecond), end, now.Add(time.Hour)} {
+				cost := float64(index + 1)
+				records = append(records, domain.Record{Provider: domain.Codex, Model: "reported", SessionId: "shared", TimestampMs: instant.UnixMilli(), Speed: "standard", ReportedCostUsd: &cost, Totals: domain.Tokens{OutputTokens: 1}})
+			}
+			seedReportRecords(test, service, records)
+			receipt, err := service.Receipt(ctx, days, zone)
+			if err != nil || receipt.TotalUsd != 5 || receipt.Tokens != 2 || receipt.Sessions != 1 || receipt.StartsAtMs != start.UnixMilli() || receipt.EndsAtMs != end.UnixMilli() || receipt.Days != days || receipt.Window != window {
+				test.Fatal(days, zone, receipt, err)
+			}
+			activeDays := 1
+			if start.In(accounting.Location(zone)).Format(time.DateOnly) != end.Add(-time.Millisecond).In(accounting.Location(zone)).Format(time.DateOnly) {
+				activeDays = 2
+			}
+			if receipt.ActiveDays != activeDays || receipt.FirstAtMs == nil || *receipt.FirstAtMs != start.UnixMilli() || receipt.LastAtMs == nil || *receipt.LastAtMs != end.Add(-time.Millisecond).UnixMilli() {
+				test.Fatal(days, zone, receipt)
+			}
+			expectedNumber := strings.ReplaceAll(window.UntilDay, "-", "") + fmt.Sprintf("-%dD", days)
+			if days == 1 {
+				expectedNumber = end.In(accounting.Location(zone)).Format("200601021504") + "-24H"
+			}
+			if receipt.Number != expectedNumber {
+				test.Fatal(receipt.Number, expectedNumber)
+			}
+			covered := window
+			covered.SinceTimeMs, covered.UntilTimeMs = start.UnixMilli(), end.UnixMilli()
+			aggregate, err := accounting.Aggregate(records, accounting.AggregateOptions{Window: covered})
+			total := 0.0
+			for _, bucket := range aggregate.Buckets {
+				total += bucket.CostUsd
+			}
+			if err != nil || total != receipt.TotalUsd {
+				test.Fatal("Usage pricing differs", total, receipt.TotalUsd, err)
+			}
+			assertQrFinderPatterns(test, receipt.QrModules)
 		}
 	}
 }
@@ -109,11 +121,13 @@ func TestReceiptMatchesUsageAndSubscriptionSplit(t *testing.T) {
 	if _, err := service.Store.WriteSetting(ctx, "local-quotas", 0, quotaSnapshot{Providers: []remote.Provider{provider}}); err != nil {
 		t.Fatal(err)
 	}
-	receipt, err := service.Receipt(ctx, "day", "2026-10-06", "UTC", 0)
+	receipt, err := service.Receipt(ctx, 7, "UTC")
 	if err != nil {
 		t.Fatal(err)
 	}
-	window, _ := accounting.BuildReceiptWindow(now, "day", "2026-10-06", "UTC", 0)
+	window, _ := accounting.BuildWindow(now, 7, "UTC")
+	start, _ := time.ParseInLocation(time.DateOnly, window.SinceDay, time.UTC)
+	window.SinceTimeMs, window.UntilTimeMs = start.UnixMilli(), now.UnixMilli()
 	summary, err := service.localSummary(ctx, window)
 	if err != nil {
 		t.Fatal(err)
@@ -130,14 +144,14 @@ func TestReceiptMatchesUsageAndSubscriptionSplit(t *testing.T) {
 	if math.Abs(receipt.SubscriptionUsd-0.26) > 1e-12 || math.Abs(receipt.PaidUsd-(receipt.TotalUsd-0.26)) > 1e-12 {
 		t.Fatalf("subscription split: %+v", receipt)
 	}
-	if receipt.FirstAtMs == nil || *receipt.FirstAtMs != records[3].TimestampMs || receipt.LastAtMs == nil || *receipt.LastAtMs != records[0].TimestampMs || receipt.NextDate != "" || receipt.PreviousDate != "2026-10-05" {
+	if receipt.FirstAtMs == nil || *receipt.FirstAtMs != records[3].TimestampMs || receipt.LastAtMs == nil || *receipt.LastAtMs != records[0].TimestampMs {
 		t.Fatal(receipt)
 	}
 	if len(receipt.Items) != 4 || receipt.Items[0].Provider != "cursor" || !receipt.Items[1].IsSubscription {
 		t.Fatal(receipt.Items)
 	}
 	assertQrFinderPatterns(t, receipt.QrModules)
-	if receipt.QrText != "YOUSAGE 2026-10-06\nAPI $3.30 PAID $3.04\n202.03K TOKENS 3 SESSIONS" {
+	if receipt.QrText != "YOUSAGE 7D 2026-09-30..2026-10-06\nAPI $3.30 PAID $3.04\n202.03K TOKENS 3 SESSIONS" {
 		t.Fatal(receipt.QrText)
 	}
 }
@@ -170,14 +184,20 @@ func assertQrFinderPatterns(t *testing.T, rows []string) {
 	}
 }
 
-func TestEmptyReceiptAndNavigation(t *testing.T) {
+// TestEmptyReceiptTrailingWindows keeps an empty receipt renderable for every supported period.
+func TestEmptyReceiptTrailingWindows(t *testing.T) {
 	service := testService(t)
-	for _, test := range []struct{ period, date, previous, next string }{{"day", "2026-07-09", "", "2026-07-10"}, {"month", "2026-07", "", "2026-08"}, {"month", "2026-10", "2026-09", ""}} {
-		result, err := service.Receipt(context.Background(), test.period, test.date, "UTC", 0)
-		if err != nil || result.Items == nil || len(result.Items) != 0 || result.Tokens != 0 || result.TotalUsd != 0 || result.FirstAtMs != nil || result.LastAtMs != nil || result.PreviousDate != test.previous || result.NextDate != test.next {
-			t.Fatalf("empty/navigation: %+v %v", result, err)
+	for _, days := range []int{1, 7, 30, 90} {
+		result, err := service.Receipt(context.Background(), days, "UTC")
+		if err != nil || result.Items == nil || len(result.Items) != 0 || result.Tokens != 0 || result.TotalUsd != 0 || result.FirstAtMs != nil || result.LastAtMs != nil || result.ActiveDays != 0 {
+			t.Fatal(result, err)
 		}
 		assertQrFinderPatterns(t, result.QrModules)
+	}
+	for _, days := range []int{0, 2, 31} {
+		if _, err := service.Receipt(context.Background(), days, "UTC"); err == nil {
+			t.Fatal("invalid period accepted", days)
+		}
 	}
 }
 

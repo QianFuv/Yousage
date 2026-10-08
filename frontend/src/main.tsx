@@ -40,7 +40,6 @@ import {
   InfoIcon,
   PaletteIcon,
   PlugIcon,
-  ReceiptTextIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
   TagsIcon,
@@ -70,11 +69,6 @@ const SourcesPanel = lazy(() =>
 const DiagnosticsPanel = lazy(() =>
   import("./settings/DiagnosticsPanel").then((module) => ({
     default: module.DiagnosticsPanel,
-  })),
-);
-const ReceiptPage = lazy(() =>
-  import("./receipt/ReceiptPage").then((module) => ({
-    default: module.ReceiptPage,
   })),
 );
 const LossPage = lazy(() =>
@@ -229,11 +223,8 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
         navigate("quota");
       } else if ((event.ctrlKey || event.metaKey) && event.key === "3") {
         event.preventDefault();
-        navigate("receipts");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "4") {
-        event.preventDefault();
         navigate("loss");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "5") {
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "4") {
         event.preventDefault();
         navigate("speed");
       } else if (
@@ -360,23 +351,16 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
                 onClick={() => navigate("quota")}
               />
               <NavItem
-                icon={ReceiptTextIcon}
-                label={t("Receipts")}
-                title={`${t("Receipts")} (Ctrl+3)`}
-                isCurrent={route === "receipts"}
-                onClick={() => navigate("receipts")}
-              />
-              <NavItem
                 icon={FlameIcon}
                 label={t("Loss")}
-                title={`${t("Loss")} (Ctrl+4)`}
+                title={`${t("Loss")} (Ctrl+3)`}
                 isCurrent={route === "loss"}
                 onClick={() => navigate("loss")}
               />
               <NavItem
                 icon={TimerIcon}
                 label={t("Speed")}
-                title={`${t("Speed")} (Ctrl+5)`}
+                title={`${t("Speed")} (Ctrl+4)`}
                 isCurrent={route === "speed"}
                 onClick={() => navigate("speed")}
               />
@@ -410,11 +394,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
           />
         </div>
         <Suspense fallback={null}>
-          {visitedPages.has("receipts") && (
-            <div hidden={route !== "receipts"}>
-              <ReceiptPage isActive={route === "receipts"} />
-            </div>
-          )}
           {visitedPages.has("loss") && (
             <div hidden={route !== "loss"}>
               <LossPage isActive={route === "loss"} />
@@ -517,7 +496,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
 }
 
 /** Top-level pages outside Settings. */
-type PageRoute = "statistics" | "quota" | "receipts" | "loss" | "speed";
+type PageRoute = "statistics" | "quota" | "loss" | "speed";
 
 /** Settings destinations in sidebar order. */
 type SettingsSection =

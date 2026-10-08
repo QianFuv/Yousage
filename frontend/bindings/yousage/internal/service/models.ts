@@ -167,7 +167,7 @@ export class EnvironmentState {
 }
 
 /**
- * LossDay includes every calendar day in a report, even when no loss was observed.
+ * LossDay includes every daily or hourly bucket, even when no loss was observed.
  */
 export class LossDay {
     "day": string;
@@ -485,14 +485,13 @@ export class ProviderDetection {
 }
 
 /**
- * Receipt presents a local calendar period with the same pricing as Usage.
+ * Receipt presents a local trailing window with the same pricing as Usage.
  */
 export class Receipt {
+    "days": number;
+    "window": accounting$0.Window;
     "startsAtMs": number;
     "endsAtMs": number;
-    "dayStartHour": number;
-    "period": string;
-    "label": string;
     "number": string;
     "timeZone": string;
     "sinceDay": string;
@@ -508,27 +507,22 @@ export class Receipt {
     "activeDays": number;
     "firstAtMs": number | null;
     "lastAtMs": number | null;
-    "previousDate": string;
-    "nextDate": string;
     "qrText": string;
     "qrModules": string[];
 
     /** Creates a new Receipt instance. */
     constructor($$source: Partial<Receipt> = {}) {
+        if (!("days" in $$source)) {
+            this["days"] = 0;
+        }
+        if (!("window" in $$source)) {
+            this["window"] = (new accounting$0.Window());
+        }
         if (!("startsAtMs" in $$source)) {
             this["startsAtMs"] = 0;
         }
         if (!("endsAtMs" in $$source)) {
             this["endsAtMs"] = 0;
-        }
-        if (!("dayStartHour" in $$source)) {
-            this["dayStartHour"] = 0;
-        }
-        if (!("period" in $$source)) {
-            this["period"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
         }
         if (!("number" in $$source)) {
             this["number"] = "";
@@ -575,12 +569,6 @@ export class Receipt {
         if (!("lastAtMs" in $$source)) {
             this["lastAtMs"] = null;
         }
-        if (!("previousDate" in $$source)) {
-            this["previousDate"] = "";
-        }
-        if (!("nextDate" in $$source)) {
-            this["nextDate"] = "";
-        }
         if (!("qrText" in $$source)) {
             this["qrText"] = "";
         }
@@ -595,14 +583,18 @@ export class Receipt {
      * Creates a new Receipt instance from a string or object.
      */
     static createFrom($$source: any = {}): Receipt {
-        const $$createField9_0 = $$createType22;
-        const $$createField23_0 = $$createType23;
+        const $$createField1_0 = $$createType13;
+        const $$createField8_0 = $$createType22;
+        const $$createField20_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("window" in $$parsedSource) {
+            $$parsedSource["window"] = $$createField1_0($$parsedSource["window"]);
+        }
         if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField9_0($$parsedSource["items"]);
+            $$parsedSource["items"] = $$createField8_0($$parsedSource["items"]);
         }
         if ("qrModules" in $$parsedSource) {
-            $$parsedSource["qrModules"] = $$createField23_0($$parsedSource["qrModules"]);
+            $$parsedSource["qrModules"] = $$createField20_0($$parsedSource["qrModules"]);
         }
         return new Receipt($$parsedSource as Partial<Receipt>);
     }
@@ -861,8 +853,7 @@ export class SpeedModel {
 /**
  * SpeedReport summarizes inclusive output throughput from local retained request facts.
  * OpenCode uses native assistant creation/completion times; Codex uses explicit request
- * boundaries and model response timestamps, excluding intervening tool execution; Claude
- * runs from the prompt or tool result that started a message to its final content block.
+ * boundaries and model response timestamps, excluding intervening tool execution.
  * These elapsed intervals include time to first token. Missing, nonpositive, over-ten-minute
  * and implausibly fast intervals are unmeasured; providers without reliable timing stay unmeasured.
  */

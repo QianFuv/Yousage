@@ -21,7 +21,6 @@ type WindowBounds struct {
 	Maximized bool `json:"maximized"`
 }
 type Display struct {
-	ReceiptDayStartHour int     `json:"receiptDayStartHour"`
 	Density             string  `json:"density"`
 	Zoom                float64 `json:"zoom"`
 	Metric              string  `json:"metric"`
@@ -64,9 +63,6 @@ func Defaults() Display {
 }
 
 func (display Display) Validate() error {
-	if display.ReceiptDayStartHour < 0 || display.ReceiptDayStartHour > 23 {
-		return errors.New("receipt day start hour must be between 0 and 23")
-	}
 	if display.Density != "comfortable" && display.Density != "compact" {
 		return errors.New("invalid density")
 	}

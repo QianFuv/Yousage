@@ -12,32 +12,29 @@ import (
 	"yousage/internal/remote"
 )
 
-// Receipt presents a local calendar period with the same pricing as Usage.
+// Receipt presents a local trailing window with the same pricing as Usage.
 type Receipt struct {
-	StartsAtMs      int64         `json:"startsAtMs"`
-	EndsAtMs        int64         `json:"endsAtMs"`
-	DayStartHour    int           `json:"dayStartHour"`
-	Period          string        `json:"period"`
-	Label           string        `json:"label"`
-	Number          string        `json:"number"`
-	TimeZone        string        `json:"timeZone"`
-	SinceDay        string        `json:"sinceDay"`
-	UntilDay        string        `json:"untilDay"`
-	Items           []ReceiptItem `json:"items"`
-	TotalUsd        float64       `json:"totalUsd"`
-	SubscriptionUsd float64       `json:"subscriptionUsd"`
-	PaidUsd         float64       `json:"paidUsd"`
-	Tokens          int64         `json:"tokens"`
-	Sessions        int           `json:"sessions"`
-	CacheSavingsUsd float64       `json:"cacheSavingsUsd"`
-	UnpricedRecords int           `json:"unpricedRecords"`
-	ActiveDays      int           `json:"activeDays"`
-	FirstAtMs       *int64        `json:"firstAtMs"`
-	LastAtMs        *int64        `json:"lastAtMs"`
-	PreviousDate    string        `json:"previousDate"`
-	NextDate        string        `json:"nextDate"`
-	QrText          string        `json:"qrText"`
-	QrModules       []string      `json:"qrModules"`
+	Days            int               `json:"days"`
+	Window          accounting.Window `json:"window"`
+	StartsAtMs      int64             `json:"startsAtMs"`
+	EndsAtMs        int64             `json:"endsAtMs"`
+	Number          string            `json:"number"`
+	TimeZone        string            `json:"timeZone"`
+	SinceDay        string            `json:"sinceDay"`
+	UntilDay        string            `json:"untilDay"`
+	Items           []ReceiptItem     `json:"items"`
+	TotalUsd        float64           `json:"totalUsd"`
+	SubscriptionUsd float64           `json:"subscriptionUsd"`
+	PaidUsd         float64           `json:"paidUsd"`
+	Tokens          int64             `json:"tokens"`
+	Sessions        int               `json:"sessions"`
+	CacheSavingsUsd float64           `json:"cacheSavingsUsd"`
+	UnpricedRecords int               `json:"unpricedRecords"`
+	ActiveDays      int               `json:"activeDays"`
+	FirstAtMs       *int64            `json:"firstAtMs"`
+	LastAtMs        *int64            `json:"lastAtMs"`
+	QrText          string            `json:"qrText"`
+	QrModules       []string          `json:"qrModules"`
 }
 
 // ReceiptItem combines a provider/model's priced and unpriced usage.
@@ -51,13 +48,28 @@ type ReceiptItem struct {
 }
 
 // Receipt returns only local facts, without contacting remote environments or probing accounts.
-func (service *Service) Receipt(ctx context.Context, period, date, timeZone string, dayStartHour int) (Receipt, error) {
+func (service *Service) Receipt(ctx context.Context, days int, timeZone string) (Receipt, error) {
 	now := service.Now()
-	window, err := accounting.BuildReceiptWindow(now, period, date, timeZone, dayStartHour)
+	window, err := accounting.BuildWindow(now, days, timeZone)
 	if err != nil {
 		return Receipt{}, err
 	}
-	summary, err := service.localSummary(ctx, window)
+	start := time.UnixMilli(window.SinceTimeMs)
+	end := time.UnixMilli(window.UntilTimeMs)
+	period := "24H"
+	number := end.In(accounting.Location(window.TimeZone)).Format("200601021504") + "-24H"
+	if window.Resolution != "hour" {
+		start, err = time.ParseInLocation(time.DateOnly, window.SinceDay, accounting.Location(window.TimeZone))
+		if err != nil {
+			return Receipt{}, err
+		}
+		end = now
+		period = fmt.Sprintf("%dD", days)
+		number = strings.ReplaceAll(window.UntilDay, "-", "") + "-" + period
+	}
+	covered := window
+	covered.SinceTimeMs, covered.UntilTimeMs = start.UnixMilli(), end.UnixMilli()
+	summary, err := service.localSummary(ctx, covered)
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -66,20 +78,21 @@ func (service *Service) Receipt(ctx context.Context, period, date, timeZone stri
 		return Receipt{}, err
 	}
 	result := receiptFromSummary(summary, subscriptionProviders(config))
-	result.Period, result.Label, result.Number = period, date, strings.ReplaceAll(date, "-", "")
+	result.Days, result.Window, result.Number = days, window, number
 	result.TimeZone, result.SinceDay, result.UntilDay = window.TimeZone, window.SinceDay, window.UntilDay
+	result.StartsAtMs, result.EndsAtMs = covered.SinceTimeMs, covered.UntilTimeMs
 	entries, _, err := service.sourceIndex(ctx)
 	if err != nil {
 		return result, err
 	}
-	_, records, err := service.localHistoryRecordsBetween(ctx, entries, windowStart(window).Add(-36*time.Hour), time.UnixMilli(window.SinceTimeMs), now, false)
+	_, records, err := service.localHistoryRecordsBetween(ctx, entries, windowStart(window).Add(-36*time.Hour), start, now, false)
 	if err != nil {
 		return result, err
 	}
-	sessions := map[string]bool{}
+	sessions, active := map[string]bool{}, map[string]bool{}
 	for _, sourceRecords := range records {
 		for _, record := range sourceRecords {
-			if record.IsQuotaOnly || record.ErrorKind != "" || record.TimestampMs < window.SinceTimeMs || record.TimestampMs >= window.UntilTimeMs {
+			if record.IsQuotaOnly || record.ErrorKind != "" || record.TimestampMs < result.StartsAtMs || record.TimestampMs >= result.EndsAtMs {
 				continue
 			}
 			if record.SessionId != "" {
@@ -93,47 +106,11 @@ func (service *Service) Receipt(ctx context.Context, period, date, timeZone stri
 				instant := record.TimestampMs
 				result.LastAtMs = &instant
 			}
+			active[time.UnixMilli(record.TimestampMs).In(accounting.Location(window.TimeZone)).Format(time.DateOnly)] = true
 		}
 	}
-	result.Sessions = len(sessions)
-	active := map[string]bool{}
-	for _, sourceRecords := range records {
-		for _, record := range sourceRecords {
-			if record.IsQuotaOnly || record.ErrorKind != "" || record.TimestampMs < window.SinceTimeMs || record.TimestampMs >= window.UntilTimeMs {
-				continue
-			}
-			local := time.UnixMilli(record.TimestampMs).In(accounting.Location(window.TimeZone))
-			boundary := time.Date(local.Year(), local.Month(), local.Day(), dayStartHour, 0, 0, 0, local.Location())
-			if local.Before(boundary) {
-				local = local.AddDate(0, 0, -1)
-			}
-			active[local.Format(time.DateOnly)] = true
-		}
-	}
-	result.ActiveDays = len(active)
-	layout := time.DateOnly
-	if period == "month" {
-		layout = "2006-01"
-	}
-	current, _ := time.ParseInLocation(layout, date, accounting.Location(window.TimeZone))
-	start := time.Date(current.Year(), current.Month(), current.Day(), dayStartHour, 0, 0, 0, current.Location())
-	end := current.AddDate(0, 0, 1)
-	if period == "month" {
-		end = current.AddDate(0, 1, 0)
-	}
-	end = time.Date(end.Year(), end.Month(), end.Day(), dayStartHour, 0, 0, 0, end.Location())
-	result.StartsAtMs, result.EndsAtMs, result.DayStartHour = start.UnixMilli(), end.UnixMilli(), dayStartHour
-	previous, next := current.AddDate(0, 0, -1), current.AddDate(0, 0, 1)
-	if period == "month" {
-		previous, next = current.AddDate(0, -1, 0), current.AddDate(0, 1, 0)
-	}
-	if _, err := accounting.BuildReceiptWindow(now, period, previous.Format(layout), timeZone, dayStartHour); err == nil {
-		result.PreviousDate = previous.Format(layout)
-	}
-	if _, err := accounting.BuildReceiptWindow(now, period, next.Format(layout), timeZone, dayStartHour); err == nil {
-		result.NextDate = next.Format(layout)
-	}
-	result.QrText = fmt.Sprintf("YOUSAGE %s\nAPI $%.2f PAID $%.2f\n%s TOKENS %d SESSIONS", date, result.TotalUsd, result.PaidUsd, receiptTokenLabel(result.Tokens), result.Sessions)
+	result.Sessions, result.ActiveDays = len(sessions), len(active)
+	result.QrText = fmt.Sprintf("YOUSAGE %s %s..%s\nAPI $%.2f PAID $%.2f\n%s TOKENS %d SESSIONS", period, window.SinceDay, window.UntilDay, result.TotalUsd, result.PaidUsd, receiptTokenLabel(result.Tokens), result.Sessions)
 	code, err := qr.Encode(result.QrText, qr.L)
 	if err != nil {
 		return result, err
@@ -175,6 +152,7 @@ func subscriptionProviders(config remote.Config) map[string]bool {
 	return result
 }
 
+// receiptFromSummary combines priced buckets and subscription coverage.
 func receiptFromSummary(summary remote.Summary, subscriptions map[string]bool) Receipt {
 	result := Receipt{Items: []ReceiptItem{}}
 	items := map[string]*ReceiptItem{}
