@@ -35,10 +35,12 @@ import {
   ArrowLeftIcon,
   BarChart3Icon,
   ChartNoAxesCombinedIcon,
+  FlameIcon,
   GaugeIcon,
   InfoIcon,
   PaletteIcon,
   PlugIcon,
+  ReceiptTextIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
   TagsIcon,
@@ -67,6 +69,16 @@ const SourcesPanel = lazy(() =>
 const DiagnosticsPanel = lazy(() =>
   import("./settings/DiagnosticsPanel").then((module) => ({
     default: module.DiagnosticsPanel,
+  })),
+);
+const ReceiptPage = lazy(() =>
+  import("./receipt/ReceiptPage").then((module) => ({
+    default: module.ReceiptPage,
+  })),
+);
+const LossPage = lazy(() =>
+  import("./loss/LossPage").then((module) => ({
+    default: module.LossPage,
   })),
 );
 const PricingPanel = lazy(() =>
@@ -120,11 +132,12 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       setPricingState({ isDirty, isPending }),
     [],
   );
-  const [route, setRoute] = useState<"quota" | "statistics" | "settings">(
-    "statistics",
-  );
+  const [route, setRoute] = useState<PageRoute | "settings">("statistics");
   const [section, setSection] = useState<SettingsSection>("appearance");
-  const usageRoute = useRef<"quota" | "statistics">("statistics");
+  const usageRoute = useRef<PageRoute>("statistics");
+  const [visitedPages, setVisitedPages] = useState<Set<PageRoute>>(
+    () => new Set(),
+  );
   const [visitedSections, setVisitedSections] = useState<Set<string>>(
     () => new Set(),
   );
@@ -136,7 +149,10 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
     (nextRoute: typeof route, nextSection = section) => {
       const identity = route === "settings" ? `settings:${section}` : route;
       positions.current[identity] = content.current?.scrollTop ?? 0;
-      if (nextRoute !== "settings") usageRoute.current = nextRoute;
+      if (nextRoute !== "settings") {
+        usageRoute.current = nextRoute;
+        setVisitedPages((current) => new Set([...current, nextRoute]));
+      }
       if (nextRoute === "settings")
         setVisitedSections((current) => new Set([...current, nextSection]));
       setSection(nextSection);
@@ -205,6 +221,12 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       } else if ((event.ctrlKey || event.metaKey) && event.key === "2") {
         event.preventDefault();
         navigate("quota");
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "3") {
+        event.preventDefault();
+        navigate("receipts");
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "4") {
+        event.preventDefault();
+        navigate("loss");
       } else if (
         (event.ctrlKey || event.metaKey) &&
         event.altKey &&
@@ -328,6 +350,20 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
                 isCurrent={route === "quota"}
                 onClick={() => navigate("quota")}
               />
+              <NavItem
+                icon={ReceiptTextIcon}
+                label={t("Receipts")}
+                title={`${t("Receipts")} (Ctrl+3)`}
+                isCurrent={route === "receipts"}
+                onClick={() => navigate("receipts")}
+              />
+              <NavItem
+                icon={FlameIcon}
+                label={t("Loss")}
+                title={`${t("Loss")} (Ctrl+4)`}
+                isCurrent={route === "loss"}
+                onClick={() => navigate("loss")}
+              />
             </div>
             <div className="sidebar-footer">
               <NavItem
@@ -347,9 +383,9 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
         tabIndex={-1}
         aria-label={t("Page content")}
       >
-        <div hidden={route === "settings"}>
+        <div hidden={route !== "statistics" && route !== "quota"}>
           <UsagePage
-            isActive={route !== "settings"}
+            isActive={route === "statistics" || route === "quota"}
             view={route === "statistics" ? "statistics" : "limits"}
             onSettings={(next, model) => {
               if (model) setPriceModel(model);
@@ -357,6 +393,18 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
             }}
           />
         </div>
+        <Suspense fallback={null}>
+          {visitedPages.has("receipts") && (
+            <div hidden={route !== "receipts"}>
+              <ReceiptPage isActive={route === "receipts"} />
+            </div>
+          )}
+          {visitedPages.has("loss") && (
+            <div hidden={route !== "loss"}>
+              <LossPage isActive={route === "loss"} />
+            </div>
+          )}
+        </Suspense>
         <Suspense
           fallback={
             <p className="p-6 text-sm text-muted-foreground" role="status">
@@ -446,6 +494,9 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
     </div>
   );
 }
+
+/** Top-level pages outside Settings. */
+type PageRoute = "statistics" | "quota" | "receipts" | "loss";
 
 /** Settings destinations in sidebar order. */
 type SettingsSection =
