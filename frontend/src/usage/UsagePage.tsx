@@ -9,7 +9,11 @@ import {
   usesChatGptSharing,
   type LimitPresentations,
 } from "@t3tools/shared/usageLimits";
-import { UsageLimitsPooled } from "../../vendor/UsageLimitsPooled";
+const UsageLimitsPooled = lazy(() =>
+  import("../../vendor/UsageLimitsPooled").then((module) => ({
+    default: module.UsageLimitsPooled,
+  })),
+);
 const UsageStatsPanel = lazy(() =>
   import("./UsageStatsPanel").then((module) => ({
     default: module.UsageStatsPanel,
@@ -289,12 +293,14 @@ export function UsagePage({
           </div>
         )}
         {metric === "limits" ? (
-          <UsageLimitsPooled
-            presentations={presentations}
-            now={limitsNow}
-            cursorPrompt={cursorPrompt}
-            cycleValues={indexCycleValues(selected)}
-          />
+          <Suspense fallback={null}>
+            <UsageLimitsPooled
+              presentations={presentations}
+              now={limitsNow}
+              cursorPrompt={cursorPrompt}
+              cycleValues={indexCycleValues(selected)}
+            />
+          </Suspense>
         ) : (
           usageWindow && (
             <>
