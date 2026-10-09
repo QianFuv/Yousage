@@ -403,7 +403,7 @@ export function UsageStatsPanel({
                           )}
                         </td>
                         <td className="hidden py-2.5 pl-6 sm:table-cell">
-                          {share === null ? "" : formatPercent(share)}
+                          {share === null ? "—" : formatPercent(share)}
                         </td>
                         <td className="py-2.5 pl-6">
                           {formatTokens(model.totalTokens)}

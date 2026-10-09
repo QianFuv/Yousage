@@ -7,7 +7,7 @@ import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
-import { Notice, PageBody, PageHeader } from "../ui";
+import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { msg, t } from "../i18n";
 import { useData } from "../usage/controller";
 import type { UsageProviderKind } from "../usage/contracts";
@@ -22,8 +22,29 @@ import type {
 } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
 
-/** Ink of the relative speed bars, and of chart lines without a provider color. */
+/** Color of models without a provider color, in the chart and the speed bars. */
 const LINE_COLOR = "var(--foreground)";
+
+/** Provider color share by rank within one provider; their count caps the chart. */
+const CHART_SHADES = [100, 62, 34] as const;
+
+/**
+ * Line color of a charted model: its provider color, lighter for each more used model of the same provider.
+ *
+ * @param models - The charted models, by token usage.
+ * @param index - Position of the model to color.
+ * @returns A CSS color.
+ */
+function chartColor(models: readonly SpeedModel[], index: number): string {
+  const model = models[index];
+  const rank = models
+    .slice(0, index)
+    .filter((other) => other.provider === model.provider).length;
+  const base =
+    PROVIDER_PRESENTATION[model.provider as UsageProviderKind]?.color ??
+    LINE_COLOR;
+  return `color-mix(in oklab, ${base} ${CHART_SHADES[rank]}%, var(--background))`;
+}
 
 /** Labels of the faster billing tiers; standard rows carry no badge. */
 const TIER_LABELS: Record<string, string> = {
@@ -128,23 +149,23 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
       </PageHeader>
       <PageBody>
         {error && <Notice tone="error">{error}</Notice>}
-        {report && <SpeedContent report={report} />}
+        {report ? (
+          <SpeedContent report={report} />
+        ) : (
+          !error && <EmptyState>{t("Loading speed statistics…")}</EmptyState>
+        )}
       </PageBody>
     </section>
   );
 }
 
 /**
- * Summary, trend chart of the selected model and the per-model table.
+ * Summary with the charted models as legend, their trend chart and the per-model table.
  *
  * @param props - The speed report.
  * @returns The page content.
  */
 function SpeedContent({ report }: { report: SpeedReport }) {
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const selected =
-    report.models.find((model) => rowKey(model) === selectedKey) ??
-    report.models.find((model) => model.requests > 0);
   const outputTokens = report.models.reduce(
     (sum, model) => sum + model.outputTokens,
     0,
@@ -155,6 +176,9 @@ function SpeedContent({ report }: { report: SpeedReport }) {
   );
   const overall = generationMs > 0 ? (outputTokens * 1000) / generationMs : 0;
   const labels = bucketLabels(report.window);
+  const charted = report.models
+    .filter((model) => model.requests > 0)
+    .slice(0, CHART_SHADES.length);
   return (
     <div className="flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -169,20 +193,13 @@ function SpeedContent({ report }: { report: SpeedReport }) {
               })}
             </span>
           </div>
-          {selected && (
-            <div className="flex flex-col gap-1 text-sm">
-              <span className="flex min-w-0 items-center gap-2 text-foreground">
-                <ModelName model={selected} />
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {t("Median {median} · P10–P90 {low}–{high}", {
-                  median: formatSpeed(selected.medianTokensPerSecond),
-                  low: formatRate(selected.p10TokensPerSecond),
-                  high: formatRate(selected.p90TokensPerSecond),
-                })}
-              </span>
-            </div>
-          )}
+          {charted.map((model, index) => (
+            <SpeedTotal
+              key={rowKey(model)}
+              color={chartColor(charted, index)}
+              model={model}
+            />
+          ))}
           {report.unmeasuredRequests > 0 && (
             <span className="text-xs text-muted-foreground">
               {t("{count} requests have no usable timing and are excluded.", {
@@ -195,27 +212,54 @@ function SpeedContent({ report }: { report: SpeedReport }) {
           <h2 className="text-sm font-medium">
             {labels.isHourly ? t("Hourly speed") : t("Daily speed")}
           </h2>
-          {selected ? (
+          {charted.length > 0 ? (
             <SpeedChart
               buckets={report.buckets}
-              model={selected}
+              models={charted}
               reportWindow={report.window}
             />
           ) : (
-            <p className="py-16 text-center text-sm text-muted-foreground">
-              {t("No measured requests in this window.")}
-            </p>
+            <EmptyState>{t("No measured requests in this window.")}</EmptyState>
           )}
         </div>
       </section>
       <section className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-medium">{t("Models")}</h2>
-        <SpeedTable
-          models={report.models}
-          selectedKey={selected ? rowKey(selected) : null}
-          onSelect={setSelectedKey}
-        />
+        <SpeedTable models={report.models} />
       </section>
+    </div>
+  );
+}
+
+/**
+ * One charted model in the summary column, doubling as the chart legend.
+ *
+ * @param props - Line color and model row.
+ * @returns The total row.
+ */
+function SpeedTotal({ color, model }: { color: string; model: SpeedModel }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
+          <span
+            aria-hidden
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: color }}
+          />
+          <ModelName model={model} />
+        </span>
+        <span className="shrink-0 text-sm font-medium tabular-nums">
+          {formatSpeed(model.tokensPerSecond)}
+        </span>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {t("Median {median} · P10–P90 {low}–{high}", {
+          median: formatSpeed(model.medianTokensPerSecond),
+          low: formatRate(model.p10TokensPerSecond),
+          high: formatRate(model.p90TokensPerSecond),
+        })}
+      </span>
     </div>
   );
 }
@@ -250,42 +294,40 @@ function ModelName({ model }: { model: SpeedModel }) {
 }
 
 /**
- * The selected model's output rate in every bucket of the window, as a line in its provider color.
+ * Output rate of the most used measured models in every bucket of the window, each in its provider color, lighter for less used models of the same provider.
  *
  * Buckets without a measurement are drawn at zero, like idle periods on the Usage chart.
  *
- * @param props - Every bucket ascending, the selected model and the report window.
+ * @param props - Every bucket ascending, the charted models by token usage and the report window.
  * @returns The chart element.
  */
 function SpeedChart({
   buckets,
-  model,
+  models,
   reportWindow,
 }: {
   buckets: readonly SpeedBucket[];
-  model: SpeedModel;
+  models: readonly SpeedModel[];
   reportWindow: Window;
 }) {
   const labels = bucketLabels(reportWindow);
-  const key = rowKey(model);
   const entries = useMemo(
     () =>
       buckets.map((bucket) =>
-        bucket.models.find((entry) => rowKey(entry) === key),
+        models.map((model) =>
+          bucket.models.find((entry) => rowKey(entry) === rowKey(model)),
+        ),
       ),
-    [buckets, key],
+    [buckets, models],
   );
   const series = useMemo(
-    () => [
-      {
-        id: key,
-        color:
-          PROVIDER_PRESENTATION[model.provider as UsageProviderKind]?.color ??
-          LINE_COLOR,
-        values: entries.map((entry) => entry?.tokensPerSecond ?? 0),
-      },
-    ],
-    [entries, key, model.provider],
+    () =>
+      models.map((model, index) => ({
+        id: rowKey(model),
+        color: chartColor(models, index),
+        values: entries.map((row) => row[index]?.tokensPerSecond ?? 0),
+      })),
+    [entries, models],
   );
   return (
     <SeriesChart
@@ -296,64 +338,63 @@ function SpeedChart({
       formatPeriod={labels.axis}
       formatTooltipPeriod={labels.full}
       renderTooltip={(index) => {
-        const entry = entries[index];
-        if (!entry)
+        const row = entries[index];
+        if (row.every((entry) => !entry))
           return (
             <div className="text-muted-foreground">
               {t("No measured requests")}
             </div>
           );
-        return (
-          <>
-            <TooltipRow
-              label={t("Speed")}
-              value={formatSpeed(entry.tokensPerSecond)}
-            />
-            <TooltipRow
-              label={t("Requests")}
-              value={formatCount(entry.requests)}
-            />
-            <TooltipRow
-              label={t("Output")}
-              value={formatTokens(entry.outputTokens)}
-            />
-          </>
-        );
+        return models.map((model, position) => (
+          <TooltipRow
+            key={rowKey(model)}
+            color={chartColor(models, position)}
+            model={model}
+            value={formatSpeed(row[position]?.tokensPerSecond ?? 0)}
+          />
+        ));
       }}
     />
   );
 }
 
 /**
- * One line of the chart readout.
+ * One model in the chart readout: its line color, name and rate.
  *
- * @param props - Label and formatted value.
+ * @param props - Line color, model row and formatted rate.
  * @returns The readout row.
  */
-function TooltipRow({ label, value }: { label: string; value: string }) {
+function TooltipRow({
+  color,
+  model,
+  value,
+}: {
+  color: string;
+  model: SpeedModel;
+  value: string;
+}) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-foreground tabular-nums">{value}</span>
+      <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        <ModelName model={model} />
+      </span>
+      <span className="shrink-0 text-foreground tabular-nums">{value}</span>
     </div>
   );
 }
 
 /**
- * Per-model rates with a relative bar; clicking a row charts that model.
+ * Per-model rates ranked like the Usage breakdown, with a provider-colored bar of relative speed.
  *
- * @param props - Models by output volume, the charted row and a selection handler.
+ * @param props - Models by token usage.
  * @returns The model table.
  */
-function SpeedTable({
-  models,
-  selectedKey,
-  onSelect,
-}: {
-  models: readonly SpeedModel[];
-  selectedKey: string | null;
-  onSelect: (key: string) => void;
-}) {
+function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
   const fastest = Math.max(0, ...models.map((model) => model.tokensPerSecond));
   return (
     <div
@@ -364,13 +405,15 @@ function SpeedTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-right text-xs text-muted-foreground">
-            <th className="py-2 pr-6 text-left font-normal">{t("Model")}</th>
-            <th className="w-full py-2 text-left font-normal">{t("Speed")}</th>
+            <th className="py-2 pr-3 text-left font-normal">#</th>
+            <th className="w-full py-2 text-left font-normal">{t("Model")}</th>
+            <th className="py-2 pl-6 font-normal">{t("Output speed")}</th>
             <th className="py-2 pl-6 font-normal">{t("Median")}</th>
             <th className="hidden py-2 pl-6 font-normal md:table-cell">
               P10–P90
             </th>
             <th className="py-2 pl-6 font-normal">{t("Requests")}</th>
+            <th className="py-2 pl-6 font-normal">{t("Tokens")}</th>
             <th className="hidden py-2 pl-6 font-normal sm:table-cell">
               {t("Output")}
             </th>
@@ -380,47 +423,43 @@ function SpeedTable({
           {models.length === 0 ? (
             <tr>
               <td
-                colSpan={6}
+                colSpan={8}
                 className="py-6 text-center text-muted-foreground"
               >
                 {t("No measured requests in this window.")}
               </td>
             </tr>
           ) : (
-            models.map((model) => {
-              const key = rowKey(model);
-              const isSelected = key === selectedKey;
+            models.map((model, index) => {
               const isMeasured = model.requests > 0;
               return (
                 <tr
-                  key={key}
-                  aria-selected={isSelected}
-                  className={cn(
-                    "cursor-pointer border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums hover:bg-muted/40",
-                    isSelected && "bg-muted/60",
-                  )}
-                  onClick={() => onSelect(key)}
+                  key={rowKey(model)}
+                  className="border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50"
                 >
-                  <td className="py-2.5 pr-6 text-left text-foreground">
-                    <span className="flex max-w-72 min-w-0 items-center gap-2">
+                  <td className="py-2.5 pr-3 text-left text-xs">{index + 1}</td>
+                  <td className="py-2.5 text-left text-foreground">
+                    <span className="flex min-w-0 items-center gap-2">
                       <ModelName model={model} />
                     </span>
+                    <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width:
+                            isMeasured && fastest > 0
+                              ? `max(0.5rem, ${(model.tokensPerSecond / fastest) * 100}%)`
+                              : 0,
+                          backgroundColor:
+                            PROVIDER_PRESENTATION[
+                              model.provider as UsageProviderKind
+                            ]?.color ?? LINE_COLOR,
+                        }}
+                      />
+                    </div>
                   </td>
-                  <td className="py-2.5 text-left text-foreground">
-                    <span className="flex items-center gap-3">
-                      <span className="w-20 shrink-0">
-                        {formatSpeed(model.tokensPerSecond)}
-                      </span>
-                      <span className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
-                        <span
-                          className="block h-full rounded-full"
-                          style={{
-                            width: `${fastest > 0 ? (model.tokensPerSecond / fastest) * 100 : 0}%`,
-                            backgroundColor: LINE_COLOR,
-                          }}
-                        />
-                      </span>
-                    </span>
+                  <td className="py-2.5 pl-6 text-foreground">
+                    {formatSpeed(model.tokensPerSecond)}
                   </td>
                   <td className="py-2.5 pl-6">
                     {isMeasured ? formatRate(model.medianTokensPerSecond) : "—"}
@@ -442,6 +481,9 @@ function SpeedTable({
                         +{formatCount(model.unmeasuredRequests)}
                       </span>
                     )}
+                  </td>
+                  <td className="py-2.5 pl-6">
+                    {formatTokens(model.totalTokens)}
                   </td>
                   <td className="hidden py-2.5 pl-6 sm:table-cell">
                     {formatTokens(model.outputTokens)}

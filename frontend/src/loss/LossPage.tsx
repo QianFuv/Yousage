@@ -12,7 +12,7 @@ import { Button } from "../../../tools/parity/upstream/apps/web/src/components/u
 import { UsageShareBar } from "../../vendor/UsageShareBar";
 import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
-import { Notice, PageBody, PageHeader } from "../ui";
+import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { formatDateTimeShort, formatDuration, msg, t } from "../i18n";
 import { useData } from "../usage/controller";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
@@ -120,7 +120,11 @@ export function LossPage({ isActive }: { isActive: boolean }) {
       </PageHeader>
       <PageBody>
         {error && <Notice tone="error">{error}</Notice>}
-        {report && <LossContent report={report} />}
+        {report ? (
+          <LossContent report={report} />
+        ) : (
+          !error && <EmptyState>{t("Loading loss analysis…")}</EmptyState>
+        )}
       </PageBody>
     </section>
   );
@@ -177,7 +181,11 @@ function LossContent({ report }: { report: LossReport }) {
               ? t("Hourly extra spend")
               : t("Daily extra spend")}
           </h2>
-          <LossChart days={report.days} reportWindow={report.window} />
+          {totalEvents > 0 ? (
+            <LossChart days={report.days} reportWindow={report.window} />
+          ) : (
+            <EmptyState>{t("No loss in this window.")}</EmptyState>
+          )}
         </div>
       </section>
       {report.errorKinds.length > 0 && (

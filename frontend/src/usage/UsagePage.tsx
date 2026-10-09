@@ -20,7 +20,7 @@ const UsageStatsPanel = lazy(() =>
   })),
 );
 import { RefreshCwIcon } from "lucide-react";
-import { Notice, PageBody, PageHeader } from "../ui";
+import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
@@ -377,22 +377,5 @@ export function UsagePage({
         )}
       </PageBody>
     </section>
-  );
-}
-
-/**
- * Centered placeholder for pages without displayable data.
- *
- * @param props - Placeholder message.
- * @returns The empty-state element.
- */
-function EmptyState({ children }: { children: string }) {
-  return (
-    <p
-      role="status"
-      className="rounded-xl border border-dashed border-border px-6 py-16 text-center text-sm text-muted-foreground"
-    >
-      {children}
-    </p>
   );
 }

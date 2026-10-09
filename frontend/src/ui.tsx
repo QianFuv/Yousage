@@ -205,6 +205,23 @@ export function Notice({
 }
 
 /**
+ * Centered placeholder for pages and charts without displayable data.
+ *
+ * @param props - Placeholder message.
+ * @returns The empty-state element.
+ */
+export function EmptyState({ children }: { children: string }) {
+  return (
+    <p
+      role="status"
+      className="rounded-xl border border-dashed border-border px-6 py-16 text-center text-sm text-muted-foreground"
+    >
+      {children}
+    </p>
+  );
+}
+
+/**
  * Labelled vertical form field.
  *
  * @param props - Field label, optional hint and control.

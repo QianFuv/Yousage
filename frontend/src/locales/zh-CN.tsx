@@ -202,6 +202,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Loading report…": "正在加载报告…",
   "Loading settings…": "正在加载设置…",
   "Loading usage statistics…": "正在加载用量统计…",
+  "Loading loss analysis…": "正在加载损耗分析…",
+  "Loading speed statistics…": "正在加载速率统计…",
   "Loading…": "正在加载…",
   "Local font discovery is unavailable here. Enter an installed font family manually.":
     "当前无法自动查找本地字体，请手动输入已安装的字体名称。",
@@ -695,22 +697,23 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Authentication failed": "认证失败",
   "Other error": "其他错误",
   "Copy as PNG": "复制为 PNG",
-  Speed: "速度",
-  "Speed period": "速度统计时间段",
+  Speed: "速率统计",
+  "Output speed": "输出速率",
+  "Speed period": "速率统计时间段",
   "{rate} tok/s": "{rate} tok/s",
   "Average output speed · {count} measured requests":
-    "平均输出速度 · 已测量 {count} 次请求",
+    "平均输出速率 · 已测量 {count} 次请求",
   "Median {median} · P10–P90 {low}–{high}":
     "中位数 {median} · P10–P90 {low}–{high}",
   "{count} requests have no usable timing and are excluded.":
     "{count} 次请求缺少可用计时，未计入统计。",
-  "Hourly speed": "每小时速度",
-  "Daily speed": "每日速度",
+  "Hourly speed": "每小时速率",
+  "Daily speed": "每日速率",
   "No measured requests in this window.": "该时间段内没有可测量的请求。",
   "No measured requests": "没有可测量的请求",
   Models: "模型",
   Requests: "请求数",
   Median: "中位数",
-  "Model speed table": "模型速度表",
+  "Model speed table": "模型速率表",
   "{count} without timing": "{count} 次无计时",
 };
