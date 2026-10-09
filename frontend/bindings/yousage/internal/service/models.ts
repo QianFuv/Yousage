@@ -788,6 +788,7 @@ export class SpeedBucketModel {
 
 /**
  * SpeedModel separates billing tiers and includes request-rate percentiles.
+ * TotalTokens counts input and output of every included request, measured or not.
  */
 export class SpeedModel {
     "provider": string;
@@ -795,6 +796,7 @@ export class SpeedModel {
     "speed": string;
     "requests": number;
     "unmeasuredRequests": number;
+    "totalTokens": number;
     "outputTokens": number;
     "generationMs": number;
     "tokensPerSecond": number;
@@ -818,6 +820,9 @@ export class SpeedModel {
         }
         if (!("unmeasuredRequests" in $$source)) {
             this["unmeasuredRequests"] = 0;
+        }
+        if (!("totalTokens" in $$source)) {
+            this["totalTokens"] = 0;
         }
         if (!("outputTokens" in $$source)) {
             this["outputTokens"] = 0;
@@ -853,7 +858,8 @@ export class SpeedModel {
 /**
  * SpeedReport summarizes inclusive output throughput from local retained request facts.
  * OpenCode uses native assistant creation/completion times; Codex uses explicit request
- * boundaries and model response timestamps, excluding intervening tool execution.
+ * boundaries and model response timestamps, excluding intervening tool execution; Claude
+ * runs from the prompt or tool result that started a message to its final content block.
  * These elapsed intervals include time to first token. Missing, nonpositive, over-ten-minute
  * and implausibly fast intervals are unmeasured; providers without reliable timing stay unmeasured.
  */

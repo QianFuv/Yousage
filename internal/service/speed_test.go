@@ -9,7 +9,8 @@ import (
 	"yousage/internal/domain"
 )
 
-// TestSpeedAggregation separates billing tiers, aliases models and excludes unmeasured output.
+// TestSpeedAggregation separates billing tiers, aliases models, excludes unmeasured output from rates
+// and orders models by total tokens of every request, so unmeasured usage still ranks a model.
 func TestSpeedAggregation(test *testing.T) {
 	now := time.Date(2026, 10, 9, 14, 5, 30, 0, time.UTC)
 	window, _ := accounting.BuildWindow(now, 7, "Asia/Shanghai")
@@ -30,8 +31,8 @@ func TestSpeedAggregation(test *testing.T) {
 	if report.MeasuredRequests != 4 || report.UnmeasuredRequests != 2 || len(report.Models) != 3 || len(report.Buckets) != 7 {
 		test.Fatal(report)
 	}
-	standard := report.Models[1]
-	if report.Models[0].Speed != "fast" || standard.Model != "model" || standard.Speed != "standard" || standard.Requests != 3 || standard.UnmeasuredRequests != 1 || standard.OutputTokens != 140 || standard.GenerationMs != 6000 || math.Abs(standard.TokensPerSecond-140.0/6) > 1e-12 || standard.MedianTokensPerSecond != 20 || standard.P10TokensPerSecond != 12 || standard.P90TokensPerSecond != 28 {
+	standard := report.Models[0]
+	if report.Models[1].Speed != "fast" || report.Models[1].TotalTokens != 140 || standard.Model != "model" || standard.Speed != "standard" || standard.Requests != 3 || standard.UnmeasuredRequests != 1 || standard.TotalTokens != 1139 || standard.OutputTokens != 140 || standard.GenerationMs != 6000 || math.Abs(standard.TokensPerSecond-140.0/6) > 1e-12 || standard.MedianTokensPerSecond != 20 || standard.P10TokensPerSecond != 12 || standard.P90TokensPerSecond != 28 {
 		test.Fatal(report.Models)
 	}
 	if report.Models[2].Requests != 0 || report.Models[2].TokensPerSecond != 0 || report.Models[2].MedianTokensPerSecond != 0 {

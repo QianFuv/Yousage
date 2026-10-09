@@ -24,12 +24,14 @@ type SpeedReport struct {
 }
 
 // SpeedModel separates billing tiers and includes request-rate percentiles.
+// TotalTokens counts input and output of every included request, measured or not.
 type SpeedModel struct {
 	Provider              string  `json:"provider"`
 	Model                 string  `json:"model"`
 	Speed                 string  `json:"speed"`
 	Requests              int     `json:"requests"`
 	UnmeasuredRequests    int     `json:"unmeasuredRequests"`
+	TotalTokens           int64   `json:"totalTokens"`
 	OutputTokens          int64   `json:"outputTokens"`
 	GenerationMs          int64   `json:"generationMs"`
 	TokensPerSecond       float64 `json:"tokensPerSecond"`
@@ -125,6 +127,7 @@ func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map
 			held = &speedAccumulator{model: SpeedModel{Provider: key.provider, Model: key.model, Speed: key.speed}}
 			models[key] = held
 		}
+		held.model.TotalTokens += record.Totals.Total()
 		duration := domain.ReliableGenerationMs(record.GenerationMs, record.Totals.OutputTokens)
 		if duration == 0 {
 			result.UnmeasuredRequests++
@@ -158,7 +161,7 @@ func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map
 	}
 	sort.Slice(result.Models, func(first, second int) bool {
 		left, right := result.Models[first], result.Models[second]
-		return speedLess(left.OutputTokens, left.Provider, left.Model, left.Speed, right.OutputTokens, right.Provider, right.Model, right.Speed)
+		return speedLess(left.TotalTokens, left.Provider, left.Model, left.Speed, right.TotalTokens, right.Provider, right.Model, right.Speed)
 	})
 	for index, bucket := range buckets {
 		for _, row := range bucket {
@@ -173,7 +176,7 @@ func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map
 	return result
 }
 
-// speedLess provides deterministic descending-output ordering with lexical tie breakers.
+// speedLess provides deterministic descending-token ordering with lexical tie breakers.
 func speedLess(leftTokens int64, leftProvider, leftModel, leftSpeed string, rightTokens int64, rightProvider, rightModel, rightSpeed string) bool {
 	if leftTokens != rightTokens {
 		return leftTokens > rightTokens
