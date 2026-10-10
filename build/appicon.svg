@@ -1,7 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#162c43"/>
-  <path d="M116 126h72l68 113 68-113h72L290 303v83h-68v-83Z" fill="#a4deef"/>
-  <rect x="330" y="330" width="24" height="56" rx="6" fill="#f3b96e"/>
-  <rect x="369" y="298" width="24" height="88" rx="6" fill="#f3b96e"/>
-  <rect x="408" y="266" width="24" height="120" rx="6" fill="#f3b96e"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="160" fill="#15131f"/>
+  <path d="M130.107 110.463 L256 262" fill="none" stroke="#f3f1fa" stroke-width="108" stroke-linecap="round"/>
+  <path d="M381.893 110.463 L256 262" fill="none" stroke="#f3f1fa" stroke-width="108" stroke-linecap="round"/>
+  <path d="M130.107 110.463 L256 262" fill="none" stroke="#a99bff" stroke-width="80" stroke-linecap="round"/>
+  <path d="M381.893 110.463 L256 262" fill="none" stroke="#c6ec6e" stroke-width="80" stroke-linecap="round"/>
+  <path d="M256 262 L256 406" fill="none" stroke="#15131f" stroke-width="108" stroke-linecap="round"/>
+  <path d="M256 262 L256 406" fill="none" stroke="#f3f1fa" stroke-width="80" stroke-linecap="round"/>
 </svg>
