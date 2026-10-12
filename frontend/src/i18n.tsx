@@ -205,12 +205,15 @@ export function formatRelativeHourShort(
   return formatDateTimeShort(hourStart, timeZone);
 }
 
+/** Upstream wording for a reset less than a minute away. */
+const RESETS_MOMENTARILY = "Resets momentarily";
+
 /**
  * Time until a limit window resets, without the `resets in` prefix.
  *
  * @param window - Usage window with a reset instant.
  * @param now - Current time in milliseconds.
- * @returns `2h 13m`, the localized word for now, or null without a reset.
+ * @returns `2h 13m`, `<1m` in the final minute, the localized word for now, or null without a reset.
  */
 export function formatResetDuration(
   window: Parameters<typeof formatResetsInEnglish>[0],
@@ -218,6 +221,7 @@ export function formatResetDuration(
 ): string | null {
   const english = formatResetsInEnglish(window, now);
   if (english === null) return null;
+  if (english === RESETS_MOMENTARILY) return "<1m";
   return english === "resets now"
     ? t("now")
     : english.replace(/^resets in /, "");
@@ -236,6 +240,7 @@ export function formatResetsIn(
 ): string | null {
   const english = formatResetsInEnglish(window, now);
   if (english === null) return null;
+  if (english === RESETS_MOMENTARILY) return t("resets momentarily");
   return english === "resets now"
     ? t("resets now")
     : t("resets in {duration}", {

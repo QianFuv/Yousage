@@ -586,6 +586,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "not a VS Code color theme": "不是 VS Code 颜色主题",
   now: "现在",
   "resets in {duration}": "{duration}后重置",
+  "resets momentarily": "1 分钟内重置",
   "resets now": "即将重置",
   "theme files must be no larger than 256 KiB.": "主题文件不能超过 256 KiB。",
   "{count} banked": "{count} 张可用",

@@ -2,7 +2,14 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { formatDayShort, resolveLanguage, setLanguage, t } from "./i18n";
+import {
+  formatDayShort,
+  formatResetDuration,
+  formatResetsIn,
+  resolveLanguage,
+  setLanguage,
+  t,
+} from "./i18n";
 import { ZH_CN } from "./locales/zh-CN";
 
 const FRONTEND = join(__dirname, "..");
@@ -90,5 +97,20 @@ describe("language selection", () => {
     expect(formatDayShort("2026-10-06")).toBe("Oct 6");
     setLanguage("zh-CN");
     expect(formatDayShort("2026-10-06")).toBe("10月6日");
+  });
+
+  it("localizes a reset in its final minute", () => {
+    const now = Date.parse("2026-10-06T12:00:00Z");
+    const window = {
+      id: "primary",
+      kind: "session",
+      label: "Session",
+      usedPercent: 50,
+      resetsAt: "2026-10-06T12:00:30Z",
+    } as Parameters<typeof formatResetsIn>[0];
+    expect(formatResetsIn(window, now)).toBe("resets momentarily");
+    expect(formatResetDuration(window, now)).toBe("<1m");
+    setLanguage("zh-CN");
+    expect(formatResetsIn(window, now)).toBe("1 分钟内重置");
   });
 });
