@@ -68,38 +68,51 @@ body {
 .sidebar-brand {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.625rem;
   height: 2.75rem;
   padding: 0 0.5rem;
   margin-bottom: 0.5rem;
 }
-/* The wordmark echoes the app icon's lavender and lime strokes. */
+/* The wordmark flows through the app icon's lavender and lime strokes. */
 .sidebar-wordmark {
   --wordmark-start: #6d5ce8;
   --wordmark-end: #5f8f14;
   display: inline-flex;
   align-items: baseline;
-  font-size: 1.0625rem;
+  padding-right: 0.05em;
+  font-size: 1.375rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.035em;
-  color: var(--color-sidebar-foreground);
+  background: linear-gradient(
+      90deg,
+      var(--wordmark-start),
+      var(--wordmark-end),
+      var(--wordmark-start),
+      var(--wordmark-end),
+      var(--wordmark-start)
+    )
+    0% 50% / 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: wordmark-flow 6s linear infinite;
   user-select: none;
 }
 .dark .sidebar-wordmark {
   --wordmark-start: #a99bff;
   --wordmark-end: #c6ec6e;
 }
-.sidebar-wordmark-accent {
-  padding-right: 0.05em;
-  background: linear-gradient(
-    100deg,
-    var(--wordmark-start) 10%,
-    var(--wordmark-end) 95%
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+@keyframes wordmark-flow {
+  to {
+    background-position: 100% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-wordmark {
+    animation: none;
+  }
 }
 .sidebar-group {
   display: grid;

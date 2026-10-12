@@ -333,10 +333,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
             <span className="sidebar-wordmark-tail" aria-hidden>
               ou
             </span>
-            <span
-              className="sidebar-wordmark-tail sidebar-wordmark-accent"
-              aria-hidden
-            >
+            <span className="sidebar-wordmark-tail" aria-hidden>
               sage
             </span>
           </strong>
