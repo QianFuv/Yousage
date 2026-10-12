@@ -1,9 +1,14 @@
 /** The quota-bar prediction follows the backend interval: its amount and confidence never overstate it. */
 import { describe, expect, it } from "vitest";
+import {
+  collectLimitAccounts,
+  collectLimitPools,
+} from "@t3tools/shared/usageLimits";
 import type { CycleValue, EnvironmentUsageStatus } from "./data";
 import {
   cycleValueKey,
   indexCycleValues,
+  memberCycleValue,
   predictionConfidence,
   predictionPhrase,
   predictionText,
@@ -175,5 +180,56 @@ describe("indexCycleValues", () => {
     ]);
     expect(index.size).toBe(1);
     expect(index.get(cycleValueKey("local:codex", "weekly"))).toBe(value);
+  });
+
+  it("finds each pooled Codex member's value by its own window", () => {
+    const session = cycleValue({ windowId: "primary" });
+    const weekly = cycleValue({ windowId: "secondary" });
+    const index = indexCycleValues([
+      {
+        environmentId: "local",
+        cycleValues: [session, weekly],
+      } as EnvironmentUsageStatus,
+    ]);
+    const provider = {
+      instanceId: "codex",
+      driver: "codex",
+      enabled: true,
+      installed: true,
+      status: "ready",
+      auth: { status: "authenticated", email: "user@example.invalid" },
+      slashCommands: [],
+      usageLimits: {
+        checkedAt: "2026-10-06T12:00:00.000Z",
+        windows: [
+          { id: "primary", kind: "session", label: "5h", usedPercent: 20 },
+          { id: "secondary", kind: "weekly", label: "Week", usedPercent: 40 },
+        ],
+      },
+    };
+    const [pool] = collectLimitPools(
+      collectLimitAccounts(
+        new Map([
+          [
+            "local",
+            {
+              entry: { target: { label: "Local" } },
+              serverConfig: { providers: [provider], usageLimitSources: [] },
+            },
+          ],
+        ]) as unknown as Parameters<typeof collectLimitAccounts>[0],
+      ),
+      Date.parse("2026-10-06T12:00:00Z"),
+    );
+    const found = pool.windows.map((window) =>
+      window.columns.map((member) =>
+        member.window ? memberCycleValue(index, member as never) : undefined,
+      ),
+    );
+    expect(pool.windows.map((window) => window.id)).toEqual([
+      "session",
+      "weekly",
+    ]);
+    expect(found).toEqual([[session], [weekly]]);
   });
 });

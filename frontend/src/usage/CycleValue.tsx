@@ -43,6 +43,27 @@ export function cycleValueKey(accountKey: string, windowId: string): string {
 }
 
 /**
+ * The cycle value for one account's window in a pooled bar.
+ *
+ * A pool can group different window ids of one kind (Codex reports a
+ * weekly-only plan's weekly window as `primary`), so the lookup uses the
+ * member's own window rather than the pool's.
+ *
+ * @param index - Cycle values keyed by {@link cycleValueKey}.
+ * @param member - Pool column with its account and window.
+ * @returns The member's cycle value, if any.
+ */
+export function memberCycleValue(
+  index: CycleValueIndex,
+  member: {
+    readonly account: { readonly key: string };
+    readonly window: { readonly id: string };
+  },
+): CycleValue | undefined {
+  return index.get(cycleValueKey(member.account.key, member.window.id));
+}
+
+/**
  * Index every environment's cycle values for lookup by pooled account and window.
  *
  * @param environments - Selected environments.

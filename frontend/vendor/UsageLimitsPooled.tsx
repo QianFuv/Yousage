@@ -22,8 +22,8 @@ import {
   confidenceLabel,
   type CycleValueIndex,
   CycleValueBadge,
-  cycleValueKey,
   cycleValueNotice,
+  memberCycleValue,
   historyValueText,
   precisionText,
   predictionConfidence,
@@ -662,9 +662,10 @@ function PoolBar({
               now={now}
               index={position + 1}
               showAccountName={pool.columns.length > 1}
-              cycleValue={cycleValues.get(
-                cycleValueKey(member.account.key, pool.id),
-              )}
+              cycleValue={memberCycleValue(cycleValues, {
+                account: member.account,
+                window: member.window,
+              })}
             />
           ) : null,
         )}
