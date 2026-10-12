@@ -33,7 +33,6 @@ import {
 import type { ThemeFileInput } from "../bindings/yousage/models";
 import {
   ArrowLeftIcon,
-  BarChart3Icon,
   ChartNoAxesCombinedIcon,
   FlameIcon,
   GaugeIcon,
@@ -306,10 +305,18 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
         aria-label={t("Application")}
       >
         <div className="sidebar-brand">
-          <span className="sidebar-logo" aria-hidden>
-            <BarChart3Icon />
-          </span>
-          <strong>Yousage</strong>
+          <strong className="sidebar-wordmark" aria-label="Yousage">
+            <span aria-hidden>Y</span>
+            <span className="sidebar-wordmark-tail" aria-hidden>
+              ou
+            </span>
+            <span
+              className="sidebar-wordmark-tail sidebar-wordmark-accent"
+              aria-hidden
+            >
+              sage
+            </span>
+          </strong>
         </div>
         {route === "settings" ? (
           <>

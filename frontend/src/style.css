@@ -73,24 +73,33 @@ body {
   padding: 0 0.5rem;
   margin-bottom: 0.5rem;
 }
-.sidebar-brand strong {
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+/* The wordmark echoes the app icon's lavender and lime strokes. */
+.sidebar-wordmark {
+  --wordmark-start: #6d5ce8;
+  --wordmark-end: #5f8f14;
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: var(--color-sidebar-foreground);
+  user-select: none;
 }
-.sidebar-logo {
-  display: grid;
-  place-items: center;
-  width: 1.625rem;
-  height: 1.625rem;
-  flex-shrink: 0;
-  border-radius: 0.5rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
+.dark .sidebar-wordmark {
+  --wordmark-start: #a99bff;
+  --wordmark-end: #c6ec6e;
 }
-.sidebar-logo svg {
-  width: 0.9375rem;
-  height: 0.9375rem;
+.sidebar-wordmark-accent {
+  padding-right: 0.05em;
+  background: linear-gradient(
+    100deg,
+    var(--wordmark-start) 10%,
+    var(--wordmark-end) 95%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 .sidebar-group {
   display: grid;
@@ -173,7 +182,7 @@ body {
     justify-content: center;
     padding: 0;
   }
-  .sidebar-brand strong,
+  .sidebar-wordmark-tail,
   .sidebar-item-label,
   .sidebar-group-label {
     display: none;
