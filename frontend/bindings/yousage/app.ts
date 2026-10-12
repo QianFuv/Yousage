@@ -312,6 +312,20 @@ export function SetCloseBridge(isActive: boolean): $CancellablePromise<void> {
 }
 
 /**
+ * SetTrayLabels replaces the tray menu after the frontend resolves its language.
+ */
+export function SetTrayLabels(labels: $models.TrayLabels): $CancellablePromise<void> {
+    return $Call.ByID(2665324948, labels);
+}
+
+/**
+ * ShowWindow reveals a hidden or minimized window without changing its retained page.
+ */
+export function ShowWindow(): $CancellablePromise<void> {
+    return $Call.ByID(31117496);
+}
+
+/**
  * StageHubCredential stores a fresh native reference; the frontend never reads a saved key.
  */
 export function StageHubCredential(origin: string, value: string): $CancellablePromise<string> {

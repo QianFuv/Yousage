@@ -86,6 +86,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Click to reveal email": "点击显示邮箱",
   "Close Yousage?": "关闭 Yousage？",
   "Close the theme editor": "关闭主题编辑器",
+  "Close to tray": "关闭时最小化到托盘",
+  "Closing the window keeps Yousage running in the notification area. Choose Quit from the tray menu to exit.":
+    "关闭窗口后 Yousage 会继续在托盘中运行，在托盘菜单中选择“退出”才会真正退出。",
   "Code Background": "代码背景",
   "Code Foreground": "代码文字",
   "Code surface": "代码背景",
@@ -312,6 +315,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Prices not loaded": "价格未加载",
   "Processed tokens": "处理 Token",
   "Provider detection updated.": "Provider 识别结果已更新。",
+  Quit: "退出",
   Quota: "额度监控",
   "Quota account draft discarded.": "已放弃额度账户草稿。",
   "Quota accounts": "额度账户",

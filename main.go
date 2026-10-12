@@ -48,6 +48,7 @@ func main() {
 		Windows: application.WindowsWindow{Theme: application.Light},
 	})
 	service.installDesktopHooks()
+	service.installTray()
 	nativeApp.Event.OnApplicationEvent(events.Common.ThemeChanged, func(event *application.ApplicationEvent) {
 		nativeApp.Event.Emit("system-appearance", event.Context().IsDarkMode())
 	})

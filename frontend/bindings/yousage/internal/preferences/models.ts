@@ -16,6 +16,7 @@ export class Display {
     "windowDays": number;
     "shouldAutoRefresh": boolean;
     "shouldRestoreWindow": boolean;
+    "shouldCloseToTray": boolean;
     "timestampFormat": string;
     "breakdown": string;
     "language": string;
@@ -39,6 +40,9 @@ export class Display {
         }
         if (!("shouldRestoreWindow" in $$source)) {
             this["shouldRestoreWindow"] = false;
+        }
+        if (!("shouldCloseToTray" in $$source)) {
+            this["shouldCloseToTray"] = false;
         }
         if (!("timestampFormat" in $$source)) {
             this["timestampFormat"] = "";

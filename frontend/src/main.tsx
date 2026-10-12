@@ -121,6 +121,18 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
     () => applyLanguage(data.display.value.language, systemLocale),
     [data.display.value.language, systemLocale],
   );
+  useEffect(() => {
+    void nativeApi
+      .SetTrayLabels({
+        usage: t("Usage"),
+        quota: t("Quota"),
+        loss: t("Loss"),
+        speed: t("Speed"),
+        settings: t("Settings"),
+        quit: t("Quit"),
+      })
+      .catch(() => {});
+  }, [data.display.value.language, systemLocale]);
   const [priceModel, setPriceModel] = useState<string>();
   const [pricingState, setPricingState] = useState({
     isDirty: false,
@@ -172,6 +184,13 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       }),
     [navigate],
   );
+  useEffect(
+    () =>
+      Events.On("tray-navigate", (event) =>
+        navigate(event.data as PageRoute | "settings"),
+      ),
+    [navigate],
+  );
   const [status, setStatus] = useState("");
   const closeState = useRef({ isDirty: false, isPending: false });
   closeState.current = {
@@ -188,15 +207,19 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       appearance.editorState.isPending,
   };
   useEffect(() => {
+    /** Reveal a window hidden in the tray before asking about its drafts. */
+    const confirmVisibly = (error: string) => {
+      void nativeApi.ShowWindow().catch(() => {});
+      setCloseError(error);
+      setIsClosing(true);
+    };
     const dispose = Events.On("close-requested", () => {
-      if (closeState.current.isDirty || closeState.current.isPending) {
-        setIsClosing(true);
-        setCloseError("");
-      } else
-        void nativeApi.ConfirmClose().catch((cause) => {
-          setCloseError(String(cause));
-          setIsClosing(true);
-        });
+      if (closeState.current.isDirty || closeState.current.isPending)
+        confirmVisibly("");
+      else
+        void nativeApi
+          .ConfirmClose()
+          .catch((cause) => confirmVisibly(String(cause)));
     });
     void nativeApi
       .SetCloseBridge(true)

@@ -96,6 +96,50 @@ export class ThemeFileInput {
     }
 }
 
+/**
+ * TrayLabels carries localized notification-area menu text from the frontend.
+ */
+export class TrayLabels {
+    "usage": string;
+    "quota": string;
+    "loss": string;
+    "speed": string;
+    "settings": string;
+    "quit": string;
+
+    /** Creates a new TrayLabels instance. */
+    constructor($$source: Partial<TrayLabels> = {}) {
+        if (!("usage" in $$source)) {
+            this["usage"] = "";
+        }
+        if (!("quota" in $$source)) {
+            this["quota"] = "";
+        }
+        if (!("loss" in $$source)) {
+            this["loss"] = "";
+        }
+        if (!("speed" in $$source)) {
+            this["speed"] = "";
+        }
+        if (!("settings" in $$source)) {
+            this["settings"] = "";
+        }
+        if (!("quit" in $$source)) {
+            this["quit"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TrayLabels instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TrayLabels {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TrayLabels($$parsedSource as Partial<TrayLabels>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = preferences$0.Source.createFrom;
 const $$createType1 = $Create.Array($$createType0);

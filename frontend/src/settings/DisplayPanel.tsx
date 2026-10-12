@@ -161,6 +161,21 @@ export function DisplayPanel() {
             }
           />
           <SettingsRow
+            title={t("Close to tray")}
+            description={t(
+              "Closing the window keeps Yousage running in the notification area. Choose Quit from the tray menu to exit.",
+            )}
+            control={
+              <Switch
+                aria-label={t("Close to tray")}
+                checked={value.shouldCloseToTray}
+                onCheckedChange={(isChecked) =>
+                  change({ shouldCloseToTray: isChecked })
+                }
+              />
+            }
+          />
+          <SettingsRow
             title={t("Recenter window")}
             description={t("Move the window back onto the primary display.")}
             control={

@@ -27,6 +27,7 @@ type Display struct {
 	WindowDays          int     `json:"windowDays"`
 	ShouldAutoRefresh   bool    `json:"shouldAutoRefresh"`
 	ShouldRestoreWindow bool    `json:"shouldRestoreWindow"`
+	ShouldCloseToTray   bool    `json:"shouldCloseToTray"`
 	TimestampFormat     string  `json:"timestampFormat"`
 	Breakdown           string  `json:"breakdown"`
 	Language            string  `json:"language"`
@@ -59,7 +60,7 @@ type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }
 func Defaults() Display {
-	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, TimestampFormat: "locale", Breakdown: "model", Language: "system"}
+	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, ShouldCloseToTray: true, TimestampFormat: "locale", Breakdown: "model", Language: "system"}
 }
 
 func (display Display) Validate() error {

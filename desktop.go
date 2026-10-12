@@ -17,7 +17,14 @@ func (service *App) installDesktopHooks() {
 	service.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		service.windowMutex.Lock()
 		shouldGuard := service.isCloseBridgeActive && !service.shouldAllowClose
+		shouldHide := service.shouldCloseToTray && service.tray != nil && !service.shouldAllowClose
 		service.windowMutex.Unlock()
+		if shouldHide {
+			event.Cancel()
+			service.captureBounds()
+			service.window.Hide()
+			return
+		}
 		if shouldGuard {
 			event.Cancel()
 			service.nativeApp.Event.Emit("close-requested")

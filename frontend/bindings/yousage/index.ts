@@ -9,5 +9,6 @@ export {
 export {
     Bootstrap,
     SavedSources,
-    ThemeFileInput
+    ThemeFileInput,
+    TrayLabels
 } from "./models.js";

@@ -32,6 +32,7 @@ type App struct {
 	context             context.Context
 	nativeApp           *application.App
 	window              *application.WebviewWindow
+	tray                *application.SystemTray
 	logFile             *os.File
 	logMutex            sync.Mutex
 	logPath             string
@@ -47,6 +48,7 @@ type App struct {
 	isShuttingDown      bool
 	isCloseBridgeActive bool
 	shouldAllowClose    bool
+	shouldCloseToTray   bool
 }
 
 func newApp() (*App, error) {
@@ -101,6 +103,9 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	service.usage = usage
 	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
 	usage.ReconcileConnections()
+	if display, err := usage.Preferences.Display(ctx); err == nil {
+		service.setCloseToTray(display.Value.ShouldCloseToTray)
+	}
 	watcher, cancel := context.WithCancel(ctx)
 	service.themeCancel = cancel
 	service.themeDone = make(chan struct{})
@@ -202,6 +207,7 @@ func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.Sav
 	value, err := service.usage.Preferences.SaveDisplay(ctx, saved)
 	if err == nil {
 		service.window.SetZoom(value.Value.Zoom)
+		service.setCloseToTray(value.Value.ShouldCloseToTray)
 	}
 	return value, err
 }

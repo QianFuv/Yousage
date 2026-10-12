@@ -13,6 +13,7 @@ let display = {
     density: "comfortable",
     zoom: 1,
     shouldRestoreWindow: true,
+    shouldCloseToTray: true,
     timestampFormat: "locale",
     breakdown: "model",
     metric: "limits",
@@ -278,6 +279,8 @@ setTransport({
       case 2798394763:
       case 3259341121:
       case 3076200806:
+      case 2665324948:
+      case 31117496:
         return null;
 
       case 2885542999:
