@@ -9,12 +9,13 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
+	"path/filepath"
 	"yousage/internal/domain"
 	"yousage/internal/history/grok"
 )
 
-// ParserVersion forces retained transcripts to replay for Claude final-block usage and request timing.
-const ParserVersion = 5
+// ParserVersion replays retained transcripts to separate native files and compaction contexts.
+const ParserVersion = 6
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -64,6 +65,8 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 	}
 	if !result.IsResumed {
 		state = InitialCodexState()
+		state.TranscriptId = filepath.Base(path)
+		state.Claude.TranscriptId = state.TranscriptId
 	}
 	result.Checkpoint.Offset = start
 	reader := bufio.NewReaderSize(io.NewSectionReader(file, start, info.Size()-start), 256*1024)

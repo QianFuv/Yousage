@@ -145,7 +145,7 @@ func cacheTtl(previous domain.Record) int64 {
 	return CacheDefaultTtl.Milliseconds()
 }
 
-// analyzeLoss classifies retained context and assigns losses to the selected window buckets.
+// analyzeLoss compares requests only within one native transcript context and assigns losses to window buckets.
 func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, now time.Time) LossReport {
 	result := LossReport{Window: options.Window, ErrorKinds: []LossKindCount{}, Days: []LossDay{}, Events: []LossEvent{}}
 	pricer := accounting.NewPricer(options.Rates, options.Overrides)
@@ -170,7 +170,7 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 			result.CacheWriteTokens += record.Totals.CacheCreationTokens
 		}
 		// Unknown session identities cannot safely share predecessors or follow-ups.
-		key := string(record.Provider) + "\x00" + record.SessionId
+		key := string(record.Provider) + "\x00" + record.SessionId + "\x00" + record.ContextId
 		if record.SessionId == "" {
 			if record.ErrorKind != "" && inWindow(record) {
 				result.Events = append(result.Events, LossEvent{Kind: "error", ErrorKind: record.ErrorKind, Provider: string(record.Provider), Model: record.Model, AtMs: record.TimestampMs, Precision: "exact"})

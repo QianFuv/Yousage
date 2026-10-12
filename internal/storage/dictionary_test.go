@@ -17,6 +17,7 @@ func TestDictionaryReferencesFollowReplacementAndRetention(test *testing.T) {
 	checkpoint := domain.Checkpoint{SourceId: id, Path: "session", ModifiedNs: 10, Reducer: json.RawMessage(`{}`)}
 	old := usageRecord("retired-model")
 	old.SessionId, old.DedupeKey, old.QuotaBucket = "retired-session", "retired-key", "codex"
+	old.ContextId = "retired-context"
 	old.Quota = &domain.QuotaObservation{PlanType: "retired-plan", Windows: []domain.QuotaWindow{{Id: "retired-window"}}}
 	checkpoint, err := store.CommitFileWithTail(ctx, checkpoint, []domain.Record{old}, []domain.Record{old}, true)
 	if err != nil {

@@ -64,13 +64,15 @@ func (tokens *Tokens) Add(other Tokens) {
 }
 
 // Record contains usage facts or a redacted error variant, never transcript text or credentials.
-// Error facts populate only provider, timestamp, model, session and a closed error kind.
+// ContextId separates native transcript incarnations and explicit context resets within a session.
+// Error facts retain the same context identity and a closed error kind without usage.
 type Record struct {
 	Provider        Provider          `json:"provider"`
 	TimestampMs     int64             `json:"timestampMs"`
 	Model           string            `json:"model"`
 	RateModel       string            `json:"rateModel,omitempty"`
 	SessionId       string            `json:"sessionId"`
+	ContextId       string            `json:"contextId,omitempty"`
 	Totals          Tokens            `json:"totals"`
 	ReportedCostUsd *float64          `json:"reportedCostUsd"`
 	Speed           string            `json:"speed"`

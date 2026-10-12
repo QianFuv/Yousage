@@ -2,11 +2,16 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
+	"yousage/internal/history"
 )
 
 // TestLossRolling24Hours keeps all hourly buckets and excludes exact boundary instants.
@@ -38,6 +43,97 @@ func TestLossRolling24Hours(test *testing.T) {
 	}
 	if report.Days[0].ErrorCount != 1 || report.Days[0].CacheExpiryCount != 1 || report.Days[1].ErrorCount != 1 || report.Days[23].ErrorCount != 1 || report.Days[2].ErrorCount != 0 {
 		test.Fatal(report.Days)
+	}
+}
+
+// lossTranscriptRecords reads synthetic metadata through the production streaming parser.
+func lossTranscriptRecords(test *testing.T, provider domain.Provider, name string, lines ...string) []domain.Record {
+	test.Helper()
+	path := filepath.Join(test.TempDir(), name)
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600); err != nil {
+		test.Fatal(err)
+	}
+	read, err := history.ReadTranscript(context.Background(), path, provider, domain.Checkpoint{})
+	if err != nil {
+		test.Fatal(err)
+	}
+	return append(read.Records, read.Tail...)
+}
+
+// lossUsageLine creates content-free usage with a large context and a final Claude block.
+func lossUsageLine(provider domain.Provider, instant, identity string, cached int64) string {
+	line := map[string]any{"timestamp": instant}
+	if provider == domain.Claude {
+		line["type"], line["sessionId"], line["requestId"] = "assistant", "session", identity
+		line["message"] = map[string]any{"id": identity, "model": "fixture", "stop_reason": "end_turn", "usage": map[string]any{"input_tokens": 2, "cache_read_input_tokens": cached, "cache_creation_input_tokens": 100000 - cached, "output_tokens": 10}}
+	} else {
+		line["type"] = "event_msg"
+		line["payload"] = map[string]any{"type": "token_count", "info": map[string]any{"last_token_usage": map[string]any{"input_tokens": 100000, "cached_input_tokens": cached, "output_tokens": 10}}}
+	}
+	encoded, _ := json.Marshal(line)
+	return string(encoded)
+}
+
+// TestLossSeparatesTranscriptContexts excludes first writes without losing later idle expiries.
+func TestLossSeparatesTranscriptContexts(test *testing.T) {
+	for _, provider := range []domain.Provider{domain.Codex, domain.Claude} {
+		test.Run(string(provider), func(test *testing.T) {
+			_, _, options, now := lossFixture()
+			header := []string{}
+			if provider == domain.Codex {
+				header = []string{`{"type":"session_meta","payload":{"id":"session","session_id":"session","history_mode":"paginated","history_base":{"thread_id":"session","end_ordinal_exclusive":10772,"end_byte_offset":61073059}}}`, `{"type":"turn_context","payload":{"model":"fixture"}}`}
+			}
+			parent := lossTranscriptRecords(test, provider, "session.jsonl", append(header, lossUsageLine(provider, "2026-10-06T11:00:00Z", "parent", 100000))...)
+			childLines := append([]string{}, header...)
+			first := lossUsageLine(provider, "2026-10-06T11:10:00Z", "first", 0)
+			if provider == domain.Claude {
+				first = strings.Replace(first, `"type":"assistant"`, `"agentId":"agent-new","isSidechain":true,"type":"assistant"`, 1)
+			}
+			childLines = append(childLines, first, lossUsageLine(provider, "2026-10-06T11:11:00Z", "cached", 100000), lossUsageLine(provider, "2026-10-06T11:21:00Z", "expired", 0))
+			child := lossTranscriptRecords(test, provider, "session_new.jsonl", childLines...)
+			report := analyzeLoss(append(parent, child...), options, now)
+			if report.CacheExpiry.Events != 1 || report.Events[0].AtMs != now.Add(-39*time.Minute).UnixMilli() {
+				test.Fatalf("new transcript counted as an expiry: %+v", report.CacheExpiry)
+			}
+		})
+	}
+}
+
+// TestLossSeparatesCompactedContexts excludes reset writes and retains continuing-context retries.
+func TestLossSeparatesCompactedContexts(test *testing.T) {
+	for _, provider := range []domain.Provider{domain.Codex, domain.Claude} {
+		test.Run(string(provider), func(test *testing.T) {
+			_, _, options, now := lossFixture()
+			lines := []string{}
+			boundary := `{"type":"system","subtype":"compact_boundary","timestamp":"2026-10-06T11:09:00Z","uuid":"compact-new"}`
+			if provider == domain.Codex {
+				lines = []string{`{"type":"session_meta","payload":{"id":"session"}}`, `{"type":"turn_context","payload":{"model":"fixture"}}`}
+				boundary = `{"type":"compacted","timestamp":"2026-10-06T11:09:00Z","payload":{"window_number":2,"window_id":"window-new"}}`
+			}
+			lines = append(lines, lossUsageLine(provider, "2026-10-06T11:00:00Z", "before", 100000), boundary, lossUsageLine(provider, "2026-10-06T11:10:00Z", "reset", 0), lossUsageLine(provider, "2026-10-06T11:11:00Z", "cached", 100000), lossUsageLine(provider, "2026-10-06T11:21:00Z", "expired", 0))
+			records := lossTranscriptRecords(test, provider, "session.jsonl", lines...)
+			report := analyzeLoss(records, options, now)
+			if report.CacheExpiry.Events != 1 || report.Events[0].AtMs != now.Add(-39*time.Minute).UnixMilli() {
+				test.Fatalf("compacted context counted as an expiry: %+v", report.CacheExpiry)
+			}
+		})
+	}
+}
+
+// TestLossDoesNotLinkRetriesAcrossContextStart charges a rewrite only to its own context's failure.
+func TestLossDoesNotLinkRetriesAcrossContextStart(test *testing.T) {
+	_, _, options, now := lossFixture()
+	header := []string{`{"type":"session_meta","payload":{"id":"session"}}`, `{"type":"turn_context","payload":{"model":"fixture"}}`}
+	failure := `{"type":"event_msg","timestamp":"2026-10-06T11:09:00Z","payload":{"type":"error","message":"server_error"}}`
+	parent := lossTranscriptRecords(test, domain.Codex, "parent.jsonl", append(header, lossUsageLine(domain.Codex, "2026-10-06T11:00:00Z", "before", 100000), failure)...)
+	child := lossTranscriptRecords(test, domain.Codex, "child.jsonl", append(header,
+		lossUsageLine(domain.Codex, "2026-10-06T11:10:00Z", "first", 0),
+		lossUsageLine(domain.Codex, "2026-10-06T11:11:00Z", "cached", 100000),
+		strings.Replace(failure, "11:09:00", "11:20:00", 1),
+		lossUsageLine(domain.Codex, "2026-10-06T11:21:00Z", "retry", 0))...)
+	report := analyzeLoss(append(parent, child...), options, now)
+	if report.CacheExpiry.Events != 0 || report.Errors.Events != 2 || report.Errors.Tokens != 100000 {
+		test.Fatalf("retry loss crossed context start: %+v", report)
 	}
 }
 

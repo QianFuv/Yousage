@@ -5,16 +5,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 	"yousage/internal/domain"
 )
 
-// CodexState checkpoints usage deduplication and scalar request timing without transcript content.
+// CodexState checkpoints usage deduplication, native context identity and request timing without transcript content.
 type CodexState struct {
 	Model                 string      `json:"model"`
 	Speed                 string      `json:"speed"`
 	SessionId             string      `json:"sessionId"`
+	TranscriptId          string      `json:"transcriptId,omitempty"`
+	ContextEpoch          int64       `json:"contextEpoch,omitempty"`
 	LastUsageSignature    string      `json:"lastUsageSignature"`
 	SawSessionMeta        bool        `json:"sawSessionMeta"`
 	SuppressingForkCopies bool        `json:"suppressingForkCopies"`
@@ -26,13 +29,23 @@ type CodexState struct {
 	Claude                ClaudeState `json:"claude,omitzero"`
 }
 
-// ClaudeState checkpoints request starts and unfinished messages without transcript content,
+// ClaudeState checkpoints native context identity, request starts and unfinished messages without transcript content,
 // so Claude usage and timing come from each message's final block.
 type ClaudeState struct {
-	Entries     []ClaudeEntry   `json:"entries,omitempty"`
-	Starts      []ClaudeStart   `json:"starts,omitempty"`
-	Pending     []domain.Record `json:"pending,omitempty"`
-	LastErrorMs int64           `json:"lastErrorMs,omitempty"`
+	TranscriptId string          `json:"transcriptId,omitempty"`
+	ContextEpoch int64           `json:"contextEpoch,omitempty"`
+	Entries      []ClaudeEntry   `json:"entries,omitempty"`
+	Starts       []ClaudeStart   `json:"starts,omitempty"`
+	Pending      []domain.Record `json:"pending,omitempty"`
+	LastErrorMs  int64           `json:"lastErrorMs,omitempty"`
+}
+
+// transcriptContextId keeps a file's initial context and each explicit reset distinct.
+func transcriptContextId(transcriptId string, epoch int64) string {
+	if epoch == 0 {
+		return transcriptId
+	}
+	return transcriptId + "\x00" + strconv.FormatInt(epoch, 10)
 }
 
 // ClaudeEntry links a recent non-assistant entry to its parent for request start lookups.
@@ -138,9 +151,11 @@ func ParseClaude(data []byte) *domain.Record {
 // the message ends with a null stop reason and partial usage; those wait for the final block and are
 // emitted untimed only when another message begins without one. A request that hit an API error is
 // not timed, because the interval would include the failed attempt and its retry delay.
+// Explicit compaction boundaries start a separate loss-analysis context.
 func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
 	var line struct {
 		Type       string `json:"type"`
+		Subtype    string `json:"subtype"`
 		Uuid       string `json:"uuid"`
 		ParentUuid string `json:"parentUuid"`
 		Timestamp  string `json:"timestamp"`
@@ -149,7 +164,13 @@ func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
 		} `json:"message"`
 	}
 	json.Unmarshal(data, &line)
+	if line.Type == "system" && line.Subtype == "compact_boundary" {
+		state.ContextEpoch++
+	}
 	record := ParseClaude(data)
+	if record != nil {
+		record.ContextId = transcriptContextId(state.TranscriptId, state.ContextEpoch)
+	}
 	if record != nil && record.ErrorKind != "" {
 		state.LastErrorMs = max(state.LastErrorMs, record.TimestampMs)
 		return []domain.Record{*record}
@@ -221,6 +242,7 @@ func (state *ClaudeState) requestStart(parentUuid string) int64 {
 
 // ParseCodex retains quota observations independently of billable usage and measures
 // timestamped request boundaries through model response items, excluding tool execution.
+// Compacted histories start a separate loss-analysis context without changing the session identity.
 func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	var record map[string]any
 	if json.Unmarshal(data, &record) != nil {
@@ -257,6 +279,10 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 		}
 		return nil
 	}
+	if record["type"] == "compacted" {
+		state.ContextEpoch++
+		return nil
+	}
 	if record["type"] == "turn_context" {
 		if instant, ok := timestamp(record["timestamp"]); ok && state.GenerationStartMs > 0 && state.ResponseEndMs == 0 {
 			state.GenerationStartMs = max(state.GenerationStartMs, instant)
@@ -289,7 +315,7 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 			fallback = "aborted"
 		}
 		detail := text(payload["reason"]) + " " + text(payload["message"]) + " " + errorDetail(payload["error"])
-		return &domain.Record{Provider: domain.Codex, TimestampMs: instant, SessionId: state.SessionId, Model: state.Model, ErrorKind: classifyError(detail, fallback)}
+		return &domain.Record{Provider: domain.Codex, TimestampMs: instant, SessionId: state.SessionId, ContextId: transcriptContextId(state.TranscriptId, state.ContextEpoch), Model: state.Model, ErrorKind: classifyError(detail, fallback)}
 	}
 	if payload["type"] != "token_count" {
 		return nil
@@ -346,7 +372,7 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 		state.GenerationStartMs = state.NextGenerationMs
 	}
 	state.ResponseEndMs, state.NextGenerationMs, state.IsTimingAmbiguous = 0, 0, false
-	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, Speed: state.Speed, Totals: totals, GenerationMs: duration}
+	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, ContextId: transcriptContextId(state.TranscriptId, state.ContextEpoch), Speed: state.Speed, Totals: totals, GenerationMs: duration}
 }
 
 // clearCodexTiming invalidates timing when a turn ends or fails.

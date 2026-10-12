@@ -43,6 +43,13 @@ Usage and quota-cycle pricing exclude these error facts. Arbitrary diagnostics,
 prompts and response text are never persisted. Error facts use the same atomic
 checkpoint/tail replacement and file-mtime retention as usage.
 
+Parser version 6 also retains the transcript basename and an epoch for explicit
+Claude `compact_boundary` and Codex `compacted` markers as a context identity.
+Loss analysis compares usage and links retries only within that context, so a new
+agent or rollout that inherits a session id cannot borrow the parent's cache.
+Appending or resuming the same transcript preserves its context identity; moved
+copies with the same basename retain the existing cross-file deduplication.
+
 Codex generation timing starts at a timestamped task/user boundary or preceding
 tool output and ends at the latest model response item before its unique usage
 event. Turn context can tighten the start before output. Tool outputs arriving

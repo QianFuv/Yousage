@@ -90,7 +90,7 @@ func (interner *stringInterner) flush(ctx context.Context, transaction *sql.Tx) 
 	return nil
 }
 
-// releaseRecordStrings counts identities before atomic replacement or retention deletion.
+// releaseRecordStrings decodes versioned string identities before atomic replacement or retention deletion.
 func releaseRecordStrings(ctx context.Context, transaction *sql.Tx, interner *stringInterner, condition string, arguments ...any) error {
 	rows, err := transaction.QueryContext(ctx, `SELECT r.data,r.bucket_id,q.data FROM records r LEFT JOIN quotas q ON q.file_id=r.file_id AND q.is_tail=r.is_tail AND q.ordinal=r.ordinal WHERE `+condition, arguments...)
 	if err != nil {
@@ -103,16 +103,15 @@ func releaseRecordStrings(ctx context.Context, transaction *sql.Tx, interner *st
 		if err := rows.Scan(&data, &bucket, &quota); err != nil {
 			return err
 		}
-		reader := newPayloadReader(data)
-		for range 7 {
-			interner.references[reader.integer()]--
-		}
-		if reader.err != nil {
-			return reader.err
+		if _, err := decodeRecord(data, 0, "", false, nil, func(identity int64) (string, bool) {
+			interner.references[identity]--
+			return "", true
+		}); err != nil {
+			return err
 		}
 		interner.references[bucket]--
 		if quota != nil {
-			reader = newPayloadReader(quota)
+			reader := newPayloadReader(quota)
 			interner.references[reader.integer()]--
 			count := reader.integer()
 			if count < -1 || count > int64(len(reader.data)) {

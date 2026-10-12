@@ -54,7 +54,7 @@ func (reader *payloadReader) number() float64 {
 // newPayloadReader checks the payload format version.
 func newPayloadReader(data []byte) payloadReader {
 	reader := payloadReader{data: data}
-	if len(data) == 0 || (data[0] != 1 && data[0] != 2 && data[0] != 3) {
+	if len(data) == 0 || (data[0] != 1 && data[0] != 2 && data[0] != 3 && data[0] != 4) {
 		reader.err = errors.New("unsupported storage payload version")
 		return reader
 	}
@@ -74,9 +74,9 @@ func (reader *payloadReader) finish() error {
 	return nil
 }
 
-// encodeRecord writes payload v3 with the original string slots and optional generation duration.
+// encodeRecord writes payload v4 with the original slots and a native context identity.
 func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]byte, error) {
-	writer := payloadWriter{data: []byte{3}}
+	writer := payloadWriter{data: []byte{4}}
 	for _, value := range []string{string(record.Provider), record.Model, record.RateModel, record.SessionId, record.Speed, record.DedupeKey, record.SourcePath} {
 		identity, err := intern(value)
 		if err != nil {
@@ -108,10 +108,15 @@ func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]b
 	writer.integer(kindCode)
 	writer.integer(record.CacheTtlMs)
 	writer.integer(record.GenerationMs)
+	contextId, err := intern(record.ContextId)
+	if err != nil {
+		return nil, err
+	}
+	writer.integer(contextId)
 	return writer.data, nil
 }
 
-// decodeRecord restores v1/v2/v3 facts with relational timestamp, bucket and observation fields.
+// decodeRecord restores v1 through v4 facts with relational timestamp, bucket and observation fields.
 func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool, quota []byte, lookup func(int64) (string, bool)) (domain.Record, error) {
 	reader := newPayloadReader(data)
 	values := make([]string, 7)
@@ -144,6 +149,13 @@ func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool,
 	}
 	if reader.version >= 3 {
 		record.GenerationMs = reader.integer()
+	}
+	if reader.version >= 4 {
+		contextId, exists := lookup(reader.integer())
+		if !exists {
+			reader.err = errUnknownString
+		}
+		record.ContextId = contextId
 	}
 	if err := reader.finish(); err != nil {
 		return record, err
