@@ -25,7 +25,11 @@ the t3code settings layout. Each page has a sticky header holding its title
 and controls: segmented metric and 24h/7d/30d/90d toggles, an icon refresh action and an
 overflow menu. Statistics provides provider
 charts, clickable model rows with environment comparisons, and time breakdowns.
-The content area scrolls independently; narrow windows use an icon sidebar.
+The content area scrolls independently. The desktop window keeps one layout:
+it is at least 1024×680 at 100% scale, and dragging its edges keeps it between
+3:4 and 21:9; maximizing and snapping are unrestricted. Viewports narrower than
+768 CSS pixels, such as phone browsers, use a single-column mobile layout with
+a bottom tab bar.
 Controls use the original t3code button, toggle, select, switch, menu and
 dialog primitives. Settings are grouped into cards of title/description/control
 rows; staged source and connection drafts show a floating Apply/Discard bar.
@@ -40,7 +44,8 @@ Settings is a separate destination with five sections:
 - **Appearance:** built-in/custom themes, collections, separate light/dark
   choices, color editor/inspector, JSON/JSONC/VS Code/OpenVSX imports, fonts with
   fallbacks, contrast, transparency and motion.
-- **Display & behavior:** comfortable/compact density, 100–200% scale, regional
+- **Display & behavior:** comfortable/compact density, 100–200% scale (lowered
+  temporarily when the screen cannot hold the scaled minimum window), regional
   or explicit 12/24-hour timestamps, refresh and window restoration. Recenter
   recovers the window after display changes.
 - **Sources & connections:** automatic provider discovery, quota hubs and

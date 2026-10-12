@@ -113,7 +113,7 @@ function LossContent({ report }: { report: LossReport }) {
   const totalEvents = report.cacheExpiry.events;
   return (
     <div className="flex flex-col gap-10">
-      <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <section className="grid gap-x-12 gap-y-8 md:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
@@ -306,7 +306,7 @@ function LossEvents({
               <th className="w-full py-2 text-left font-normal">
                 {t("Model")}
               </th>
-              <th className="hidden py-2 pl-6 font-normal sm:table-cell">
+              <th className="hidden py-2 pl-6 font-normal md:table-cell">
                 {t("Gap")}
               </th>
               <th className="py-2 pl-6 font-normal">{t("Tokens")}</th>
@@ -351,7 +351,7 @@ function LossEvents({
                         {event.model || t("Unknown model")}
                       </span>
                     </td>
-                    <td className="hidden py-2.5 pl-6 sm:table-cell">
+                    <td className="hidden py-2.5 pl-6 md:table-cell">
                       {gap > 0 ? formatDuration(gap) : "—"}
                     </td>
                     <td className="py-2.5 pl-6">
