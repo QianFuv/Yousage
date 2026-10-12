@@ -198,7 +198,7 @@ export class Provider {
     "installed": boolean;
     "availability"?: string;
     "status": string;
-    "auth": {"status": string, "email"?: string, "label"?: string, "subscriptionSharing"?: json$0.RawMessage};
+    "auth": {"status": string, "email"?: string, "label"?: string, "subscriptionSharing"?: json$0.RawMessage, "workspaceId"?: string};
     "usageLimits"?: quota$0.Limits | null;
     "slashCommands": SlashCommand[];
     "workspaceSnapshots"?: {"slashCommands": SlashCommand[]}[];

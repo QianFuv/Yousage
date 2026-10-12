@@ -67,6 +67,35 @@ func ReadClaudeLogin(ctx context.Context, options HttpOptions, configDirectory s
 	return limits
 }
 
+// ReadClaudeOrganization names the organization the local Claude Code login is signed in to.
+//
+// The CLI keeps this account record beside its settings when a configuration
+// directory is set, or in the home directory otherwise. One email can belong
+// to several organizations, each with its own quota.
+func ReadClaudeOrganization(options HttpOptions, configDirectory string) string {
+	directory := strings.TrimSpace(configDirectory)
+	if directory == "" {
+		directory = strings.TrimSpace(options.Environment["CLAUDE_CONFIG_DIR"])
+	}
+	path := filepath.Join(options.userHome(), ".claude.json")
+	if directory != "" {
+		path = filepath.Join(directory, ".claude.json")
+	}
+	data, err := options.file(path)
+	if err != nil {
+		return ""
+	}
+	var config struct {
+		Account *struct {
+			OrganizationUuid string `json:"organizationUuid"`
+		} `json:"oauthAccount"`
+	}
+	if json.Unmarshal(data, &config) != nil || config.Account == nil {
+		return ""
+	}
+	return strings.TrimSpace(config.Account.OrganizationUuid)
+}
+
 // PreferClaudeLogin replaces an unavailable CLI result with login-based limits when they are more informative.
 //
 // Successful login limits always win. A login failure replaces only an

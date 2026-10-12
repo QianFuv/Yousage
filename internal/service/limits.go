@@ -267,6 +267,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					if account.Limits.Unavailable != nil {
 						account.Limits = quota.PreferClaudeLogin(account.Limits, quota.ReadClaudeLogin(ctx, httpOptions, target.Home))
 					}
+					account.WorkspaceId = quota.ReadClaudeOrganization(httpOptions, target.Home)
 				case "cursor":
 					account.Limits = quota.ReadCursor(ctx, httpOptions)
 				case "grok":
@@ -287,8 +288,11 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					account.Email = old.Auth.Email
 					account.Plan = old.Auth.Label
 				}
+				if account.WorkspaceId == "" && isProbeFailed {
+					account.WorkspaceId = old.Auth.WorkspaceId
+				}
 				provider.Limits = &account.Limits
-				provider.Auth.Email, provider.Auth.Label = account.Email, account.Plan
+				provider.Auth.Email, provider.Auth.Label, provider.Auth.WorkspaceId = account.Email, account.Plan, account.WorkspaceId
 				if account.Limits.Unavailable == nil {
 					provider.Auth.Status = "authenticated"
 				}

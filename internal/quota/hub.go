@@ -48,6 +48,15 @@ type authFile struct {
 		Plan      string `json:"chatgpt_plan_type"`
 	} `json:"id_token"`
 }
+
+// workspaceId names the ChatGPT workspace whose quota this login draws on.
+func (account authFile) workspaceId() string {
+	if account.Identity == nil {
+		return ""
+	}
+	return strings.TrimSpace(account.Identity.AccountId)
+}
+
 type HubClient struct {
 	Client *http.Client
 	Key    func(context.Context, string) (string, error)
@@ -332,7 +341,7 @@ func (hub HubClient) readAccount(ctx context.Context, config HubConfig, account 
 	if account.Provider == "claude" {
 		driver = "claudeAgent"
 	}
-	result := HubAccount{Id: account.Id, Driver: driver, Account: Account{Email: account.Email, Limits: unavailable(checked(time.Now()), "probeFailed", "The hub could not read this account's usage.")}}
+	result := HubAccount{Id: account.Id, Driver: driver, Account: Account{Email: account.Email, WorkspaceId: account.workspaceId(), Limits: unavailable(checked(time.Now()), "probeFailed", "The hub could not read this account's usage.")}}
 	endpoint := "https://chatgpt.com/backend-api/wham/usage"
 	if driver == "claudeAgent" {
 		endpoint = "https://api.anthropic.com/api/oauth/usage"
@@ -405,7 +414,7 @@ func (hub HubClient) Read(ctx context.Context, config HubConfig) HubSnapshot {
 				if account.Provider == "claude" {
 					driver = "claudeAgent"
 				}
-				result.Accounts[position] = HubAccount{Id: account.Id, Driver: driver, Account: Account{Email: account.Email, Limits: unavailable(checked(time.Now()), "probeFailed", "The hub could not read this account's usage.")}}
+				result.Accounts[position] = HubAccount{Id: account.Id, Driver: driver, Account: Account{Email: account.Email, WorkspaceId: account.workspaceId(), Limits: unavailable(checked(time.Now()), "probeFailed", "The hub could not read this account's usage.")}}
 				return
 			}
 			result.Accounts[position] = hub.readAccount(ctx, config, account)

@@ -107,7 +107,7 @@ func newHubFixture(t *testing.T) *hubFixture {
 func TestHubAccountsCreditOutageAndDisabled(t *testing.T) {
 	fixture := newHubFixture(t)
 	result := fixture.client.Read(context.Background(), fixture.config)
-	if result.Error != "" || len(result.Accounts) != 2 || result.Accounts[0].Limits.Windows[0].UsedPercent != 25 || result.Accounts[0].Limits.ResetCredits.AvailableCount != 2 || result.Accounts[0].Limits.ResetCredits.NextCreditId != "early" || result.Accounts[1].Driver != "claudeAgent" || len(result.Accounts[1].Limits.Windows) != 2 {
+	if result.Error != "" || len(result.Accounts) != 2 || result.Accounts[0].WorkspaceId != "account-a" || result.Accounts[1].WorkspaceId != "" || result.Accounts[0].Limits.Windows[0].UsedPercent != 25 || result.Accounts[0].Limits.ResetCredits.AvailableCount != 2 || result.Accounts[0].Limits.ResetCredits.NextCreditId != "early" || result.Accounts[1].Driver != "claudeAgent" || len(result.Accounts[1].Limits.Windows) != 2 {
 		t.Fatal(result)
 	}
 	fixture.isCreditFailed.Store(true)
@@ -245,5 +245,40 @@ func TestPoolFreshnessUsesInstantsAcrossOffsetAndPrecision(t *testing.T) {
 	pools := CollectPools(accounts, time.Now())
 	if pools[0].Accounts[0].Email != "different" {
 		t.Fatal("reset order compared strings", pools)
+	}
+}
+
+// TestPoolKeepsWorkspacesOfOneEmailApart counts each workspace's quota once without merging them.
+func TestPoolKeepsWorkspacesOfOneEmailApart(t *testing.T) {
+	limits := makeLimits("2026-10-06T12:00:00.000Z", []Window{{Id: "primary", Kind: "session", UsedPercent: 10}})
+	personal := Candidate{Driver: "codex", EnvironmentId: "local", InstanceId: "personal", Account: Account{Email: "same@example.invalid", WorkspaceId: "personal", Limits: limits}}
+	team := Candidate{Driver: "codex", EnvironmentId: "local", InstanceId: "team", Account: Account{Email: "same@example.invalid", WorkspaceId: "team", Limits: limits}}
+	unnamed := Candidate{Driver: "codex", EnvironmentId: "remote", SourceId: "hub", AccountId: "a", Account: Account{Email: "same@example.invalid", Limits: limits}}
+	accounts := MergeAccounts([]Candidate{personal, team, unnamed})
+	if len(accounts) != 3 || accounts[0].Key == accounts[1].Key || accounts[2].Key != "hub:a" {
+		t.Fatal("an ambiguous unnamed report joined a workspace", accounts)
+	}
+	accounts = MergeAccounts([]Candidate{personal, unnamed})
+	if len(accounts) != 1 || accounts[0].Key != "codex:same@example.invalid:personal" {
+		t.Fatal("an unnamed report did not join the only known workspace", accounts)
+	}
+}
+
+// TestCodexPoolsWeeklySlotsByKind pools a weekly-only plan's primary slot with other plans' weekly slot.
+func TestCodexPoolsWeeklySlotsByKind(t *testing.T) {
+	weeklyOnly := Candidate{Driver: "codex", EnvironmentId: "local", InstanceId: "weekly", Account: Account{Email: "weekly@example.invalid", Limits: makeLimits("2026-10-06T12:00:00.000Z", []Window{{Id: "primary", Kind: "weekly", Label: "Weekly", UsedPercent: 20}})}}
+	standard := Candidate{Driver: "codex", EnvironmentId: "local", InstanceId: "standard", Account: Account{Email: "standard@example.invalid", Limits: makeLimits("2026-10-06T12:00:00.000Z", []Window{{Id: "primary", Kind: "session", Label: "Session", UsedPercent: 50}, {Id: "secondary", Kind: "weekly", Label: "Weekly", UsedPercent: 40}})}}
+	pools := CollectPools(MergeAccounts([]Candidate{weeklyOnly, standard}), time.Now())
+	if len(pools) != 1 || len(pools[0].Windows) != 2 {
+		t.Fatal("weekly slots were not pooled by kind", pools)
+	}
+	weekly := pools[0].Windows[1]
+	if weekly.Id != "weekly" || weekly.UsedPercent != 30 || weekly.Columns[0].Window == nil || weekly.Columns[1].Window == nil {
+		t.Fatal("weekly pool missed a member", weekly)
+	}
+	twoWeekly := Candidate{Driver: "codex", EnvironmentId: "local", InstanceId: "double", Account: Account{Email: "double@example.invalid", Limits: makeLimits("2026-10-06T12:00:00.000Z", []Window{{Id: "primary", Kind: "weekly", UsedPercent: 10}, {Id: "secondary", Kind: "weekly", UsedPercent: 90}})}}
+	pools = CollectPools(MergeAccounts([]Candidate{twoWeekly}), time.Now())
+	if len(pools[0].Windows) != 2 || pools[0].Windows[1].Id != "weekly:secondary" {
+		t.Fatal("an account's second weekly window was pooled with its first", pools)
 	}
 }

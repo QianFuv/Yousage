@@ -64,3 +64,24 @@ func TestClaudeLoginFailuresKeepTheMostInformativeResult(test *testing.T) {
 		test.Fatalf("CLI failure message was replaced: %+v", result)
 	}
 }
+
+// TestClaudeOrganizationFollowsTheAccountRecord reads the organization beside the settings or in the home directory.
+func TestClaudeOrganizationFollowsTheAccountRecord(test *testing.T) {
+	configured, home := test.TempDir(), test.TempDir()
+	if err := os.WriteFile(filepath.Join(configured, ".claude.json"), []byte(`{"oauthAccount":{"organizationUuid":" org-configured "}}`), 0o600); err != nil {
+		test.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"oauthAccount":{"organizationUuid":"org-home"}}`), 0o600); err != nil {
+		test.Fatal(err)
+	}
+	options := HttpOptions{Environment: map[string]string{"HOME": home}}
+	if organization := ReadClaudeOrganization(options, configured); organization != "org-configured" {
+		test.Fatalf("configured directory: got %q", organization)
+	}
+	if organization := ReadClaudeOrganization(options, ""); organization != "org-home" {
+		test.Fatalf("home directory: got %q", organization)
+	}
+	if organization := ReadClaudeOrganization(options, test.TempDir()); organization != "" {
+		test.Fatalf("missing record: got %q", organization)
+	}
+}

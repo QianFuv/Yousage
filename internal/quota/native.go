@@ -210,6 +210,12 @@ func ProbeCodex(ctx context.Context, options NativeOptions) Account {
 	if err != nil {
 		return failure("Codex returned invalid usage limits.")
 	}
+	var owner struct {
+		AccountId string `json:"accountId"`
+	}
+	if json.Unmarshal(data, &owner) == nil {
+		account.WorkspaceId = strings.TrimSpace(owner.AccountId)
+	}
 	account.Limits = limits
 	return account
 }

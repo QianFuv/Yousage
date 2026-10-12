@@ -38,9 +38,10 @@ type Limits struct {
 	Unavailable           *Unavailable   `json:"unavailable,omitempty"`
 }
 type Account struct {
-	Email  string `json:"email,omitempty"`
-	Plan   string `json:"plan,omitempty"`
-	Limits Limits `json:"usageLimits"`
+	Email       string `json:"email,omitempty"`
+	Plan        string `json:"plan,omitempty"`
+	WorkspaceId string `json:"workspaceId,omitempty"`
+	Limits      Limits `json:"usageLimits"`
 }
 
 func checked(now time.Time) string { return now.UTC().Format("2006-01-02T15:04:05.000Z") }

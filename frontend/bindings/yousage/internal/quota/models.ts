@@ -220,6 +220,7 @@ export class HubAccount {
     "driver": string;
     "email"?: string;
     "plan"?: string;
+    "workspaceId"?: string;
     "usageLimits": Limits;
 
     /** Creates a new HubAccount instance. */
@@ -241,10 +242,10 @@ export class HubAccount {
      * Creates a new HubAccount instance from a string or object.
      */
     static createFrom($$source: any = {}): HubAccount {
-        const $$createField4_0 = $$createType4;
+        const $$createField5_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("usageLimits" in $$parsedSource) {
-            $$parsedSource["usageLimits"] = $$createField4_0($$parsedSource["usageLimits"]);
+            $$parsedSource["usageLimits"] = $$createField5_0($$parsedSource["usageLimits"]);
         }
         return new HubAccount($$parsedSource as Partial<HubAccount>);
     }

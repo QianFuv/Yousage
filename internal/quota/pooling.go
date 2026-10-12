@@ -37,21 +37,73 @@ type PooledAccount struct {
 	Limits       Limits       `json:"limits"`
 }
 
+// accountKey prefers the reported email and falls back to an identical credential.
+func accountKey(driver, email string, limits Limits) string {
+	if normalized := strings.ToLower(strings.TrimSpace(email)); normalized != "" {
+		return driver + ":" + normalized
+	}
+	if limits.CredentialFingerprint != "" {
+		return driver + ":credential:" + limits.CredentialFingerprint
+	}
+	return ""
+}
+
+// accountKeyResolver keys each report by the account it draws on.
+//
+// One email can belong to several workspaces, each with its own quota, so a
+// report that names its workspace is keyed by it too. One that does not joins
+// the only workspace known for its email, and gets no key when there are
+// several. Every candidate counts, read or not, so an unreadable workspace
+// still counts as one.
+func accountKeyResolver(candidates []Candidate) func(Candidate) string {
+	workspaces := map[string]map[string]bool{}
+	for _, candidate := range candidates {
+		key, workspace := accountKey(candidate.Driver, candidate.Email, candidate.Limits), strings.TrimSpace(candidate.WorkspaceId)
+		if key != "" && workspace != "" {
+			if workspaces[key] == nil {
+				workspaces[key] = map[string]bool{}
+			}
+			workspaces[key][workspace] = true
+		}
+	}
+	return func(candidate Candidate) string {
+		key := accountKey(candidate.Driver, candidate.Email, candidate.Limits)
+		if key == "" {
+			return ""
+		}
+		if workspace := strings.TrimSpace(candidate.WorkspaceId); workspace != "" {
+			return key + ":" + workspace
+		}
+		known := workspaces[key]
+		if len(known) == 0 {
+			return key
+		}
+		if len(known) == 1 {
+			for workspace := range known {
+				return key + ":" + workspace
+			}
+		}
+		return ""
+	}
+}
+
 // MergeAccounts counts a subscription once, independently selecting fresh windows, credits and hub redemption.
 func MergeAccounts(candidates []Candidate) []PooledAccount {
 	accounts := []PooledAccount{}
 	positions := map[string]int{}
 	creditsAt, hubsAt := map[string]string{}, map[string]string{}
+	resolveKey := accountKeyResolver(candidates)
 	for _, candidate := range candidates {
 		if candidate.Limits.Unavailable != nil || len(candidate.Limits.Windows) == 0 {
 			continue
 		}
-		key := candidate.Driver + ":" + strings.ToLower(strings.TrimSpace(candidate.Email))
-		if strings.TrimSpace(candidate.Email) == "" {
-			if candidate.Limits.CredentialFingerprint != "" {
-				key = candidate.Driver + ":credential:" + candidate.Limits.CredentialFingerprint
-			} else if candidate.SourceId != "" {
+		key := resolveKey(candidate)
+		if key == "" {
+			if candidate.SourceId != "" {
 				key = candidate.SourceId + ":" + candidate.AccountId
+				if workspace := strings.TrimSpace(candidate.WorkspaceId); workspace != "" {
+					key += ":" + workspace
+				}
 			} else {
 				key = candidate.EnvironmentId + ":" + candidate.InstanceId
 			}
@@ -171,7 +223,7 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 		orderWindow := all[0]
 		orderReset := func(account PooledAccount) string {
 			for _, window := range account.Limits.Windows {
-				if window.Id == orderWindow.Id && window.Kind == orderWindow.Kind && iso(window.ResetsAt) != "" {
+				if poolKey(pool.Driver, window) == poolKey(pool.Driver, orderWindow) && iso(window.ResetsAt) != "" {
 					return iso(window.ResetsAt)
 				}
 			}
@@ -188,27 +240,43 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 			}
 			return left.Key < right.Key
 		})
+		type member struct {
+			accountKey string
+			window     Window
+		}
 		keys := []string{}
-		byKey := map[string]Window{}
+		members := map[string][]member{}
 		for _, account := range pool.Accounts {
 			for _, window := range account.Limits.Windows {
-				key := window.Kind + ":" + window.Id
-				if _, exists := byKey[key]; !exists {
-					keys = append(keys, key)
-					byKey[key] = window
+				key := poolKey(pool.Driver, window)
+				for _, existing := range members[key] {
+					if existing.accountKey == account.Key {
+						key = window.Kind + ":" + window.Id
+						break
+					}
 				}
+				if _, exists := members[key]; !exists {
+					keys = append(keys, key)
+				}
+				members[key] = append(members[key], member{account.Key, window})
 			}
 		}
-		sort.SliceStable(keys, func(first, second int) bool { return order[byKey[keys[first]].Kind] < order[byKey[keys[second]].Kind] })
+		sort.SliceStable(keys, func(first, second int) bool {
+			return order[members[keys[first]][0].window.Kind] < order[members[keys[second]][0].window.Kind]
+		})
 		for _, key := range keys {
-			first := byKey[key]
-			window := PoolWindow{Id: first.Id, Kind: first.Kind, Label: first.Label, Columns: []PoolColumn{}, Resets: []PoolReset{}}
+			first := members[key][0].window
+			id := first.Id
+			if pool.Driver == "codex" {
+				id = key
+			}
+			window := PoolWindow{Id: id, Kind: first.Kind, Label: first.Label, Columns: []PoolColumn{}, Resets: []PoolReset{}}
 			used, memberCount, timedUsed, elapsed, timedCount := 0.0, 0, 0.0, 0.0, 0
 			for _, account := range pool.Accounts {
 				var selected *Window
-				for _, candidate := range account.Limits.Windows {
-					if candidate.Kind+":"+candidate.Id == key {
-						copy := candidate
+				for _, candidate := range members[key] {
+					if candidate.accountKey == account.Key {
+						copy := candidate.window
 						selected = &copy
 						break
 					}
@@ -255,6 +323,17 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 		}
 	}
 	return result
+}
+
+// poolKey pools Codex windows by kind because its ids are slots, not allowances.
+//
+// A weekly-only Codex plan reports its weekly window as primary and other
+// plans as secondary. Other drivers' ids name distinct allowances.
+func poolKey(driver string, window Window) string {
+	if driver == "codex" {
+		return window.Kind
+	}
+	return window.Kind + ":" + window.Id
 }
 
 func accountSortName(account PooledAccount) string {

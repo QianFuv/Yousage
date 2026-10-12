@@ -25,6 +25,7 @@ type Provider struct {
 		Email               string          `json:"email,omitempty"`
 		Label               string          `json:"label,omitempty"`
 		SubscriptionSharing json.RawMessage `json:"subscriptionSharing,omitempty"`
+		WorkspaceId         string          `json:"workspaceId,omitempty"`
 	} `json:"auth"`
 	Limits             *quota.Limits  `json:"usageLimits,omitempty"`
 	SlashCommands      []SlashCommand `json:"slashCommands"`
