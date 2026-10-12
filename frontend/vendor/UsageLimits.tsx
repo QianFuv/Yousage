@@ -61,7 +61,9 @@ export function barColor(driver: ServerProvider["driver"]): string {
       ? "codex"
       : driver === "claudeAgent"
         ? "claude"
-        : undefined;
+        : driver === "antigravity"
+          ? "antigravity"
+          : undefined;
   return kind ? PROVIDER_PRESENTATION[kind].color : "var(--foreground)";
 }
 
@@ -126,7 +128,7 @@ function WindowBar({
             role="img"
             aria-label={summary}
             tabIndex={0}
-            className="relative h-6 cursor-default rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="relative h-6 cursor-default rounded-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         }
       >

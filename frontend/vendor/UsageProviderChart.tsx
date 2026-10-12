@@ -1,6 +1,7 @@
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { observeResize } from "~/lib/observeResize";
 
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
 import { formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
@@ -303,17 +304,8 @@ export function UsageProviderChart({
 
     const plot = plotRef.current;
     const tooltip = tooltipRef.current;
-    if (
-      plot === null ||
-      tooltip === null ||
-      typeof ResizeObserver === "undefined"
-    )
-      return;
-
-    const observer = new ResizeObserver(positionTooltip);
-    observer.observe(plot);
-    observer.observe(tooltip);
-    return () => observer.disconnect();
+    if (plot === null || tooltip === null) return;
+    return observeResize([plot, tooltip], positionTooltip);
   }, [hoverIndex, positionTooltip]);
 
   const handleMove = useCallback(

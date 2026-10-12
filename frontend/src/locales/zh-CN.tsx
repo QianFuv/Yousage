@@ -114,6 +114,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Could not save. Try again.": "保存失败，请重试。",
   "Could not use the reset credit.": "无法使用重置券。",
   "Create theme": "创建主题",
+  "Current match": "当前匹配",
   "Cursor usage requires explicit macOS Keychain access.":
     "读取 Cursor 用量需要授权访问 macOS 钥匙串。",
   "Custom configuration": "自定义配置",
@@ -366,6 +367,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Saved: "已保存",
   "Saving…": "正在保存…",
   "Scanning…": "正在扫描…",
+  Search: "搜索",
+  "Search matches": "搜索匹配",
   "Search Open VSX themes": "搜索 Open VSX 主题",
   "Searching…": "正在搜索…",
   Secondary: "次要背景",

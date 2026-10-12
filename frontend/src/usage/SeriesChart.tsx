@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { observeResize } from "~/lib/observeResize";
 import {
   curvePath,
   niceScale,
@@ -123,16 +124,8 @@ export function SeriesChart({
     positionTooltip();
     const plot = plotRef.current;
     const tooltip = tooltipRef.current;
-    if (
-      plot === null ||
-      tooltip === null ||
-      typeof ResizeObserver === "undefined"
-    )
-      return;
-    const observer = new ResizeObserver(positionTooltip);
-    observer.observe(plot);
-    observer.observe(tooltip);
-    return () => observer.disconnect();
+    if (plot === null || tooltip === null) return;
+    return observeResize([plot, tooltip], positionTooltip);
   }, [hoverIndex, positionTooltip]);
 
   /** Snap the hover to the nearest bucket. */

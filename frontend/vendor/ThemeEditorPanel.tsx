@@ -193,6 +193,24 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
     ],
   },
   {
+    id: "search",
+    title: msg("Search"),
+    families: [
+      {
+        id: "search-matches",
+        label: msg("Search matches"),
+        role: "searchMatchBackground",
+        roles: ["searchMatchBackground", "searchMatchForeground"],
+      },
+      {
+        id: "current-match",
+        label: msg("Current match"),
+        role: "searchMatchActiveBackground",
+        roles: ["searchMatchActiveBackground", "searchMatchActiveForeground"],
+      },
+    ],
+  },
+  {
     id: "context",
     title: msg("Context"),
     families: [
