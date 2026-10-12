@@ -303,7 +303,6 @@ function LossEvents({
           <thead>
             <tr className="border-b border-border text-right text-xs text-muted-foreground">
               <th className="py-2 pr-6 text-left font-normal">{t("Time")}</th>
-              <th className="py-2 pr-6 text-left font-normal">{t("Cause")}</th>
               <th className="w-full py-2 text-left font-normal">
                 {t("Model")}
               </th>
@@ -318,7 +317,7 @@ function LossEvents({
             {events.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={5}
                   className="py-6 text-center text-muted-foreground"
                 >
                   {t("No loss in this window.")}
@@ -339,18 +338,6 @@ function LossEvents({
                         new Date(event.atMs).toISOString(),
                         timeZone,
                       )}
-                    </td>
-                    <td className="py-2.5 pr-6 text-left text-foreground">
-                      <span className="flex items-center gap-2">
-                        <span
-                          aria-hidden
-                          className="size-2 shrink-0 rounded-full"
-                          style={{
-                            backgroundColor: CACHE_EXPIRY_COLOR,
-                          }}
-                        />
-                        {t("Cache expiry")}
-                      </span>
                     </td>
                     <td className="py-2.5 text-left text-foreground">
                       <span className="flex items-center gap-2">

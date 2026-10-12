@@ -686,7 +686,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Events: "事件",
   "Loss events table": "损耗事件表",
   Time: "时间",
-  Cause: "原因",
   Gap: "间隔",
   "Extra spend": "额外花费",
   "No loss in this window.": "该时间段内没有损耗。",
