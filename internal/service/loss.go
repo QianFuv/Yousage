@@ -198,7 +198,13 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 		if left.SessionId != right.SessionId {
 			return left.SessionId < right.SessionId
 		}
-		return left.Model < right.Model
+		if left.Model != right.Model {
+			return left.Model < right.Model
+		}
+		if left.IdleMs != right.IdleMs {
+			return left.IdleMs > right.IdleMs
+		}
+		return left.Tokens > right.Tokens
 	})
 	if len(result.Events) > LossEventLimit {
 		result.Events = result.Events[:LossEventLimit]

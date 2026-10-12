@@ -341,3 +341,22 @@ func TestLossIncludesSeparateCodexQuotaBuckets(t *testing.T) {
 		t.Fatal("separate Codex quota bucket omitted from loss", report, err)
 	}
 }
+
+// TestLossOrdersTiedEventsDeterministically keeps capped detail rows stable across separate contexts of one session.
+func TestLossOrdersTiedEventsDeterministically(t *testing.T) {
+	before, after, options, now := lossFixture()
+	records := []domain.Record{}
+	for index := range 8 {
+		previous, current := before, after
+		previous.ContextId, current.ContextId = "context-"+strconv.Itoa(index), "context-"+strconv.Itoa(index)
+		previous.TimestampMs -= int64(index) * time.Minute.Milliseconds()
+		current.Totals.CacheCreationTokens += int64(index)
+		records = append(records, previous, current)
+	}
+	expected := analyzeLoss(records, options, now).Events
+	for range 20 {
+		if actual := analyzeLoss(records, options, now).Events; !reflect.DeepEqual(actual, expected) {
+			t.Fatal("tied events changed order", actual, expected)
+		}
+	}
+}
