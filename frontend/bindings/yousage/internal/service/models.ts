@@ -268,7 +268,7 @@ export class LossEvent {
 }
 
 /**
- * LossKindCount separates user interruptions from provider failure kinds.
+ * LossKindCount counts one provider failure kind.
  */
 export class LossKindCount {
     "kind": string;
