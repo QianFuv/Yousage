@@ -130,6 +130,7 @@ export type ServerProvider = {
     email?: string;
     label?: string;
     subscriptionSharing?: boolean;
+    workspaceId?: string;
   };
   usageLimits?: ServerProviderUsageLimits;
   slashCommands: ServerProviderSlashCommand[];
@@ -149,6 +150,7 @@ export type UsageLimitSourceSnapshots = {
     driver: string;
     email?: string;
     plan?: string;
+    workspaceId?: string;
     usageLimits: ServerProviderUsageLimits;
   }[];
   error?: string;

@@ -4,8 +4,8 @@ import { THEME_COLOR_ROLES, BUILT_IN_THEMES } from '../upstream/packages/shared/
 import { createVividThemeColors, parseThemeFile, serializeThemeFile } from '../upstream/apps/web/src/themePalette';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-it('generates every one of the 57 roles for both appearances', () => {
-  expect(THEME_COLOR_ROLES).toHaveLength(57);
+it('generates every one of the 61 roles for both appearances', () => {
+  expect(THEME_COLOR_ROLES).toHaveLength(61);
   for (const appearance of ['light', 'dark'] as const) {
     const colors = createVividThemeColors(appearance, '#172554', '#f97316');
     expect(Object.keys(colors).sort()).toEqual([...THEME_COLOR_ROLES].sort());

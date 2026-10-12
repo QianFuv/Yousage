@@ -1,6 +1,6 @@
 # Yousage architecture
 
-Reference: t3code `51f7f77f87318a5329d3bab15d513fda5654200b`.
+Reference: t3code `58d253231d83f669a2cdfefa5fe479751d22c582`.
 Execution authority: the user's explicit approval of Wails v3 and subsequent
 in-task changes through completion. Windows qualification is required now;
 macOS/Linux native qualification waits for those environments.
@@ -92,7 +92,7 @@ prices have explicit Apply.
 
 Keep the floating theme editor and DOM inspector above routes. Preserve drafts,
 selection and reading context across navigation. Theme modes and light/dark
-owners are separate fields. Preserve all 57 roles, six standard/built-in choices,
+owners are separate fields. Preserve all 61 roles, six standard/built-in choices,
 paired variants, imports, collections, advanced families, preview/cancel, fonts,
 contrast, glass, motion, Open VSX and publishing behavior. The preflight hex/OKLCH
 parser is a bounded proof; complete literal CSS import compatibility remains work.

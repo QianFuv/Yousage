@@ -1,4 +1,4 @@
-// Vivid palette derivation is adapted from t3code 51f7f77 (MIT).
+// Vivid palette derivation is adapted from t3code 58d2532 (MIT).
 package theme
 
 import (
@@ -9,7 +9,7 @@ import (
 // Colors retains every product role, including roles absent from this application's screens.
 type Colors map[string]string
 
-// Generate derives the pinned 57-role palette from canvas and accent seeds.
+// Generate derives the pinned 61-role palette from canvas and accent seeds.
 func Generate(appearance, backgroundValue, accentValue string) (Colors, error) {
 	if appearance != "light" && appearance != "dark" {
 		return nil, errors.New("invalid theme appearance")
@@ -60,6 +60,8 @@ func Generate(appearance, backgroundValue, accentValue string) (Colors, error) {
 	foregroundOn := func(surface rgb) string {
 		return perceptualColor(solveLightness(textBase, surface, 4.6, isDark))
 	}
+	searchMatchRgb := oklchToRgb(surfaceAt(0.22, math.Min(0.12, accent.chroma)))
+	searchMatchActiveRgb := oklchToRgb(surfaceAt(0.4, math.Min(0.18, accent.chroma)))
 	actionHover := action
 	actionHover.lightness += choose(0.06, -0.06)
 	colors := Colors{
@@ -81,6 +83,8 @@ func Generate(appearance, backgroundValue, accentValue string) (Colors, error) {
 		"messageSurface": perceptualColor(messageSurface), "messageForeground": foregroundOn(oklchToRgb(messageSurface)),
 		"messageAction": rgbColor(actionRgb), "messageActionForeground": rgbColor(readableForeground(actionRgb)), "messageActionHover": perceptualColor(actionHover),
 		"codeBackground": perceptualColor(codeBackground), "codeForeground": rgbColor(textRgb),
+		"searchMatchBackground": rgbColor(searchMatchRgb), "searchMatchForeground": rgbColor(readableForeground(searchMatchRgb)),
+		"searchMatchActiveBackground": rgbColor(searchMatchActiveRgb), "searchMatchActiveForeground": rgbColor(readableForeground(searchMatchActiveRgb)),
 		"sidebar": perceptualColor(sidebar), "sidebarForeground": foregroundOn(sidebarRgb), "sidebarMutedForeground": rgbColor(mutedText(sidebarRgb, textRgb)),
 		"sidebarControlSurface": perceptualColor(surfaceAt(choose(0.1, 0.07), tintChroma*1.5)),
 		"sidebarRowHover":       perceptualColor(surfaceAt(choose(0.08, 0.06), math.Min(0.08, accent.chroma*0.45))),

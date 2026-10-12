@@ -1,7 +1,7 @@
 # Native themes
 
 The generator ports the frozen t3code vivid palette engine. Six committed oracle
-cases compare exactly across all 57 roles, including grayscale, alpha and OKLCH
+cases compare exactly across all 61 roles, including grayscale, alpha and OKLCH
 seeds. The generator follows actual canvas luminance rather than its appearance
 slot, and intentionally ignores seed alpha while portable direct role overrides
 retain alpha. Culori's input matrix and the palette engine's derivation matrix
@@ -9,7 +9,7 @@ remain distinct. Reused code/data is MIT; see the root notice and CULORI-LICENSE
 
 `builtins.json` is data exported from the pinned shared theme definitions without
 changing them or the reference oracle. It contains five paired themes and the
-ordered 57-role vocabulary. Standard T3 Code remains the unthemed frontend choice.
+ordered 61-role vocabulary. Standard T3 Code remains the unthemed frontend choice.
 
 Strict portable v1 import and lenient environment publishing are different
 contracts. Portable imports reject unknown roles, repeated base variants and bad

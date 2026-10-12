@@ -18,7 +18,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "culori": "4.0.2",
-    "effect": "4.0.0-rc.115",
+    "effect": "4.0.2",
     "jsonc-parser": "3.3.1",
     "jszip": "3.10.1",
     "lucide": "0.564.0",
@@ -40,10 +40,5 @@
     "typescript-eslint": "8.57.1",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
     "vitest": "5.0.1"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "effect@4.0.0-rc.115": "../tools/parity/upstream/patches/effect@4.0.0-rc.115.patch"
-    }
   }
 }

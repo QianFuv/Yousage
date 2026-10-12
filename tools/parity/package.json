@@ -16,7 +16,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "culori": "4.0.2",
-    "effect": "4.0.0-rc.115",
+    "effect": "4.0.2",
     "lucide-react": "0.564.0",
     "lucide": "0.564.0",
     "morphicons": "1.7.1",
@@ -33,10 +33,5 @@
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
     "vitest": "5.0.1"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "effect@4.0.0-rc.115": "upstream/patches/effect@4.0.0-rc.115.patch"
-    }
   }
 }

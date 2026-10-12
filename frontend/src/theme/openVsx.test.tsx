@@ -110,7 +110,7 @@ it("imports inherited colors and pairs both appearances with stable collection i
   expect(themes).toHaveLength(1);
   expect(themes[0].collection?.id).toBe(EXTENSION.collectionId);
   expect(themes[0].variants?.dark).toBeDefined();
-  expect(Object.keys(themes[0].colors)).toHaveLength(57);
+  expect(Object.keys(themes[0].colors)).toHaveLength(61);
   const repeated = await importOpenVsxThemeExtension(EXTENSION);
   expect(repeated[0].id).toBe(themes[0].id);
 });

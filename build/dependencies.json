@@ -606,9 +606,9 @@
     {
       "ecosystem": "npm",
       "name": "effect",
-      "version": "4.0.0-rc.115",
+      "version": "4.0.2",
       "license": "MIT",
-      "source": "https://registry.npmjs.org/effect/-/effect-4.0.0-rc.115.tgz",
+      "source": "https://registry.npmjs.org/effect/-/effect-4.0.2.tgz",
       "licenses": [
         {
           "file": "LICENSE",

@@ -1,11 +1,11 @@
 {
   "upstream": "https://github.com/pingdotgg/t3code",
-  "commit": "51f7f77f87318a5329d3bab15d513fda5654200b",
+  "commit": "58d253231d83f669a2cdfefa5fe479751d22c582",
   "sourcePath": "packages/shared/src/themePalettes.ts",
-  "sourceSha256": "82385050b8b691ff280efc0e93ea9dd8a4bbfd64a4c50cf8536b5c15d1e74479",
+  "sourceSha256": "a6fb0f8276608dfc8ba5edc94a786e9e6b436abb9604e38f8eff5f4898b92367",
   "dataPath": "builtins.json",
   "dataDigestAlgorithm": "SHA256-UTF8-LF-v1",
-  "dataSha256": "cfaacf7db6d89175acc6fbb7abb18c01d39b58b87a460e0a90a625ba09039e13",
+  "dataSha256": "ce64df8ad62378d38d9e2defda5519aee4384c3f6036d8413d9d5f86d932eb43",
   "conversion": "TypeScript5.9.3 transpileModule, then export only roles/BUILT_IN_THEMES; no source/oracle changes",
   "licenses": [
     "../../THIRD_PARTY_NOTICES.md",

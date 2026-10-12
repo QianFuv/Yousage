@@ -18,6 +18,12 @@
         "../tools/parity/upstream/apps/web/src/components/MorphIcon.tsx"
       ],
       "~/lib/color": ["../tools/parity/upstream/apps/web/src/lib/color.ts"],
+      "~/lib/observeResize": [
+        "../tools/parity/upstream/apps/web/src/lib/observeResize.ts"
+      ],
+      "~/lib/windowControlsOverlay": [
+        "../tools/parity/src/bridges/titlebar.tsx"
+      ],
       "~/lib/utils": ["../tools/parity/src/bridges/utils.tsx"],
       "~/components/ui/*": [
         "../tools/parity/upstream/apps/web/src/components/ui/*"

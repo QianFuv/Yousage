@@ -4327,9 +4327,9 @@ SOFTWARE.
 ```
 
 
-## npm:effect@4.0.0-rc.115
+## npm:effect@4.0.2
 
-Source: https://registry.npmjs.org/effect/-/effect-4.0.0-rc.115.tgz
+Source: https://registry.npmjs.org/effect/-/effect-4.0.2.tgz
 
 ### LICENSE
 

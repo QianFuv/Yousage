@@ -23,7 +23,7 @@ func writeTestFile(test *testing.T, path string, data []byte) {
 }
 
 func TestAllBuiltinPairsRoundTripAndParserBoundaries(test *testing.T) {
-	if len(Roles()) != 57 || len(Builtins()) != 5 {
+	if len(Roles()) != 61 || len(Builtins()) != 5 {
 		test.Fatal("pinned vocabulary incomplete")
 	}
 	for _, theme := range Builtins() {
@@ -36,7 +36,7 @@ func TestAllBuiltinPairsRoundTripAndParserBoundaries(test *testing.T) {
 		if err != nil {
 			test.Fatal(err)
 		}
-		if len(parsed.Colors) != 57 || len(parsed.Variants["dark"]) != 57 {
+		if len(parsed.Colors) != 61 || len(parsed.Variants["dark"]) != 61 {
 			test.Fatal("paired roles lost")
 		}
 		for role, value := range theme.Colors {
@@ -67,7 +67,7 @@ func TestAllBuiltinPairsRoundTripAndParserBoundaries(test *testing.T) {
 		test.Fatal("open published role rejected", err)
 	}
 	resolved := ResolvePublished("filename-owner", file)
-	if len(resolved.Colors) != 57 || resolved.Id != "filename-owner" || resolved.Colors["futureRole"] != "" {
+	if len(resolved.Colors) != 61 || resolved.Id != "filename-owner" || resolved.Colors["futureRole"] != "" {
 		test.Fatal("published normalization changed ownership/vocabulary")
 	}
 	if _, err := ParsePublished([]byte(`{"name":"Empty","appearance":"dark","variants":{"light":{"canvas":"#fff"}}}`)); err == nil {
@@ -100,7 +100,7 @@ func TestSetGenerationClearAndFilenameOwnership(test *testing.T) {
 		test.Fatal("filename identity changed", identity, err)
 	}
 	snapshot, _ := store.Show(ctx)
-	if len(snapshot.Themes) != 1 || snapshot.Themes[0].Id != "nightfall" || len(snapshot.Themes[0].Colors) != 57 {
+	if len(snapshot.Themes) != 1 || snapshot.Themes[0].Id != "nightfall" || len(snapshot.Themes[0].Colors) != 61 {
 		test.Fatal("published palette missing")
 	}
 	if err := store.Clear(ctx); err != nil {

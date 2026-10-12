@@ -1,5 +1,5 @@
 {
-  "commit": "51f7f77f87318a5329d3bab15d513fda5654200b",
+  "commit": "58d253231d83f669a2cdfefa5fe479751d22c582",
   "files": [
     {
       "gitBlob": "55ee675bb1de9e580b69f3dd68684df2a4dffba7",
@@ -8,28 +8,28 @@
       "bytes": 1070
     },
     {
-      "gitBlob": "e4b92d711fb94bd3c9d7d6bb62f590a7ccc2ecc6",
+      "gitBlob": "8f18f5c2504e53bac7c3994f71f88df7f9808dba",
       "path": "package.json",
-      "sha256": "54300473a4fe1d750514bc43d4b2e1ed7b3d0b2b92eb561f9d5c3a54abe4a30c",
-      "bytes": 5177
+      "sha256": "9f96b799007040af186c9d0806241139b9520b13ccf01ef747a6b4fc1442b78c",
+      "bytes": 5920
     },
     {
-      "gitBlob": "53c53c1c7cf9ecb2fcae5130ba5b1a78c2b5928b",
+      "gitBlob": "b4ef7684a006b28f3f53fc6f20aaf0ae08fbfd9c",
       "path": "apps/web/package.json",
-      "sha256": "f355fa4523b4eff73b0ab95d1001da83d37ed49dc6faf8b720388e699daa3ea6",
-      "bytes": 2799
+      "sha256": "b4ae97b483f8ddff53214b8e3ec82fcec3b8042380089ca30502188936e947bf",
+      "bytes": 3271
     },
     {
-      "gitBlob": "f6282b7b2935a2cd2d4f63bfd04b6d526d7126ca",
+      "gitBlob": "966acdaff77177cb82d4c62ef6bb29b1616da466",
       "path": "packages/contracts/src/usage.ts",
-      "sha256": "c924950424fd4878e39c5c606ecb48cce3a7486a53fb81346fa54c60bb12b6a5",
-      "bytes": 9419
+      "sha256": "7d1c429f2073e9f1f1e17cb2be1cc5d12145fe4bd72287b0635d0183b86a4ec5",
+      "bytes": 9957
     },
     {
-      "gitBlob": "c81b81426b6ac10d3d4902be30d088a2f9609342",
+      "gitBlob": "3ca88df66b19d20956eb386a4c8a4041d9efc7b3",
       "path": "packages/contracts/src/baseSchemas.ts",
-      "sha256": "b86e533237e85a517f76b5fcd59ba30604a5a33c4ec23af61f3b652a17cdeda7",
-      "bytes": 9315
+      "sha256": "c6fdadf757bbec61d876dfa715f2f046ba3e78417a982044820e0920a45cf01d",
+      "bytes": 16197
     },
     {
       "gitBlob": "f48ca86fbf0844c34158af5cbc833aa6e8c9d2ea",
@@ -50,16 +50,16 @@
       "bytes": 8850
     },
     {
-      "gitBlob": "b1211bffd54d54205777d614dc0a428219296482",
+      "gitBlob": "dd24b20c7e76958ec5bc48cde0e646f5ce018483",
       "path": "packages/shared/src/usageLimits.ts",
-      "sha256": "e4358e9a57001572794fec23d365ef7a7c4e181d05b055b6d6b116b8bc244ef5",
-      "bytes": 29219
+      "sha256": "51b3cf4a9246882d0e0227166e4ad34854cf8c0a4b4fbc5067df23eccfa0e903",
+      "bytes": 32401
     },
     {
-      "gitBlob": "b26244c04641b5ef7dab0af2619569a5f3e7a7a6",
+      "gitBlob": "d6d7979de5507a970f820adef31be178b3aaee45",
       "path": "packages/shared/src/themePalettes.ts",
-      "sha256": "82385050b8b691ff280efc0e93ea9dd8a4bbfd64a4c50cf8536b5c15d1e74479",
-      "bytes": 40283
+      "sha256": "a6fb0f8276608dfc8ba5edc94a786e9e6b436abb9604e38f8eff5f4898b92367",
+      "bytes": 43323
     },
     {
       "gitBlob": "62ac593d4c28689811f338cd0de5959fc561241c",
@@ -68,40 +68,34 @@
       "bytes": 4744
     },
     {
-      "gitBlob": "f2923871a323d256c031dfd50f339a9cf4a8c703",
+      "gitBlob": "50ccaad34f3c832aa3d4e8fa7d65291a9d0a8b66",
       "path": "apps/server/src/usage/usageAggregation.ts",
-      "sha256": "1be337c1df634c7b65524db44042da55d78640f28e1bb1aa4e05fb27401c3931",
-      "bytes": 12948
+      "sha256": "21b086e4bb9b3cc1f8eb656458874b15ca209e89cf3b29dea68b22a15dc061dd",
+      "bytes": 12962
     },
     {
-      "gitBlob": "0ec7ef8d622f8da175beaae55cdad8a9e0400693",
+      "gitBlob": "dda4e8257421602a6b1c5ea092ab6820c5f27b2d",
       "path": "apps/server/src/usage/usagePricing.ts",
-      "sha256": "f4f3d5d8adf2497239bd5b28ac4548560cfa5db9eadf109e6ba6c9e9e58b0f3d",
-      "bytes": 12513
+      "sha256": "5a74bab5c4ed95b931ccf729d11f3b8dc5c694c2909a450de4e728d212ba29f6",
+      "bytes": 12527
     },
     {
-      "gitBlob": "451f8a726b3ec05e336c53b77ea0ba27fc97f2db",
-      "path": "apps/server/src/usage/usageTranscripts.ts",
-      "sha256": "0eef232bab3b9c804ec1ac866901467cf862e4d5a0bc352027d7647c86c318e4",
-      "bytes": 20067
-    },
-    {
-      "gitBlob": "d4a1c4e8cc00c431bedf20dcf75404a220afa5d6",
+      "gitBlob": "da9af454c5a25f3bc7c9aa8a833651857d4762c0",
       "path": "apps/web/src/themePalette.ts",
-      "sha256": "7d4babcc2e6e740948ae7568489f4a42fb4352b0c92d787108bd280df157c426",
-      "bytes": 62146
+      "sha256": "dceec5fa428edb95cf373f34c61bab9afd5dcda342f6037130c52d5e7dd05fd1",
+      "bytes": 63410
     },
     {
-      "gitBlob": "46b57325a3ff39a80d54803d6f331135003adc0a",
+      "gitBlob": "90f204d201fe8b65810bcb6c317f88e675218c17",
       "path": "apps/web/src/index.css",
-      "sha256": "314122bee043f8448a4be36a84a22babd68cc44423e14b6f413e3d75a9eea308",
-      "bytes": 79342
+      "sha256": "b391a47112e8f1b380178b92d9cf75512a2aa7dc6ff5986b0b143b6ac5dd95bc",
+      "bytes": 82082
     },
     {
-      "gitBlob": "62772a6478dc4dbea420dd43db2617f94898a0e4",
+      "gitBlob": "d08227f61e3fdc96e039ff1c31dd22e8bff5d8a4",
       "path": "apps/web/src/components/usage/UsageProviderChart.tsx",
-      "sha256": "1116cecd173c5f468cc5ce91cc4764911187fb16fd56413070afd554021d417a",
-      "bytes": 16185
+      "sha256": "50146099587bf2dd5572cc050422030541ba88c5d9cc7ecdac5850d0e40dd15b",
+      "bytes": 17958
     },
     {
       "gitBlob": "6d94a912df536e64baf8009bead1ecb97e804c61",
@@ -110,10 +104,10 @@
       "bytes": 2421
     },
     {
-      "gitBlob": "02bbfb40ffb49c61f726990fdf7d3b41c9dfc3fc",
+      "gitBlob": "c7e3bb42b1adae542ef21f34a0bb0afb085ea8fe",
       "path": "apps/web/src/components/usage/usageProviders.ts",
-      "sha256": "5a87cef00e6e27b1190c57bdacdf82098f47834f88d4b0b8ff062f4e97533c01",
-      "bytes": 2103
+      "sha256": "276385e93fc81d4dd3e486ca2cb21cb4c699683695fa57aa21d5b2d25ddbab1e",
+      "bytes": 2202
     },
     {
       "gitBlob": "ab449af9fbbb89bbe9d1943e03215cf70793c539",
@@ -122,10 +116,10 @@
       "bytes": 3410
     },
     {
-      "gitBlob": "65e5270e60b6a3566ed7dd5755e27c84149da1f2",
+      "gitBlob": "efaa1c76801893e79d638927228c6cebac898689",
       "path": "apps/web/src/components/settings/ThemePreviewCircles.tsx",
-      "sha256": "9c54a5ee8b7e2f916b836ac8a9fdf809178d7e53d2562135ca9a73a0d9904250",
-      "bytes": 7917
+      "sha256": "a917b0299b4d8dcff2179b1603e3eb7ed135706d1852c85a3e345c8cd50f6f44",
+      "bytes": 7942
     },
     {
       "gitBlob": "6f403ed4301aa0a6d259224fe62ad6c9c0b9a955",
@@ -134,40 +128,34 @@
       "bytes": 4452
     },
     {
-      "gitBlob": "1017a787931fd4233f5571c46b8842bd0fa9ee79",
+      "gitBlob": "fbd338afbc16aece179578d7e6b8e82742f92193",
       "path": "apps/web/src/components/ui/tooltip.tsx",
-      "sha256": "8e6e4792e2fa7d4ad62ce27cf471a65b2f99a71ec775033141a6ec2e034fc82c",
-      "bytes": 5926
+      "sha256": "0a5626d43cc457c46c368c5da48f13511888f336076b58a15b0a49fe13524aec",
+      "bytes": 6646
     },
     {
-      "gitBlob": "1bb318376d23a324a42438b6c9f14febf47e20ba",
+      "gitBlob": "13322e19bef83f6b49c59da04ad18ec85836735e",
       "path": "apps/web/src/components/chat/ProviderInstanceIcon.tsx",
-      "sha256": "45572ff19d14815ba0c315dcf5116885f690b47b3487909c8d0c6b96bc8e8fec",
-      "bytes": 5043
+      "sha256": "2f802e8e244a65334e821b3d6aa494b970251323793fc1296928227405d8aa29",
+      "bytes": 5288
     },
     {
-      "gitBlob": "8c44369dc53e5a49614bca3d13e795dec67d80a1",
+      "gitBlob": "e25ca6489d9cc067ae292c90c016b668594f59ba",
       "path": "apps/web/src/lib/utils.ts",
-      "sha256": "959db86396dcb93871b8e95c8c83901073bf9289239c35e3d0bf71230b8aedc3",
-      "bytes": 1840
-    },
-    {
-      "gitBlob": "53b1a3b3f5be1755199f8a5baaa5750734156fec",
-      "path": "patches/effect@4.0.0-rc.115.patch",
-      "sha256": "e7f58877e87996e73e44f697dd39ec71b3a05dcfd00047253c11eb9ee47d84ec",
-      "bytes": 17073
+      "sha256": "1882d13f5ea8e02966a0cbd8abf0aa14794a123dd5c282a464189066e6823356",
+      "bytes": 1808
     },
     {
       "path": "apps/web/src/components/Icons.tsx",
-      "gitBlob": "f47bd48678abb7ac4206816e57c393e4a1c794b1",
-      "sha256": "5558751a7ac07c4b8fdf267cb604b2b83457a083f7b13749469fb889189691ea",
-      "bytes": 71430
+      "gitBlob": "909b9c7456f3d16c373256513278fd0a558614dc",
+      "sha256": "16927ada334f612297d667f0f208d0f8ba4007ccf10259bbaf5aed660980b939",
+      "bytes": 69710
     },
     {
       "path": "packages/contracts/src/server.ts",
-      "gitBlob": "68ffef7d110b32146da524009c34eb5f48e0cc51",
-      "sha256": "918747946774dfaddc2684a50f83b9d91f503328f977c80c46d800a5ac9d7e90",
-      "bytes": 39966
+      "gitBlob": "985e6bbc126ea84d2173b6f1caef07cc4e73146d",
+      "sha256": "e57a118cef64d3b31a28f8f77bf3d8cb7c4ad3d1fc0e289177b37ac21f8b11b2",
+      "bytes": 42618
     },
     {
       "path": "apps/web/src/components/ui/dialog.tsx",
@@ -177,15 +165,15 @@
     },
     {
       "path": "apps/web/src/components/ui/menu.tsx",
-      "gitBlob": "a8687dcdbc7dea58cfcab273ecd18e4470203a41",
-      "sha256": "6d009d488e644b93a2f3696d7f0aeb2d0fa77b34991f8b465e40dcc00af3854a",
-      "bytes": 12982
+      "gitBlob": "12e621963dc417325ccd55a8a93513c035fd64e7",
+      "sha256": "5a56a098eee903af2edcbce4d7dbcc72438e5288e51637607514c4a801f749dd",
+      "bytes": 12985
     },
     {
       "path": "apps/web/src/components/ui/button.tsx",
-      "gitBlob": "1a101f1071145982415cb50c36d91b692ea327f0",
-      "sha256": "ea8610d7be226f04bc51c7a36574740b9260cea043982a442d270e5ecd0aca9e",
-      "bytes": 9181
+      "gitBlob": "a395f459bc09c802a1567db3238524490f1f2c50",
+      "sha256": "a2fa67d6b8a592460f6775a5edd52b5b22d14a1ac3ba7d9747a31ffc80b189bd",
+      "bytes": 9298
     },
     {
       "path": "apps/web/src/components/settings/ThemeEditorHost.tsx",
@@ -195,9 +183,9 @@
     },
     {
       "path": "apps/web/src/components/settings/ThemeEditorPanel.tsx",
-      "gitBlob": "27176181768e1a4b14ea909c93b2a39ab8c41920",
-      "sha256": "f0791271bc6fb02ba9bea30c3cbb5a6cd255dee87f17a1a348cb7439e3e87b61",
-      "bytes": 47923
+      "gitBlob": "63482a22a1058de1856a4960edb3b101995fab90",
+      "sha256": "6c36f8c7785c3a9e393616677f55e445fded3b58731e151e7c20cb4d33bd164c",
+      "bytes": 48382
     },
     {
       "path": "apps/web/src/components/settings/themeEditorStore.ts",
@@ -207,15 +195,15 @@
     },
     {
       "path": "apps/web/src/components/usage/UsageLimits.tsx",
-      "gitBlob": "585bd6ccf100cfe23072e462d616a4f05f8a8542",
-      "sha256": "90e06b4b22142b775058986f2bd4a0025dad2ef8d5b5d161d532c77a62127ffe",
-      "bytes": 11868
+      "gitBlob": "45e567f346cb7a11d8b3112df390773170191028",
+      "sha256": "9afb9d0be5bade4342cd04afe72bbf548fa05fb325f94e8919fe817fde6ab198",
+      "bytes": 13946
     },
     {
       "path": "apps/web/src/components/usage/UsageLimitsPooled.tsx",
-      "gitBlob": "d99ce30b475cb53779d4ef7be43cb6ee94356105",
-      "sha256": "4b0dc4dda861f2be10364a6fe8b445103de398a328f1bfbc5b63e5ff727ab0b8",
-      "bytes": 22839
+      "gitBlob": "8a6d3cc5eecd282f8921bb60a2d66b5aa82caf84",
+      "sha256": "6e016437d028d655780bfab53a6e0379dfec166a01983218efb984be5188b31f",
+      "bytes": 23005
     },
     {
       "path": "apps/web/src/components/usage/UsageModelDialog.tsx",
@@ -225,21 +213,21 @@
     },
     {
       "path": "apps/web/src/components/usage/UsagePage.tsx",
-      "gitBlob": "969ca5f4e907ea58f8c105f2f7adbc73d305ef40",
-      "sha256": "abf0e4c350c6a0cb822350a545137848226eb28b91679407f267eca9e9103cd5",
-      "bytes": 52054
+      "gitBlob": "08a07241b612375d0f1ca1a23ac945f674e20628",
+      "sha256": "a6f51a0233ff393c08286fc5ae7fce23842d241c68d1438893b7d290866abe96",
+      "bytes": 60612
     },
     {
       "path": "apps/web/src/components/usage/UsagePriceOverrides.tsx",
-      "gitBlob": "0b52687c81b0b1df053ddbcb25c10664371b5ba9",
-      "sha256": "361f498e66620deb2253f0ce62a99b8950cd31d44a425dbca3bcd7e605b88fb8",
-      "bytes": 27501
+      "gitBlob": "4fe68f66c8a3a6e48fd51782f9fa4c17685aa311",
+      "sha256": "d458f63229d9778e7134a2719a74e6fb072ec2633caf848855af1b86bf69457d",
+      "bytes": 27467
     },
     {
       "path": "apps/web/src/components/usage/usagePagePreferences.ts",
-      "gitBlob": "630e78e98fe2b9a49505d1ab7b6f60686b95e60d",
-      "sha256": "db11dce70b89a45f375669a8c658c0c872149d54c896285a781ce329df5782e6",
-      "bytes": 1260
+      "gitBlob": "84e6723658c93a4fd5c62a0a1df6633e044e23f6",
+      "sha256": "bfea767b69328e7fc241e361864a30341242b13a8a1316ed30936820e9d6fb1d",
+      "bytes": 1481
     },
     {
       "path": "apps/web/src/components/usage/usagePriceForm.ts",
@@ -273,15 +261,15 @@
     },
     {
       "path": "apps/web/src/components/ui/scroll-area.tsx",
-      "gitBlob": "ce9d41edaa5d0a5079425a1424b4e953b8c42512",
-      "sha256": "3d0b0df8d40240ac5e60165a7345fed487120b3ea0b702167362e151dd685028",
-      "bytes": 4440
+      "gitBlob": "0a65a1374ae86d5f91b9e55e250a50c9af1e0b0c",
+      "sha256": "601ca408d3a58588baab3724f8df96ecfeb433aac487a2710a6f664cf6ada348",
+      "bytes": 4566
     },
     {
       "path": "apps/web/src/components/settings/ThemeColorPicker.tsx",
-      "gitBlob": "30f1752f6cbf79348003fdcfe775533766c79f61",
-      "sha256": "fa79ff68f0d0dc563757e0e5d11684e73cf4eae15251a8e0593891d81a26b7b8",
-      "bytes": 13326
+      "gitBlob": "50461d1ffd3174098d684c7863ed25c0f5eb4b3b",
+      "sha256": "61d4d7601695f717337bf4cb72eb503d90fc0ff8d9c1eb3c00493ae772ab1fc6",
+      "bytes": 13325
     },
     {
       "path": "apps/web/src/components/settings/themeInspector.ts",
@@ -297,21 +285,21 @@
     },
     {
       "path": "apps/web/src/components/ui/color-picker.tsx",
-      "gitBlob": "0b6adb91669c46f6dfb5f78dad4ca4ec34cff5ac",
-      "sha256": "2c24388f869f2623ff5258e2e924cf7e78e80fa23f6870790ecff8f5c083c0d3",
-      "bytes": 7572
+      "gitBlob": "0ac729ee522087efc7a1250448e816b4b7b9e4e8",
+      "sha256": "cffbf1bc0415c6315b9a03bc2bb29e4a8187e7f1104778bf1f72b31a06a05380",
+      "bytes": 7629
     },
     {
       "path": "apps/web/src/components/ui/input.tsx",
-      "gitBlob": "448986505a007b977c2af9328ffe39864c2e9d62",
-      "sha256": "87d1336adffafb195443564c0e57bdfc5d28307dd24d3fc197c6856463ffc553",
-      "bytes": 3813
+      "gitBlob": "21cd1a8f6a6bc4947c681a1d8f00640f293518f8",
+      "sha256": "0d1e01e0061339db802217fbf91dd8e06a49d4f0eec167a6465ac50f2bfd3feb",
+      "bytes": 3842
     },
     {
       "path": "apps/web/src/components/ui/switch.tsx",
-      "gitBlob": "e6bf20aa64c7ed2e18639831a441b73b540bfe58",
-      "sha256": "a2a1dbe9986ff5ef54458f12b414339d3e6ee9617eeaa2aaf57474dfaf9f6ee2",
-      "bytes": 2474
+      "gitBlob": "c982f031ce7f040a38c25e1bbc00c190f09f76d9",
+      "sha256": "b6a76d03b50e878a3659e67fac13d5d2e1e27d5857400e33499a5e46604b0274",
+      "bytes": 2477
     },
     {
       "path": "apps/web/src/components/ui/toggle-group.tsx",
@@ -321,21 +309,45 @@
     },
     {
       "path": "apps/web/src/components/ui/toggle.tsx",
-      "gitBlob": "070d47466a7d3cbd02f632075545e266b7a5a847",
-      "sha256": "af294500671a27469c82a1723b683acee70d0a08e37b84a6ff1b7bc6c52cdf98",
-      "bytes": 3451
+      "gitBlob": "69f51154ef35e59712d59add477da22d9f79c7aa",
+      "sha256": "c2ee976dd81b44482a22b4ba65c4ae06ae7aaec395a235ebbfc874904446483e",
+      "bytes": 3476
     },
     {
       "path": "apps/web/src/components/ui/popover.tsx",
-      "gitBlob": "87995d512ad0df97f46b4f43e0fa0efa1687a2c4",
-      "sha256": "76521dfd74392785ca7b74ab64555fe11afb065d9247a7ea74700173b5619be2",
-      "bytes": 6229
+      "gitBlob": "cf40b20320a422009a9afb4af8178e68e9ec054d",
+      "sha256": "4efd7294a675d43d01ed41739954be761748ab9170467b4c5a9b638ea82bb8e1",
+      "bytes": 6912
     },
     {
       "path": "apps/web/src/components/MorphIcon.tsx",
       "gitBlob": "053921dde42f03075b918ac58afcf44a41b80d13",
       "sha256": "5b77a099cafc3df61013f54abc4b4229ad2a0cfe916a47f10219e18d456dee2a",
       "bytes": 319
+    },
+    {
+      "gitBlob": "f69e9b77175d6221d614f3e4baaa5d8812310fc2",
+      "path": "packages/provider-core/src/server/usage.ts",
+      "sha256": "fea7e1b2c79334c503c1ca782eac3a6be6b3122874a7b6442c7358b888a36ad5",
+      "bytes": 7055
+    },
+    {
+      "gitBlob": "1ffcb3aecfcd00fee55cb5893798cda2d01f8f7f",
+      "path": "apps/server/src/provider/Drivers/codexUsage.ts",
+      "sha256": "d46c320d3f69b6d486e8af2c139a3f59b1ce6dcae9cea4985575b69265a11986",
+      "bytes": 10334
+    },
+    {
+      "gitBlob": "d0ad4202954cc7f39a0a2ac4ef7e3a691cf66da0",
+      "path": "apps/server/src/provider/Drivers/claudeUsage.ts",
+      "sha256": "2c25e98a29ac1a8aea88bf44ac67b07b2f6bb09e5257b00c71db87c1ffd57061",
+      "bytes": 4520
+    },
+    {
+      "gitBlob": "a7d7b11dbaac84757d9ca888facf743b4a315c0e",
+      "path": "apps/web/src/lib/observeResize.ts",
+      "sha256": "78e4d11c6330b35d7379f5031f3a474f71a1a512f3537e52a9cde99b51a53d09",
+      "bytes": 3815
     }
   ]
 }

@@ -5,7 +5,8 @@ import type { ThemeDefinition } from "@t3tools/shared/themePalettes";
  * Catppuccin Mocha (https://catppuccin.com/palette, MIT) as a dark built-in theme.
  *
  * Base, mantle and crust form the canvas, card and sidebar layers; mauve is the
- * accent; red, peach and blue carry error, warning and update states.
+ * accent; red, peach and blue carry error, warning and update states; yellow
+ * marks search matches.
  */
 export const CATPPUCCIN_MOCHA_THEME: ThemeDefinition = {
   id: "catppuccin-mocha",
@@ -55,6 +56,10 @@ export const CATPPUCCIN_MOCHA_THEME: ThemeDefinition = {
     messageActionHover: "#b4befe",
     codeBackground: "#181825",
     codeForeground: "#cdd6f4",
+    searchMatchBackground: "#605955",
+    searchMatchForeground: "#cdd6f4",
+    searchMatchActiveBackground: "#f9e2af",
+    searchMatchActiveForeground: "#11111b",
     sidebar: "#11111b",
     sidebarForeground: "#cdd6f4",
     sidebarMutedForeground: "#a6adc8",

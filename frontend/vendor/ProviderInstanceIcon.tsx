@@ -1,5 +1,6 @@
 /** The six history harness marks with native account initials and the original provider glyphs. */
-import {ClaudeAI,OpenAI,CursorIcon,GrokIcon,OpenCodeIcon,AntigravityIcon,type Icon} from "../../tools/parity/upstream/apps/web/src/components/Icons";
+import {ClaudeAI,OpenAI,CursorIcon,AntigravityIcon,type Icon} from "../../tools/parity/upstream/apps/web/src/components/Icons";
+import {GrokIcon,OpenCodeIcon} from "./providerIcons";
 import {providerInstanceInitials} from "../../tools/parity/src/bridges/instance";
 import {cn} from "../../tools/parity/src/bridges/utils";
 const MARKS:Record<string,Icon>={codex:OpenAI,claudeAgent:ClaudeAI,cursor:CursorIcon,grok:GrokIcon,opencode:OpenCodeIcon,antigravity:AntigravityIcon};

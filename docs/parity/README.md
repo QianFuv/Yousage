@@ -1,6 +1,6 @@
 # Pinned reference baseline
 
-The reference is t3code commit `51f7f77f87318a5329d3bab15d513fda5654200b`.
+The reference is t3code commit `58d253231d83f669a2cdfefa5fe479751d22c582`.
 `tools/parity/sources.json` records the Git blob ID, SHA-256 and byte length of
 each unmodified copied file. `sync-upstream.mjs` retrieves only exact pinned raw
 URLs and verifies the Git blob before writing. `verify-sources.mjs` verifies both
@@ -57,7 +57,7 @@ for color-conversion ports, require recorded numeric channel tolerance, rather
 than accepting an unspecified visual resemblance. Geometry deviations must be
 measured and recorded. Screenshots alone do not prove focus or native dialogs.
 
-`fixtures/theme-golden.json` contains six complete 57-role palettes (two modes,
+`fixtures/theme-golden.json` contains six complete 61-role palettes (two modes,
 three seed pairs including grayscale/alpha/oklch). A deliberate update uses
 `UPDATE_REFERENCE=1 pnpm --dir tools/parity test:theme`; normal tests only compare.
 Hand-calculated tests additionally guard token reasoning subsets, reported vs

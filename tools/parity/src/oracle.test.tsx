@@ -1,7 +1,7 @@
 /** Hand-calculated acceptance cases executed against unmodified pinned upstream functions. */
 import { describe, expect, it } from 'vitest';
 import { priceUsage, cacheSavingsUsd, createOverrideRateTable } from '../upstream/apps/server/src/usage/usagePricing';
-import { totalTokens } from '../upstream/apps/server/src/usage/usageTranscripts';
+import { totalTokens } from '../upstream/packages/provider-core/src/server/usage';
 import { UsageAggregator, resolveModelAliases } from '../upstream/apps/server/src/usage/usageAggregation';
 import { enumerateHourStarts } from '../upstream/packages/shared/src/usageFormat';
 import { remainingPercent, elapsedShare, paceOf } from '../upstream/packages/shared/src/usageLimits';

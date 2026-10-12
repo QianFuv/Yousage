@@ -23,7 +23,7 @@ func TestPinnedGeneratorGoldens(test *testing.T) {
 	}
 	for _, fixture := range cases {
 		actual, err := Generate(fixture.Appearance, fixture.Background, fixture.Accent)
-		if err != nil || len(actual) != 57 {
+		if err != nil || len(actual) != 61 {
 			test.Fatalf("incomplete palette: %d %v", len(actual), err)
 		}
 		for role, expected := range fixture.Colors {
