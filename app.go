@@ -49,6 +49,7 @@ type App struct {
 	isCloseBridgeActive bool
 	shouldAllowClose    bool
 	shouldCloseToTray   bool
+	zoom                float64
 }
 
 func newApp() (*App, error) {
@@ -192,7 +193,7 @@ func (service *App) ConsumeResetCredit(route quota.RedeemRoute, operationId stri
 func (service *App) GetDisplay() (preferences.SavedDisplay, error) {
 	saved, err := service.usage.Preferences.Display(service.context)
 	if err == nil && service.window != nil {
-		service.window.SetZoom(saved.Value.Zoom)
+		service.applyZoom(saved.Value.Zoom)
 	}
 	return saved, err
 }
@@ -206,7 +207,7 @@ func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.Sav
 	defer release()
 	value, err := service.usage.Preferences.SaveDisplay(ctx, saved)
 	if err == nil {
-		service.window.SetZoom(value.Value.Zoom)
+		service.applyZoom(value.Value.Zoom)
 		service.setCloseToTray(value.Value.ShouldCloseToTray)
 	}
 	return value, err

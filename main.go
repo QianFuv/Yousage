@@ -48,11 +48,11 @@ func main() {
 		SingleInstance: singleInstance,
 		Assets:         application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
 		Mac:            application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
-		Windows:        application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview")},
+		Windows:        application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview"), WndProcInterceptor: service.interceptWindowMessage},
 	})
 	service.nativeApp = nativeApp
 	service.window = nativeApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "yousage", Title: "Yousage", URL: "/", Width: 1280, Height: 900, MinWidth: 480, MinHeight: 600,
+		Name: "yousage", Title: "Yousage", URL: "/", Width: 1280, Height: 900, MinWidth: DesktopMinWidth, MinHeight: DesktopMinHeight,
 		Hidden: true, EnableFileDrop: true, BackgroundColour: application.NewRGBA(10, 10, 10, 255),
 		Windows: application.WindowsWindow{Theme: application.Light},
 	})

@@ -41,6 +41,16 @@ func setNativeAppearance(window *application.WebviewWindow, isDark bool, red, gr
 	})
 }
 
+// interceptWindowMessage keeps edge dragging of the main window within desktop proportions.
+func (service *App) interceptWindowMessage(hwnd uintptr, message uint32, wParam, lParam uintptr) (uintptr, bool) {
+	if message != w32.WM_SIZING || service.window == nil || uintptr(service.window.NativeWindow()) != hwnd {
+		return 0, false
+	}
+	rect := *(**w32.RECT)(unsafe.Pointer(&lParam))
+	rect.Left, rect.Top, rect.Right, rect.Bottom = constrainSizing(int(wParam), rect.Left, rect.Top, rect.Right, rect.Bottom)
+	return 1, true
+}
+
 var allowSetForegroundWindow = syscall.NewLazyDLL("user32.dll").NewProc("AllowSetForegroundWindow")
 
 // allowForegroundHandoff lets the running instance focus itself when a relaunch delegates to it.
