@@ -261,11 +261,11 @@ func TestLossWindowContextAndDetailCap(t *testing.T) {
 	after.TimestampMs = firstDay.UnixMilli()
 	records := []domain.Record{before, after}
 	for index := range 205 {
-		records = append(records, domain.Record{Provider: domain.Codex, TimestampMs: now.Add(-time.Duration(index) * time.Second).UnixMilli(), ErrorKind: "interrupted"})
+		records = append(records, domain.Record{Provider: domain.Codex, TimestampMs: now.Add(-time.Duration(index) * time.Second).UnixMilli(), ErrorKind: "rateLimit"})
 	}
 	records = append(records, domain.Record{Provider: domain.Codex, TimestampMs: now.Add(time.Hour).UnixMilli(), ErrorKind: "server"})
 	report := analyzeLoss(records, options, now)
-	if report.CacheExpiry.Events != 1 || report.Errors.Events != 205 || len(report.Events) != LossEventLimit || report.Events[0].AtMs != now.UnixMilli() || report.ErrorKinds[0].Kind != "interrupted" || report.ErrorKinds[0].Count != 205 || report.Days[0].CacheExpiryCount != 1 {
+	if report.CacheExpiry.Events != 1 || report.Errors.Events != 205 || len(report.Events) != LossEventLimit || report.Events[0].AtMs != now.UnixMilli() || report.ErrorKinds[0].Kind != "rateLimit" || report.ErrorKinds[0].Count != 205 || report.Days[0].CacheExpiryCount != 1 {
 		t.Fatal(report)
 	}
 }
@@ -306,5 +306,18 @@ func TestOneHourTtlSurvivesCachedRead(t *testing.T) {
 	report := analyzeLoss([]domain.Record{before, middle, after}, options, now)
 	if report.CacheExpiry.Events != 0 {
 		t.Fatal("one-hour context TTL lost across read", report)
+	}
+}
+
+// TestLossOmitsClientStops keeps user interruptions out of the report while the cache they idle past still counts.
+func TestLossOmitsClientStops(t *testing.T) {
+	before, after, options, now := lossFixture()
+	interrupted := domain.Record{Provider: before.Provider, Model: before.Model, SessionId: before.SessionId, TimestampMs: after.TimestampMs - time.Minute.Milliseconds(), ErrorKind: "interrupted"}
+	aborted := interrupted
+	aborted.TimestampMs -= time.Second.Milliseconds()
+	aborted.ErrorKind = "aborted"
+	report := analyzeLoss([]domain.Record{before, aborted, interrupted, after}, options, now)
+	if report.Errors.Events != 0 || len(report.ErrorKinds) != 0 || report.CacheExpiry.Events != 1 || len(report.Events) != 1 || report.Events[0].Kind != "cacheExpiry" {
+		t.Fatal("client stops were reported or absorbed the cache expiry", report)
 	}
 }

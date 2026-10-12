@@ -50,7 +50,7 @@ type LossTotals struct {
 	CostUsd float64 `json:"costUsd"`
 }
 
-// LossKindCount separates user interruptions from provider failure kinds.
+// LossKindCount counts one provider failure kind.
 type LossKindCount struct {
 	Kind    string  `json:"kind"`
 	Count   int     `json:"count"`
@@ -138,6 +138,11 @@ func cacheRewrite(previous, current domain.Record) (int64, string, bool) {
 	return resent, "estimated", true
 }
 
+// isClientStop reports turns the user or client ended, which are not provider losses.
+func isClientStop(errorKind string) bool {
+	return errorKind == "interrupted" || errorKind == "aborted"
+}
+
 func cacheTtl(previous domain.Record) int64 {
 	if previous.CacheTtlMs == CacheLongTtl.Milliseconds() {
 		return CacheLongTtl.Milliseconds()
@@ -160,7 +165,7 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 	}
 	sessions := map[string][]domain.Record{}
 	for _, record := range records {
-		if record.IsQuotaOnly || record.TimestampMs > now.UnixMilli() {
+		if record.IsQuotaOnly || record.TimestampMs > now.UnixMilli() || isClientStop(record.ErrorKind) {
 			continue
 		}
 		if model, exists := options.Aliases[record.Model]; exists {

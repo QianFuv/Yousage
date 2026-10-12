@@ -40,8 +40,6 @@ const ERROR_KIND_LABELS: Record<string, string> = {
   overloaded: msg("Overloaded"),
   server: msg("Server error"),
   streamDisconnected: msg("Stream disconnected"),
-  interrupted: msg("Interrupted"),
-  aborted: msg("Aborted"),
   auth: msg("Authentication failed"),
   other: msg("Other error"),
 };

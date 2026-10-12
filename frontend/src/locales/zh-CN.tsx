@@ -700,8 +700,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Overloaded: "服务过载",
   "Server error": "服务端错误",
   "Stream disconnected": "连接中断",
-  Interrupted: "用户中断",
-  Aborted: "任务中止",
   "Authentication failed": "认证失败",
   "Other error": "其他错误",
   "Copy as PNG": "复制为 PNG",
