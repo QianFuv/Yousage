@@ -188,3 +188,44 @@ it("normalizes comma-separated font fallbacks without losing quoted families", (
   );
   expect(fontFamilyList(" , ")).toBe("");
 });
+it("imports current T3 Code theme files that carry search match colors", () => {
+  const text = JSON.stringify({
+    version: 1,
+    id: "current-export",
+    name: "Current export",
+    appearance: "dark",
+    colors: {
+      canvas: "#101010",
+      accent: "#ff8800",
+      searchMatchBackground: "#8c6c1f",
+      searchMatchForeground: "#f5f5f5",
+      searchMatchActiveBackground: "#eea52b",
+      searchMatchActiveForeground: "#21180a",
+    },
+  });
+  const [theme] = parseThemeBatch([
+    { name: "current.json", text, size: text.length },
+  ]);
+  expect(theme.colors.searchMatchActiveBackground).toBe(
+    desktopCanonical("#eea52b"),
+  );
+});
+it("maps VS Code find highlights onto the search match roles", () => {
+  const text = JSON.stringify({
+    name: "Fixture Dark",
+    type: "dark",
+    colors: {
+      "editor.background": "#1e1e1e",
+      "editor.foreground": "#d4d4d4",
+      "editor.findMatchBackground": "#515c6a",
+      "editor.findMatchHighlightBackground": "#3a3d41",
+    },
+  });
+  const [theme] = parseThemeBatch([
+    { name: "vscode.json", text, size: text.length },
+  ]);
+  expect(theme.colors.searchMatchActiveBackground).toBe(
+    desktopCanonical("#515c6a"),
+  );
+  expect(theme.colors.searchMatchBackground).toBe(desktopCanonical("#3a3d41"));
+});
