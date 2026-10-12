@@ -250,7 +250,7 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 			}
 		}
 	}
-	historyInputs := []any{"robust-cycle-fit-cache-v2", selection, pricing.Value, rates.encodedRates, service.Scope}
+	historyInputs := []any{"robust-cycle-fit-cache-v3", selection, pricing.Value, rates.encodedRates, service.Scope}
 	for _, stored := range series {
 		for _, observation := range stored.Observations {
 			reset, _ := time.Parse(time.RFC3339Nano, observation.ResetsAt)

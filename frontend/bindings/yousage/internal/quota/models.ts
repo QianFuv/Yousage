@@ -6,7 +6,7 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
- * CycleValue estimates full-cycle API-equivalent USD with an empirically calibrated nominal 80% band.
+ * CycleValue estimates full-cycle API-equivalent USD with a spend-constrained uncertainty band.
  */
 export class CycleValue {
     "instanceId": string;

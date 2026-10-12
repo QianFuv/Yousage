@@ -79,6 +79,41 @@ func TestCyclePriorCombination(test *testing.T) {
 	}
 }
 
+// TestCyclePriorRespectsCurrentSpend prevents history from overriding current monetary evidence.
+func TestCyclePriorRespectsCurrentSpend(test *testing.T) {
+	now := cycleInstant("12:00")
+	for _, used := range []float64{80, 100} {
+		current := fittedFixture(now.Add(time.Hour), 300, 14, 16)
+		current.Value.Status = "insufficientData"
+		current.Value.ValueUsd, current.Value.ValueLowUsd, current.Value.ValueHighUsd = nil, nil, nil
+		current.Value.SpentUsd, current.Value.UsedPercent = 19, used
+		result := CombineCyclePrior(current, []FittedCycle{fittedFixture(now.Add(-time.Hour), 300, 14, 16)}, now)
+		if result.ValueUsd == nil || *result.ValueUsd < 19 || *result.ValueLowUsd < 19 || *result.ValueHighUsd < *result.ValueUsd {
+			test.Fatal("historical prediction below already-used amount", result)
+		}
+	}
+	current := fittedFixture(now.Add(time.Hour), 10080, 1100, 1300)
+	current.Value.SpentUsd, current.Value.UsedPercent = 972, 81
+	current.Value.Samples = []CycleValueSample{{UsedPercent: 81, SpentUsd: 972, ImpliedLowUsd: usd(972.0 / 82 * 100), ImpliedHighUsd: usd(972.0 / 80.5 * 100), IsUsable: true}}
+	result := CombineCyclePrior(current, []FittedCycle{fittedFixture(now.Add(-time.Hour), 10080, 600, 1000)}, now)
+	if result.ValueUsd == nil || *result.ValueUsd < 1185 || *result.ValueUsd > 1210 {
+		test.Fatal("historical shrinkage overrode mature current evidence", result)
+	}
+}
+
+// TestCyclePriorKeepsUnknownSpendInUpperBound preserves uncertain bucket attribution during shrinkage.
+func TestCyclePriorKeepsUnknownSpendInUpperBound(test *testing.T) {
+	start, now := cycleInstant("10:00"), cycleInstant("12:00")
+	minutes := 300
+	history := NewBucketCostHistory([]BucketCostRecord{{CostRecord: CostRecord{At: start, CostUsd: 10}, Bucket: "codex"}, {CostRecord: CostRecord{At: start, CostUsd: 400}}}, "codex", now, start)
+	current := fittedFixture(now.Add(3*time.Hour), minutes, 19, 21)
+	current.Value = EstimateCycle(CycleSeries{}, "codex", Window{Id: "primary", UsedPercent: 50, ResetsAt: checked(start.Add(5 * time.Hour)), WindowDurationMins: &minutes}, checked(now), history, now)
+	result := CombineCyclePrior(current, []FittedCycle{fittedFixture(now.Add(-time.Hour), minutes, 19, 21)}, now)
+	if result.ValueUsd == nil || math.Abs(*result.ValueUsd-20) > 1e-6 || *result.ValueLowUsd < 10 || *result.ValueLowUsd >= 410 || *result.ValueHighUsd < 410 {
+		test.Fatal("unknown bucket spend entered confirmed estimate or vanished from upper bound", result)
+	}
+}
+
 // TestCyclePriorRegimesAndCaps checks metadata, disjoint jumps, skipping and age limits.
 func TestCyclePriorRegimesAndCaps(test *testing.T) {
 	now := cycleInstant("12:00")

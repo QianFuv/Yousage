@@ -34,7 +34,7 @@ type CycleValueSample struct {
 	IsUsable       bool     `json:"usable"`
 }
 
-// CycleValue estimates full-cycle API-equivalent USD with an empirically calibrated nominal 80% band.
+// CycleValue estimates full-cycle API-equivalent USD with a spend-constrained uncertainty band.
 type CycleValue struct {
 	InstanceId            string              `json:"instanceId"`
 	Driver                string              `json:"driver"`
@@ -61,6 +61,7 @@ type CycleValue struct {
 	PriorCycleCount       int                 `json:"priorCycleCount"`
 	IsAdjustmentSuspected bool                `json:"adjustmentSuspected"`
 	History               []CycleValueHistory `json:"history"`
+	confirmedSpentUsd     *float64
 }
 
 // CycleValueHistory exposes one completed cycle and its prior selection.
@@ -333,35 +334,39 @@ func EstimateCycle(series CycleSeries, driver string, window Window, checkedAt s
 	return estimateConstraints(result, current, start, history, now, DefaultCycleLag)
 }
 
-// estimateConstraints robustly fits covered transition endpoints without weighting repeated plateaus.
+// estimateConstraints robustly weights covered transition endpoints by percentage precision and bounds lag.
 func estimateConstraints(result CycleValue, current []CycleSample, start time.Time, history CostHistory, now time.Time, lag time.Duration) CycleValue {
 	result.CycleStartedAt = checked(start)
 	result.Status = "insufficientData"
 	spentNow, records, unpriced := history.totals(start, now)
 	result.SpentUsd, result.Records, result.UnpricedRecords = *usd(spentNow), records, unpriced
+	result.confirmedSpentUsd = usd(history.lowerTotal(start, now))
 	ratios := []float64{}
 	usedTicks := map[float64]bool{}
 	fitSamples := []CycleValueSample{}
 	maxUsed := 0.0
+	lagRadius := 0.0
 	for index, sample := range current {
 		if index > 0 && index+1 < len(current) && current[index-1].UsedPercent == sample.UsedPercent && current[index+1].UsedPercent == sample.UsedPercent {
 			continue
 		}
 		instant := sampleTime(sample.CheckedAt)
-		spent, _, _ := history.totals(start, instant)
+		spent, _, sampleUnpriced := history.totals(start, instant)
 		observation := CycleValueSample{At: sample.CheckedAt, UsedPercent: percent(sample.UsedPercent), SpentUsd: *usd(spent)}
 		effective := instant.Add(-lag)
 		isCovered := !history.CoveredThrough.IsZero() && !history.CoveredThrough.Before(instant) && !start.Before(history.RetainedSince) && !effective.Before(start) && !instant.After(now)
 		if isCovered && observation.UsedPercent > 0 && observation.UsedPercent < 100 {
 			certain := history.lowerTotal(start, effective)
-			cost, _, sampleUnpriced := history.totals(start, effective)
+			laggedCost, _, _ := history.totals(start, effective)
+			cost := laggedCost/2 + spent/2
 			low, high := PercentInterval(sample.UsedPercent)
 			observation.ImpliedLowUsd = usd(certain / high * 100)
 			if low > 0 && sampleUnpriced == 0 {
-				observation.ImpliedHighUsd = usd(cost / low * 100)
+				observation.ImpliedHighUsd = usd(spent / low * 100)
 			}
 			observation.IsUsable = certain > 0 && sampleUnpriced == 0 && cost > 0
 			if observation.IsUsable {
+				lagRadius = max(lagRadius, math.Log(cost/laggedCost), math.Log(spent/cost))
 				ratios = append(ratios, sample.UsedPercent/cost)
 				usedTicks[observation.UsedPercent] = true
 				fitSamples = append(fitSamples, CycleValueSample{UsedPercent: observation.UsedPercent, SpentUsd: cost})
@@ -374,7 +379,7 @@ func estimateConstraints(result CycleValue, current []CycleSample, start time.Ti
 	if records == 0 && result.UsedPercent > 0 {
 		result.Status = "noLocalUsage"
 	} else if len(usedTicks) >= 2 {
-		slope := median(ratios)
+		slope := robustCycleSlope(ratios, fitSamples)
 		residuals, logResiduals := []float64{}, []float64{}
 		for _, sample := range fitSamples {
 			residuals = append(residuals, math.Abs(sample.UsedPercent-slope*sample.SpentUsd))
@@ -384,7 +389,7 @@ func estimateConstraints(result CycleValue, current []CycleSample, start time.Ti
 		if len(usedTicks) >= 4 && median(residuals)/max(5, maxUsed) > 0.30 {
 			result.Status = "inconsistent"
 		}
-		radius := max(cycleBandFloor(maxUsed), 1/max(1, maxUsed), 1.28*median(logResiduals))
+		radius := max(cycleBandFloor(maxUsed), 1/max(1, maxUsed), 1.28*median(logResiduals), lagRadius)
 		certain := history.lowerTotal(start, now)
 		if certain > 0 && spentNow > certain {
 			radius += math.Log(spentNow / certain)
@@ -393,6 +398,38 @@ func estimateConstraints(result CycleValue, current []CycleSample, start time.Ti
 	}
 	result.Samples = thinCycleSamples(result.Samples, -1, -1)
 	return result
+}
+
+// robustCycleSlope favors mature percentages while limiting the influence of isolated ratio outliers.
+func robustCycleSlope(ratios []float64, samples []CycleValueSample) float64 {
+	center := median(ratios)
+	deviations := make([]float64, len(ratios))
+	for index, ratio := range ratios {
+		deviations[index] = math.Abs(math.Log(ratio / center))
+	}
+	threshold := max(0.25, 3*1.4826*median(deviations))
+	type weightedRatio struct {
+		ratio, weight float64
+	}
+	weighted := make([]weightedRatio, len(ratios))
+	total := 0.0
+	for index, ratio := range ratios {
+		weight := samples[index].UsedPercent * samples[index].UsedPercent
+		if deviations[index] > threshold {
+			weight *= math.Pow(threshold/deviations[index], 2)
+		}
+		weighted[index] = weightedRatio{ratio, weight}
+		total += weight
+	}
+	sort.Slice(weighted, func(first, second int) bool { return weighted[first].ratio < weighted[second].ratio })
+	cumulative := 0.0
+	for _, sample := range weighted {
+		cumulative += sample.weight
+		if cumulative >= total/2 {
+			return sample.ratio
+		}
+	}
+	return center
 }
 
 // median returns the middle of a copied, ordered sample.
@@ -423,10 +460,29 @@ func cycleBandFloor(used float64) float64 {
 	return 0.08
 }
 
-// setCycleBand stores a multiplicative nominal 80% band and its remaining value.
+// setCycleBand respects observed spend and compatible mature evidence after fitting or prior shrinkage.
 func setCycleBand(result *CycleValue, point, logRadius float64) {
+	confirmedSpent := result.SpentUsd
+	if result.confirmedSpentUsd != nil {
+		confirmedSpent = *result.confirmedSpentUsd
+	}
+	if point > 0 && point < confirmedSpent {
+		logRadius += math.Log(confirmedSpent / point)
+		point = confirmedSpent
+	}
+	if point > 0 && len(result.Samples) > 0 {
+		latest := result.Samples[len(result.Samples)-1]
+		if latest.IsUsable && latest.UsedPercent >= 25 && latest.UsedPercent == result.UsedPercent && latest.ImpliedLowUsd != nil && latest.ImpliedHighUsd != nil {
+			calibrated := max(confirmedSpent, min(max(point, *latest.ImpliedLowUsd), *latest.ImpliedHighUsd))
+			difference := math.Abs(math.Log(calibrated / point))
+			if difference <= min(logRadius, 0.25) {
+				point = calibrated
+				logRadius += difference
+			}
+		}
+	}
 	result.ValueUsd = usd(point)
-	result.ValueLowUsd, result.ValueHighUsd = usd(point*math.Exp(-logRadius)), usd(point*math.Exp(logRadius))
+	result.ValueLowUsd, result.ValueHighUsd = usd(max(confirmedSpent, point*math.Exp(-logRadius))), usd(max(result.SpentUsd, point*math.Exp(logRadius)))
 	if result.ValueLowUsd != nil {
 		result.RemainingLowUsd = usd(max(0, *result.ValueLowUsd-result.SpentUsd))
 	}

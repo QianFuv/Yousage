@@ -279,3 +279,87 @@ func TestCycleUnpricedSampleBounds(test *testing.T) {
 		test.Fatal("early fully priced ticks discarded", result)
 	}
 }
+
+// TestCycleMatureEvidence keeps early ratios from overriding well-observed current spend.
+func TestCycleMatureEvidence(test *testing.T) {
+	for _, fixture := range []struct {
+		name             string
+		used, costs      []float64
+		minimum, maximum float64
+	}{
+		{"claude spent exceeds old fit", []float64{10, 20, 30, 80}, []float64{1.5, 3, 4.5, 19}, 23, 24},
+		{"gpt mature percentage", []float64{10, 20, 30, 81}, []float64{110, 220, 330, 972}, 1185, 1210},
+		{"corrupt latest percentage", []float64{10, 20, 30, 80}, []float64{20, 40, 60, 80}, 190, 210},
+	} {
+		test.Run(fixture.name, func(test *testing.T) {
+			start, now := cycleInstant("10:00"), cycleInstant("12:00")
+			samples := []CycleSample{}
+			records := []CostRecord{}
+			previousCost := 0.0
+			for index, used := range fixture.used {
+				at := start.Add(time.Duration(index+1) * 20 * time.Minute)
+				samples = append(samples, CycleSample{CheckedAt: checked(at), UsedPercent: used})
+				records = append(records, CostRecord{At: at.Add(-2 * time.Minute), CostUsd: fixture.costs[index] - previousCost})
+				previousCost = fixture.costs[index]
+			}
+			value := estimateConstraints(CycleValue{UsedPercent: fixture.used[len(fixture.used)-1]}, samples, start, NewCostHistory(records, now, start), now, DefaultCycleLag)
+			if value.ValueUsd == nil || *value.ValueUsd < fixture.minimum || *value.ValueUsd > fixture.maximum {
+				test.Fatalf("prediction does not respect mature evidence: %+v", value)
+			}
+			if *value.ValueLowUsd < value.SpentUsd || *value.ValueLowUsd > *value.ValueUsd || *value.ValueHighUsd < *value.ValueUsd {
+				test.Fatal("invalid spend-constrained band", value)
+			}
+		})
+	}
+}
+
+// TestCycleLagInterval covers synchronized bursts and unpriced usage inside the lag window.
+func TestCycleLagInterval(test *testing.T) {
+	start, now := cycleInstant("10:00"), cycleInstant("12:00")
+	for _, isUnpriced := range []bool{false, true} {
+		samples := []CycleSample{{CheckedAt: checked(start.Add(20 * time.Minute)), UsedPercent: 10}, {CheckedAt: checked(start.Add(40 * time.Minute)), UsedPercent: 20}}
+		records := []CostRecord{{At: start, CostUsd: 10}, {At: start.Add(40 * time.Minute), CostUsd: 10, IsUnpriced: isUnpriced}}
+		value := estimateConstraints(CycleValue{UsedPercent: 20}, samples, start, NewCostHistory(records, now, start), now, DefaultCycleLag)
+		latest := value.Samples[len(value.Samples)-1]
+		if isUnpriced {
+			if latest.IsUsable || latest.ImpliedHighUsd != nil {
+				test.Fatal("recent unpriced spend treated as complete", value)
+			}
+		} else if latest.ImpliedHighUsd == nil || math.Abs(*latest.ImpliedHighUsd-20/19.5*100) > 1e-6 || value.ValueHighUsd == nil || *value.ValueHighUsd < 100 {
+			test.Fatal("lag interval omitted synchronized spend", value)
+		}
+	}
+}
+
+// TestCycleStaleQuotaDoesNotExtrapolateLaterSpend uses the snapshot cost, not spend after it.
+func TestCycleStaleQuotaDoesNotExtrapolateLaterSpend(test *testing.T) {
+	start, now := cycleInstant("10:00"), cycleInstant("12:00")
+	samples := []CycleSample{{CheckedAt: checked(start.Add(20 * time.Minute)), UsedPercent: 20}, {CheckedAt: checked(start.Add(40 * time.Minute)), UsedPercent: 50}}
+	records := []CostRecord{{At: start, CostUsd: 20}, {At: start.Add(30 * time.Minute), CostUsd: 30}, {At: start.Add(time.Hour), CostUsd: 40}}
+	value := estimateConstraints(CycleValue{UsedPercent: 50}, samples, start, NewCostHistory(records, now, start), now, DefaultCycleLag)
+	if value.SpentUsd != 90 || value.ValueUsd == nil || math.Abs(*value.ValueUsd-100) > 1e-6 {
+		test.Fatal("later spend was normalized by a stale percentage", value)
+	}
+}
+
+// TestCycleEarlyLagDoesNotValidateLatestOutlier isolates fit compatibility from lag uncertainty.
+func TestCycleEarlyLagDoesNotValidateLatestOutlier(test *testing.T) {
+	start, now := cycleInstant("10:00"), cycleInstant("12:00")
+	samples := []CycleSample{}
+	records := []CostRecord{{At: start, CostUsd: 1}, {At: start.Add(20 * time.Minute), CostUsd: 9}}
+	for index, used := range []float64{5, 10, 20, 30, 80} {
+		at := start.Add(time.Duration(index+1) * 20 * time.Minute)
+		samples = append(samples, CycleSample{CheckedAt: checked(at), UsedPercent: used})
+		if index > 0 {
+			cost := 20.0
+			if index == 1 {
+				cost = 10
+			}
+			records = append(records, CostRecord{At: at.Add(-2 * time.Minute), CostUsd: cost})
+		}
+	}
+	value := estimateConstraints(CycleValue{UsedPercent: 80}, samples, start, NewCostHistory(records, now, start), now, DefaultCycleLag)
+	if value.ValueUsd == nil || math.Abs(*value.ValueUsd-200) > 1e-6 {
+		test.Fatal("unrelated lag allowed corrupt latest evidence to override fit", value)
+	}
+}
