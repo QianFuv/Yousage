@@ -6,6 +6,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +35,7 @@ func TestLossRolling24Hours(test *testing.T) {
 	records = append(records, outside)
 	seedReportRecords(test, service, records)
 	report, err := service.LossReport(context.Background(), 1, "America/New_York")
-	if err != nil || report.Window != window || len(report.Days) != 24 || report.Errors.Events != 3 || report.CacheExpiry.Events != 1 || report.CacheWriteTokens != 100000 {
+	if err != nil || report.Window != window || len(report.Days) != 24 || report.CacheExpiry.Events != 1 || report.CacheWriteTokens != 100000 {
 		test.Fatal(report, err)
 	}
 	for index, day := range report.Days {
@@ -41,8 +43,35 @@ func TestLossRolling24Hours(test *testing.T) {
 			test.Fatal(day, index)
 		}
 	}
-	if report.Days[0].ErrorCount != 1 || report.Days[0].CacheExpiryCount != 1 || report.Days[1].ErrorCount != 1 || report.Days[23].ErrorCount != 1 || report.Days[2].ErrorCount != 0 {
+	if report.Days[0].CacheExpiryCount != 1 || report.Days[1].CacheExpiryCount != 0 || report.Days[23].CacheExpiryCount != 0 || report.Days[2].CacheExpiryCount != 0 {
 		test.Fatal(report.Days)
+	}
+}
+
+// TestLossIgnoresAllErrors keeps every error kind out of cache-expiry reporting.
+func TestLossIgnoresAllErrors(test *testing.T) {
+	for _, provider := range []domain.Provider{domain.Claude, domain.Codex} {
+		for _, kind := range domain.ErrorKinds {
+			test.Run(string(provider)+"/"+kind, func(test *testing.T) {
+				before, after, options, now := lossFixture()
+				before.Provider, after.Provider = provider, provider
+				if provider == domain.Codex {
+					after.Totals = domain.Tokens{UncachedInputTokens: 100000}
+				}
+				failure := domain.Record{Provider: provider, Model: before.Model, SessionId: before.SessionId, TimestampMs: after.TimestampMs - time.Minute.Milliseconds(), ErrorKind: kind}
+				trailing, unknown := failure, failure
+				trailing.TimestampMs = after.TimestampMs + time.Minute.Milliseconds()
+				unknown.SessionId = ""
+				baseline := analyzeLoss([]domain.Record{before, after}, options, now)
+				report := analyzeLoss([]domain.Record{before, failure, after, trailing, unknown}, options, now)
+				if !reflect.DeepEqual(report, baseline) {
+					test.Fatalf("errors changed cache-expiry report: got %+v, want %+v", report, baseline)
+				}
+				if report := analyzeLoss([]domain.Record{failure, trailing, unknown}, options, now); len(report.Events) != 0 || report.CacheExpiry != (LossTotals{}) {
+					test.Fatal("error-only history produced loss", report)
+				}
+			})
+		}
 	}
 }
 
@@ -120,8 +149,8 @@ func TestLossSeparatesCompactedContexts(test *testing.T) {
 	}
 }
 
-// TestLossDoesNotLinkRetriesAcrossContextStart charges a rewrite only to its own context's failure.
-func TestLossDoesNotLinkRetriesAcrossContextStart(test *testing.T) {
+// TestLossIgnoresErrorsAcrossContextStart excludes first writes while retaining later cache expiry.
+func TestLossIgnoresErrorsAcrossContextStart(test *testing.T) {
 	_, _, options, now := lossFixture()
 	header := []string{`{"type":"session_meta","payload":{"id":"session"}}`, `{"type":"turn_context","payload":{"model":"fixture"}}`}
 	failure := `{"type":"event_msg","timestamp":"2026-10-06T11:09:00Z","payload":{"type":"error","message":"server_error"}}`
@@ -132,8 +161,8 @@ func TestLossDoesNotLinkRetriesAcrossContextStart(test *testing.T) {
 		strings.Replace(failure, "11:09:00", "11:20:00", 1),
 		lossUsageLine(domain.Codex, "2026-10-06T11:21:00Z", "retry", 0))...)
 	report := analyzeLoss(append(parent, child...), options, now)
-	if report.CacheExpiry.Events != 0 || report.Errors.Events != 2 || report.Errors.Tokens != 100000 {
-		test.Fatalf("retry loss crossed context start: %+v", report)
+	if report.CacheExpiry.Events != 1 || report.CacheExpiry.Tokens != 100000 || len(report.Events) != 1 || report.Events[0].AtMs != now.Add(-39*time.Minute).UnixMilli() {
+		test.Fatalf("errors changed cache expiry across context start: %+v", report)
 	}
 }
 
@@ -221,52 +250,42 @@ func TestOpenAiCacheCollapseEstimate(t *testing.T) {
 	}
 }
 
-func TestErrorFollowUpAndSingleAttribution(t *testing.T) {
+// TestLossIgnoresErrorsBeforeCacheExpiry excludes fast rewrites and cached retries even after failures.
+func TestLossIgnoresErrorsBeforeCacheExpiry(test *testing.T) {
 	before, after, options, now := lossFixture()
-	failure := domain.Record{Provider: before.Provider, SessionId: before.SessionId, Model: before.Model, TimestampMs: after.TimestampMs - time.Minute.Milliseconds(), ErrorKind: "server"}
-	second := failure
-	second.TimestampMs += 1000
-	second.ErrorKind = "rateLimit"
-	report := analyzeLoss([]domain.Record{after, second, before, failure}, options, now)
-	if report.Errors.Events != 2 || report.Errors.Tokens != 100000 || report.CacheExpiry.Events != 0 || report.Events[0].ErrorKind != "rateLimit" || report.Events[0].FollowUpMs != 59000 || report.Events[1].Tokens != 0 || len(report.ErrorKinds) != 2 || report.Days[6].ErrorCount != 2 {
-		t.Fatal(report)
+	failure := domain.Record{Provider: before.Provider, SessionId: before.SessionId, Model: before.Model, TimestampMs: before.TimestampMs + time.Second.Milliseconds(), ErrorKind: "server"}
+	after.TimestampMs = before.TimestampMs + time.Minute.Milliseconds()
+	if report := analyzeLoss([]domain.Record{before, failure, after}, options, now); len(report.Events) != 0 {
+		test.Fatal("error caused a rewrite within cache TTL to count as expiry", report)
 	}
-	after.TimestampMs = failure.TimestampMs + ErrorFollowUpLimit.Milliseconds()
-	report = analyzeLoss([]domain.Record{before, failure, after}, options, now)
-	if report.Errors.Tokens != 100000 || report.Events[0].FollowUpMs != ErrorFollowUpLimit.Milliseconds() {
-		t.Fatal("follow-up limit should be inclusive", report)
-	}
-	after.TimestampMs++
-	report = analyzeLoss([]domain.Record{before, failure, after}, options, now)
-	if report.Errors.Tokens != 0 || report.Errors.Events != 1 || report.CacheExpiry.Events != 1 {
-		t.Fatal("too late retry attributed", report)
-	}
-	after.SessionId = "different"
-	report = analyzeLoss([]domain.Record{before, failure, after}, options, now)
-	if report.Errors.Tokens != 0 || report.Errors.Events != 1 || report.Events[0].FollowUpMs != 0 {
-		t.Fatal("linked another session", report)
-	}
-	after.SessionId = before.SessionId
+	after.TimestampMs = before.TimestampMs + 10*time.Minute.Milliseconds()
 	after.Totals = domain.Tokens{CachedInputTokens: 100000}
-	report = analyzeLoss([]domain.Record{before, failure, after}, options, now)
-	if report.Errors.Tokens != 0 || report.Errors.Events != 1 {
-		t.Fatal("cached retry charged", report)
+	if report := analyzeLoss([]domain.Record{before, failure, after}, options, now); len(report.Events) != 0 {
+		test.Fatal("cached retry counted as expiry", report)
 	}
 }
 
-func TestLossWindowContextAndDetailCap(t *testing.T) {
+// TestLossWindowContextAndDetailCap preserves totals beyond the newest cache-expiry detail rows.
+func TestLossWindowContextAndDetailCap(test *testing.T) {
 	before, after, options, now := lossFixture()
 	firstDay, _ := time.Parse(time.DateOnly, options.Window.SinceDay)
 	before.TimestampMs = firstDay.Add(-10 * time.Minute).UnixMilli()
 	after.TimestampMs = firstDay.UnixMilli()
 	records := []domain.Record{before, after}
 	for index := range 205 {
-		records = append(records, domain.Record{Provider: domain.Codex, TimestampMs: now.Add(-time.Duration(index) * time.Second).UnixMilli(), ErrorKind: "rateLimit"})
+		previous, current := before, after
+		current.SessionId = "session-" + strconv.Itoa(index)
+		current.TimestampMs = now.Add(-time.Duration(index) * time.Second).UnixMilli()
+		previous.SessionId = current.SessionId
+		previous.TimestampMs = current.TimestampMs - 10*time.Minute.Milliseconds()
+		records = append(records, previous, current)
 	}
-	records = append(records, domain.Record{Provider: domain.Codex, TimestampMs: now.Add(time.Hour).UnixMilli(), ErrorKind: "server"})
+	future := after
+	future.TimestampMs = now.Add(time.Hour).UnixMilli()
+	records = append(records, future)
 	report := analyzeLoss(records, options, now)
-	if report.CacheExpiry.Events != 1 || report.Errors.Events != 205 || len(report.Events) != LossEventLimit || report.Events[0].AtMs != now.UnixMilli() || report.ErrorKinds[0].Kind != "rateLimit" || report.ErrorKinds[0].Count != 205 || report.Days[0].CacheExpiryCount != 1 {
-		t.Fatal(report)
+	if report.CacheExpiry.Events != 206 || report.CacheExpiry.Tokens != 20600000 || len(report.Events) != LossEventLimit || report.Events[0].AtMs != now.UnixMilli() || report.Days[0].CacheExpiryCount != 1 || report.Days[6].CacheExpiryCount != 205 {
+		test.Fatal(report)
 	}
 }
 
@@ -285,7 +304,7 @@ func TestLossReportLocalFactsAndAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	report, err := service.LossReport(ctx, 7, "UTC")
-	if err != nil || report.Errors.Events != 1 || report.Errors.Tokens != 100000 || math.Abs(report.Errors.CostUsd-0.23) > 1e-12 || report.CacheWriteTokens != 100000 {
+	if err != nil || report.CacheExpiry.Events != 1 || report.CacheExpiry.Tokens != 100000 || math.Abs(report.CacheExpiry.CostUsd-0.23) > 1e-12 || report.CacheWriteTokens != 100000 {
 		t.Fatal(report, err)
 	}
 	if _, err := service.LossReport(ctx, 2, "UTC"); err == nil {
@@ -309,15 +328,16 @@ func TestOneHourTtlSurvivesCachedRead(t *testing.T) {
 	}
 }
 
-// TestLossOmitsClientStops keeps user interruptions out of the report while the cache they idle past still counts.
-func TestLossOmitsClientStops(t *testing.T) {
-	before, after, options, now := lossFixture()
-	interrupted := domain.Record{Provider: before.Provider, Model: before.Model, SessionId: before.SessionId, TimestampMs: after.TimestampMs - time.Minute.Milliseconds(), ErrorKind: "interrupted"}
-	aborted := interrupted
-	aborted.TimestampMs -= time.Second.Milliseconds()
-	aborted.ErrorKind = "aborted"
-	report := analyzeLoss([]domain.Record{before, aborted, interrupted, after}, options, now)
-	if report.Errors.Events != 0 || len(report.ErrorKinds) != 0 || report.CacheExpiry.Events != 1 || len(report.Events) != 1 || report.Events[0].Kind != "cacheExpiry" {
-		t.Fatal("client stops were reported or absorbed the cache expiry", report)
+// TestLossIncludesSeparateCodexQuotaBuckets reports models billed against another Codex quota like Usage does.
+func TestLossIncludesSeparateCodexQuotaBuckets(t *testing.T) {
+	service := testService(t)
+	before, after, _, _ := lossFixture()
+	before.Provider, after.Provider = domain.Codex, domain.Codex
+	before.QuotaBucket, after.QuotaBucket = "codex_bengalfox", "codex_bengalfox"
+	after.Totals = domain.Tokens{UncachedInputTokens: 100000, OutputTokens: 100}
+	seedReportRecords(t, service, []domain.Record{before, after})
+	report, err := service.LossReport(context.Background(), 7, "UTC")
+	if err != nil || report.CacheExpiry.Events != 1 || report.CacheExpiry.Tokens != 100000 {
+		t.Fatal("separate Codex quota bucket omitted from loss", report, err)
 	}
 }

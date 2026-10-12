@@ -1,4 +1,4 @@
-/** Extra spend caused by expired prompt caches and by errors followed by a full resend. */
+/** Extra spend caused by expired prompt caches. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Events } from "@wailsio/runtime";
 import { RefreshCwIcon } from "lucide-react";
@@ -9,7 +9,6 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-import { UsageShareBar } from "../../vendor/UsageShareBar";
 import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
@@ -31,36 +30,11 @@ import type { Window } from "../../bindings/yousage/internal/accounting/models";
 const ink = (percent: number) =>
   `color-mix(in oklab, var(--foreground) ${percent}%, var(--background))`;
 
-/** Series colors shared by the totals, the daily chart and the event table. */
-const LOSS_COLORS = { cacheExpiry: ink(100), error: ink(42) } as const;
-
-/** Labels of the error kinds reported by the history collectors. */
-const ERROR_KIND_LABELS: Record<string, string> = {
-  rateLimit: msg("Rate limited"),
-  overloaded: msg("Overloaded"),
-  server: msg("Server error"),
-  streamDisconnected: msg("Stream disconnected"),
-  auth: msg("Authentication failed"),
-  other: msg("Other error"),
-};
-
-/** Error kind shades, darkest first, cycling for kinds beyond the palette. */
-const KIND_SHADES = [100, 72, 52, 36, 24] as const;
+/** Cache-expiry color shared by the totals, the daily chart and the event table. */
+const CACHE_EXPIRY_COLOR = ink(100);
 
 /**
- * Localized label of an error kind.
- *
- * @param kind - Collector error kind.
- * @returns The label, or the raw kind when it is unknown.
- */
-function errorKindLabel(kind: string | undefined): string {
-  return kind && ERROR_KIND_LABELS[kind]
-    ? t(ERROR_KIND_LABELS[kind])
-    : (kind ?? t("Other error"));
-}
-
-/**
- * Loss analysis page: cache-expiry rewrites and error resends over a trailing window.
+ * Loss analysis page: cache-expiry rewrites over a trailing window.
  *
  * @param props - Whether the page is the visible route.
  * @returns The loss page.
@@ -129,14 +103,14 @@ export function LossPage({ isActive }: { isActive: boolean }) {
 }
 
 /**
- * Totals, daily chart, error kinds and the event list of one report.
+ * Cache-expiry totals, daily chart and the event list of one report.
  *
  * @param props - The loss report.
  * @returns The page content.
  */
 function LossContent({ report }: { report: LossReport }) {
-  const totalUsd = report.cacheExpiry.costUsd + report.errors.costUsd;
-  const totalEvents = report.cacheExpiry.events + report.errors.events;
+  const totalUsd = report.cacheExpiry.costUsd;
+  const totalEvents = report.cacheExpiry.events;
   return (
     <div className="flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -155,21 +129,12 @@ function LossContent({ report }: { report: LossReport }) {
             </span>
           </div>
           <LossTotal
-            color={LOSS_COLORS.cacheExpiry}
+            color={CACHE_EXPIRY_COLOR}
             label={t("Cache expiry")}
             costUsd={report.cacheExpiry.costUsd}
             detail={t("{count} rewrites · {tokens} tokens", {
               count: formatCount(report.cacheExpiry.events),
               tokens: formatTokens(report.cacheExpiry.tokens),
-            })}
-          />
-          <LossTotal
-            color={LOSS_COLORS.error}
-            label={t("Errors")}
-            costUsd={report.errors.costUsd}
-            detail={t("{count} errors · {tokens} tokens resent", {
-              count: formatCount(report.errors.events),
-              tokens: formatTokens(report.errors.tokens),
             })}
           />
         </div>
@@ -186,19 +151,6 @@ function LossContent({ report }: { report: LossReport }) {
           )}
         </div>
       </section>
-      {report.errorKinds.length > 0 && (
-        <section className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
-          <UsageShareBar
-            label={t("Errors by kind")}
-            segments={report.errorKinds.map((kind, index) => ({
-              label: errorKindLabel(kind.kind),
-              value: kind.count,
-              color: ink(KIND_SHADES[index % KIND_SHADES.length]),
-            }))}
-            format={formatCount}
-          />
-        </section>
-      )}
       <section className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-medium">{t("Events")}</h2>
         <LossEvents events={report.events} timeZone={report.window.timeZone} />
@@ -245,7 +197,7 @@ function LossTotal({
 }
 
 /**
- * Cache-expiry and error spend per day, or per hour in a 24-hour window, as layered lines.
+ * Cache-expiry spend per day, or per hour in a 24-hour window.
  *
  * @param props - Every bucket of the window, ascending, and the report window.
  * @returns The chart element.
@@ -262,13 +214,8 @@ function LossChart({
     () => [
       {
         id: "cacheExpiry",
-        color: LOSS_COLORS.cacheExpiry,
+        color: CACHE_EXPIRY_COLOR,
         values: days.map((day) => day.cacheExpiryUsd),
-      },
-      {
-        id: "error",
-        color: LOSS_COLORS.error,
-        values: days.map((day) => day.errorUsd),
       },
     ],
     [days],
@@ -286,24 +233,11 @@ function LossChart({
       renderTooltip={(index) => {
         const day = days[index];
         return (
-          <>
-            <TooltipRow
-              color={LOSS_COLORS.cacheExpiry}
-              label={`${t("Cache expiry")} · ${formatCount(day.cacheExpiryCount)}`}
-              value={formatUsd(day.cacheExpiryUsd)}
-            />
-            <TooltipRow
-              color={LOSS_COLORS.error}
-              label={`${t("Errors")} · ${formatCount(day.errorCount)}`}
-              value={formatUsd(day.errorUsd)}
-            />
-            <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-1">
-              <span className="text-muted-foreground">{t("Total")}</span>
-              <span className="text-foreground tabular-nums">
-                {formatUsd(day.cacheExpiryUsd + day.errorUsd)}
-              </span>
-            </div>
-          </>
+          <TooltipRow
+            color={CACHE_EXPIRY_COLOR}
+            label={`${t("Cache expiry")} · ${formatCount(day.cacheExpiryCount)}`}
+            value={formatUsd(day.cacheExpiryUsd)}
+          />
         );
       }}
     />
@@ -344,7 +278,7 @@ function TooltipRow({
 const COLLAPSED_EVENTS = 20;
 
 /**
- * Newest loss events with their cause, model and extra spend.
+ * Newest cache-expiry events with their model and extra spend.
  *
  * @param props - Events newest first and the report time zone.
  * @returns The event table with an expand toggle.
@@ -394,10 +328,7 @@ function LossEvents({
               shown.map((event, index) => {
                 const provider = event.provider as UsageProviderKind;
                 const presentation = PROVIDER_PRESENTATION[provider];
-                const gap =
-                  event.kind === "cacheExpiry"
-                    ? event.idleMs
-                    : event.followUpMs;
+                const gap = event.idleMs;
                 return (
                   <tr
                     key={`${event.sessionId}:${event.atMs}:${event.kind}:${index}`}
@@ -415,15 +346,10 @@ function LossEvents({
                           aria-hidden
                           className="size-2 shrink-0 rounded-full"
                           style={{
-                            backgroundColor:
-                              event.kind === "cacheExpiry"
-                                ? LOSS_COLORS.cacheExpiry
-                                : LOSS_COLORS.error,
+                            backgroundColor: CACHE_EXPIRY_COLOR,
                           }}
                         />
-                        {event.kind === "cacheExpiry"
-                          ? t("Cache expiry")
-                          : errorKindLabel(event.errorKind)}
+                        {t("Cache expiry")}
                       </span>
                     </td>
                     <td className="py-2.5 text-left text-foreground">

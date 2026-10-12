@@ -14,8 +14,8 @@ import (
 	"yousage/internal/history/grok"
 )
 
-// ParserVersion replays retained transcripts to separate native files and compaction contexts.
-const ParserVersion = 6
+// ParserVersion replays retained transcripts to omit persisted error observations.
+const ParserVersion = 7
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -103,16 +103,8 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 				record = ParseCodex(projected, &lineState)
 			} else if provider == domain.Claude {
 				parsedRecords = ParseClaudeLine(projected, &lineState.Claude)
-				for index := range parsedRecords {
-					parsed := &parsedRecords[index]
-					if parsed.ErrorKind != "" {
-						if parsed.Model == "" {
-							parsed.Model = lineState.Model
-						}
-						if parsed.SessionId == "" {
-							parsed.SessionId = lineState.SessionId
-						}
-					} else {
+				for _, parsed := range parsedRecords {
+					if parsed.ErrorKind == "" {
 						lineState.Model, lineState.SessionId = parsed.Model, parsed.SessionId
 					}
 				}
@@ -123,6 +115,9 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 				parsedRecords = append(parsedRecords, *record)
 			}
 			for _, record := range parsedRecords {
+				if record.ErrorKind != "" {
+					continue
+				}
 				if stream.hasNewline {
 					result.Records = append(result.Records, record)
 				} else {

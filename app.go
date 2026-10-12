@@ -158,7 +158,7 @@ func (service *App) GetSpeedReport(days int, timeZone string) (dataservice.Speed
 	return service.usage.SpeedReport(service.context, days, timeZone)
 }
 
-// GetLossReport returns local cache expiry and redacted error observations.
+// GetLossReport returns local cache-expiry observations.
 func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossReport, error) {
 	return service.usage.LossReport(service.context, days, timeZone)
 }

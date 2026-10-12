@@ -33,19 +33,18 @@ Numeric timestamp values are rejected. Locale-specific implementation-dependent
 JavaScript Date.parse strings are not a provider format contract or a compatibility
 claim. Raw sources/oracles remain unchanged at t3code51f7f77.
 
-Parser version 4 replays all retained older checkpoints for generation timing,
-redacted error events
-and explicit Claude cache TTL observations. Claude system `api_error` and
-`isApiErrorMessage` markers, Codex `turn_aborted`, transport errors and failed
-`task_complete` records retain only timestamp, provider, session, known model and
-a closed error classification. Interruptions remain separate from failures.
-Usage and quota-cycle pricing exclude these error facts. Arbitrary diagnostics,
-prompts and response text are never persisted. Error facts use the same atomic
-checkpoint/tail replacement and file-mtime retention as usage.
+Parser version 7 replays retained older checkpoints for generation timing and
+explicit Claude cache TTL observations without saving error events. Claude
+`api_error` and `isApiErrorMessage` markers, Codex `turn_aborted`, transport errors
+and failed `task_complete` records are omitted from committed facts and EOF tails.
+Transient error state still prevents retry waits from inflating generation timing.
+Replayed files atomically replace older cached error facts with usage and quota
+observations only. Arbitrary diagnostics, prompts and response text are never
+persisted.
 
 Parser version 6 also retains the transcript basename and an epoch for explicit
 Claude `compact_boundary` and Codex `compacted` markers as a context identity.
-Loss analysis compares usage and links retries only within that context, so a new
+Loss analysis compares usage only within that context, so a new
 agent or rollout that inherits a session id cannot borrow the parent's cache.
 Appending or resuming the same transcript preserves its context identity; moved
 copies with the same basename retain the existing cross-file deduplication.

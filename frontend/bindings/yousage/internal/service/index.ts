@@ -7,7 +7,6 @@ export {
     EnvironmentState,
     LossDay,
     LossEvent,
-    LossKindCount,
     LossReport,
     LossTotals,
     NativeProvider,

@@ -10,6 +10,7 @@ import (
 	"yousage/internal/storage"
 )
 
+// TestClaudeErrorMarkersAndRedaction keeps transient classifications out of retained facts.
 func TestClaudeErrorMarkersAndRedaction(t *testing.T) {
 	for _, test := range []struct{ marker, errorValue, kind string }{
 		{`"subtype":"api_error"`, `"rate_limit"`, "rateLimit"},
@@ -26,14 +27,17 @@ func TestClaudeErrorMarkersAndRedaction(t *testing.T) {
 			t.Fatal(record)
 		}
 		path := filepath.Join(t.TempDir(), "error.jsonl")
-		writeHistory(t, path, data+"\n")
-		read, err := ReadTranscript(context.Background(), path, domain.Claude, domain.Checkpoint{})
-		if err != nil || len(read.Records) != 1 || read.Records[0].ErrorKind != test.kind {
-			t.Fatal(read, err)
+		for _, ending := range []string{"\n", ""} {
+			writeHistory(t, path, data+ending)
+			read, err := ReadTranscript(context.Background(), path, domain.Claude, domain.Checkpoint{})
+			if err != nil || len(read.Records) != 0 || len(read.Tail) != 0 {
+				t.Fatal("Claude error retained as usage or EOF tail", read, err)
+			}
 		}
 	}
 }
 
+// TestCodexErrorMarkers keeps abort and failure markers out of retained facts.
 func TestCodexErrorMarkers(t *testing.T) {
 	for _, test := range []struct{ event, kind string }{
 		{`{"type":"turn_aborted","reason":"interrupted"}`, "interrupted"},
@@ -47,17 +51,23 @@ func TestCodexErrorMarkers(t *testing.T) {
 		{`{"type":"error","message":"synthetic unknown failure"}`, "other"},
 	} {
 		data := `{"type":"event_msg","timestamp":"2026-10-06T12:00:00Z","payload":` + test.event + `}`
+		state := InitialCodexState()
+		if record := ParseCodex([]byte(data), &state); record == nil || record.ErrorKind != test.kind || record.Validate() != nil {
+			t.Fatal(record)
+		}
 		path := filepath.Join(t.TempDir(), "error.jsonl")
-		writeHistory(t, path, sessionMeta+"\n"+turnContext+"\n"+data+"\n")
-		read, err := ReadTranscript(context.Background(), path, domain.Codex, domain.Checkpoint{})
-		if err != nil || len(read.Records) != 1 || read.Records[0].ErrorKind != test.kind || read.Records[0].SessionId != "session" || read.Records[0].Model != "fixture" || read.Records[0].Validate() != nil {
-			t.Fatal(read, err)
+		for _, ending := range []string{"\n", ""} {
+			writeHistory(t, path, sessionMeta+"\n"+turnContext+"\n"+data+ending)
+			read, err := ReadTranscript(context.Background(), path, domain.Codex, domain.Checkpoint{})
+			if err != nil || len(read.Records) != 0 || len(read.Tail) != 0 {
+				t.Fatal("Codex error retained as usage or EOF tail", read, err)
+			}
 		}
 	}
 	rootPath := filepath.Join(t.TempDir(), "root-error.jsonl")
 	writeHistory(t, rootPath, `{"type":"turn_aborted","timestamp":"2026-10-06T12:00:00Z","reason":"interrupted"}`+"\n")
 	rootRead, rootError := ReadTranscript(context.Background(), rootPath, domain.Codex, domain.Checkpoint{})
-	if rootError != nil || len(rootRead.Records) != 1 || rootRead.Records[0].ErrorKind != "interrupted" {
+	if rootError != nil || len(rootRead.Records) != 0 || len(rootRead.Tail) != 0 {
 		t.Fatal(rootRead, rootError)
 	}
 	state := InitialCodexState()
@@ -69,7 +79,8 @@ func TestCodexErrorMarkers(t *testing.T) {
 	}
 }
 
-func TestCacheTtlAndClaudeErrorModelAcrossAppend(t *testing.T) {
+// TestCacheTtlAndClaudeErrorStateAcrossAppend preserves usage state while omitting appended errors.
+func TestCacheTtlAndClaudeErrorStateAcrossAppend(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "claude.jsonl")
 	data := `{"type":"assistant","timestamp":"2026-10-06T12:00:00Z","sessionId":"session","message":{"model":"fixture","usage":{"cache_creation_input_tokens":50000,"cache_creation":{"ephemeral_1h_input_tokens":50000}}}}` + "\n"
 	writeHistory(t, path, data)
@@ -79,14 +90,19 @@ func TestCacheTtlAndClaudeErrorModelAcrossAppend(t *testing.T) {
 	}
 	writeHistory(t, path, data+`{"type":"system","subtype":"api_error","timestamp":"2026-10-06T12:01:00Z","error":"server_error"}`+"\n")
 	appended, err := ReadTranscript(context.Background(), path, domain.Claude, read.Checkpoint)
-	if err != nil || !appended.IsResumed || len(appended.Records) != 1 || appended.Records[0].Model != "fixture" || appended.Records[0].SessionId != "session" {
+	if err != nil || !appended.IsResumed || len(appended.Records) != 0 || len(appended.Tail) != 0 {
 		t.Fatal(appended, err)
+	}
+	var state CodexState
+	if err := json.Unmarshal(appended.Checkpoint.Reducer, &state); err != nil || state.Model != "fixture" || state.SessionId != "session" || state.Claude.LastErrorMs != time.Date(2026, 10, 6, 12, 1, 0, 0, time.UTC).UnixMilli() {
+		t.Fatal("transient error lost usage or generation state", state, err)
 	}
 }
 
-func TestErrorParserUpgradeReplaysUnchangedFiles(t *testing.T) {
+// TestErrorParserUpgradeDropsRetainedErrors replaces legacy error facts once without losing usage.
+func TestErrorParserUpgradeDropsRetainedErrors(t *testing.T) {
 	for _, provider := range []domain.Provider{domain.Claude, domain.Codex} {
-		for _, version := range []int{1, 2} {
+		for _, version := range []int{1, 2, 6} {
 			t.Run(string(provider)+string(rune('0'+version)), func(t *testing.T) {
 				ctx := context.Background()
 				home := t.TempDir()
@@ -114,7 +130,11 @@ func TestErrorParserUpgradeReplaysUnchangedFiles(t *testing.T) {
 				checkpoint, _ := store.Checkpoint(ctx, id, path)
 				records, _ := store.Records(ctx, id)
 				checkpoint.ParserVersion = version
-				checkpoint, err = store.CommitFile(ctx, checkpoint, records[:1], true)
+				if len(records) != 1 {
+					t.Fatal("usage missing before legacy cache setup", records)
+				}
+				failure := domain.Record{Provider: provider, TimestampMs: now.Add(-59 * time.Minute).UnixMilli(), SessionId: "session", ErrorKind: "server"}
+				checkpoint, err = store.CommitFile(ctx, checkpoint, append(records, failure), true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -123,7 +143,7 @@ func TestErrorParserUpgradeReplaysUnchangedFiles(t *testing.T) {
 				}
 				actual, _ := store.Checkpoint(ctx, id, path)
 				records, _ = store.Records(ctx, id)
-				if actual.ParserVersion != ParserVersion || actual.Revision != checkpoint.Revision+1 || len(records) != 2 || records[1].ErrorKind == "" {
+				if actual.ParserVersion != ParserVersion || actual.Revision != checkpoint.Revision+1 || len(records) != 1 || records[0].ErrorKind != "" || records[0].Totals.Total() == 0 {
 					t.Fatal(actual, records)
 				}
 				if _, err := collector.Synchronize(ctx, roots, now); err != nil {
@@ -132,10 +152,6 @@ func TestErrorParserUpgradeReplaysUnchangedFiles(t *testing.T) {
 				stable, _ := store.Checkpoint(ctx, id, path)
 				if stable.Revision != actual.Revision {
 					t.Fatal("upgraded file reread twice")
-				}
-				encoded, _ := json.Marshal(records[1])
-				if len(encoded) > 400 {
-					t.Fatal("error persisted unexpected fields")
 				}
 			})
 		}

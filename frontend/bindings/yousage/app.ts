@@ -162,7 +162,7 @@ export function GetLocalEnvironmentId(): $CancellablePromise<string> {
 }
 
 /**
- * GetLossReport returns local cache expiry and redacted error observations.
+ * GetLossReport returns local cache-expiry observations.
  */
 export function GetLossReport(days: number, timeZone: string): $CancellablePromise<service$0.LossReport> {
     return $Call.ByID(4060904650, days, timeZone).then(($result: any) => {

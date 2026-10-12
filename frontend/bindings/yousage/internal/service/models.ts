@@ -172,9 +172,7 @@ export class EnvironmentState {
 export class LossDay {
     "day": string;
     "cacheExpiryUsd": number;
-    "errorUsd": number;
     "cacheExpiryCount": number;
-    "errorCount": number;
 
     /** Creates a new LossDay instance. */
     constructor($$source: Partial<LossDay> = {}) {
@@ -184,14 +182,8 @@ export class LossDay {
         if (!("cacheExpiryUsd" in $$source)) {
             this["cacheExpiryUsd"] = 0;
         }
-        if (!("errorUsd" in $$source)) {
-            this["errorUsd"] = 0;
-        }
         if (!("cacheExpiryCount" in $$source)) {
             this["cacheExpiryCount"] = 0;
-        }
-        if (!("errorCount" in $$source)) {
-            this["errorCount"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -211,7 +203,6 @@ export class LossDay {
  */
 export class LossEvent {
     "kind": string;
-    "errorKind"?: string;
     "provider": string;
     "model": string;
     "sessionId": string;
@@ -219,7 +210,6 @@ export class LossEvent {
     "idleMs": number;
     "tokens": number;
     "costUsd": number;
-    "followUpMs": number;
     "precision": string;
 
     /** Creates a new LossEvent instance. */
@@ -248,9 +238,6 @@ export class LossEvent {
         if (!("costUsd" in $$source)) {
             this["costUsd"] = 0;
         }
-        if (!("followUpMs" in $$source)) {
-            this["followUpMs"] = 0;
-        }
         if (!("precision" in $$source)) {
             this["precision"] = "";
         }
@@ -268,45 +255,11 @@ export class LossEvent {
 }
 
 /**
- * LossKindCount counts one provider failure kind.
- */
-export class LossKindCount {
-    "kind": string;
-    "count": number;
-    "costUsd": number;
-
-    /** Creates a new LossKindCount instance. */
-    constructor($$source: Partial<LossKindCount> = {}) {
-        if (!("kind" in $$source)) {
-            this["kind"] = "";
-        }
-        if (!("count" in $$source)) {
-            this["count"] = 0;
-        }
-        if (!("costUsd" in $$source)) {
-            this["costUsd"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new LossKindCount instance from a string or object.
-     */
-    static createFrom($$source: any = {}): LossKindCount {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new LossKindCount($$parsedSource as Partial<LossKindCount>);
-    }
-}
-
-/**
- * LossReport summarizes local cache rewrites and redacted errors.
+ * LossReport summarizes local cache-expiry rewrites.
  */
 export class LossReport {
     "window": accounting$0.Window;
     "cacheExpiry": LossTotals;
-    "errors": LossTotals;
-    "errorKinds": LossKindCount[];
     "days": LossDay[];
     "events": LossEvent[];
     "cacheWriteTokens": number;
@@ -318,12 +271,6 @@ export class LossReport {
         }
         if (!("cacheExpiry" in $$source)) {
             this["cacheExpiry"] = (new LossTotals());
-        }
-        if (!("errors" in $$source)) {
-            this["errors"] = (new LossTotals());
-        }
-        if (!("errorKinds" in $$source)) {
-            this["errorKinds"] = [];
         }
         if (!("days" in $$source)) {
             this["days"] = [];
@@ -344,10 +291,8 @@ export class LossReport {
     static createFrom($$source: any = {}): LossReport {
         const $$createField0_0 = $$createType13;
         const $$createField1_0 = $$createType14;
-        const $$createField2_0 = $$createType14;
-        const $$createField3_0 = $$createType16;
-        const $$createField4_0 = $$createType18;
-        const $$createField5_0 = $$createType20;
+        const $$createField2_0 = $$createType16;
+        const $$createField3_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -355,17 +300,11 @@ export class LossReport {
         if ("cacheExpiry" in $$parsedSource) {
             $$parsedSource["cacheExpiry"] = $$createField1_0($$parsedSource["cacheExpiry"]);
         }
-        if ("errors" in $$parsedSource) {
-            $$parsedSource["errors"] = $$createField2_0($$parsedSource["errors"]);
-        }
-        if ("errorKinds" in $$parsedSource) {
-            $$parsedSource["errorKinds"] = $$createField3_0($$parsedSource["errorKinds"]);
-        }
         if ("days" in $$parsedSource) {
-            $$parsedSource["days"] = $$createField4_0($$parsedSource["days"]);
+            $$parsedSource["days"] = $$createField2_0($$parsedSource["days"]);
         }
         if ("events" in $$parsedSource) {
-            $$parsedSource["events"] = $$createField5_0($$parsedSource["events"]);
+            $$parsedSource["events"] = $$createField3_0($$parsedSource["events"]);
         }
         return new LossReport($$parsedSource as Partial<LossReport>);
     }
@@ -584,8 +523,8 @@ export class Receipt {
      */
     static createFrom($$source: any = {}): Receipt {
         const $$createField1_0 = $$createType13;
-        const $$createField8_0 = $$createType22;
-        const $$createField20_0 = $$createType23;
+        const $$createField8_0 = $$createType20;
+        const $$createField20_0 = $$createType21;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField1_0($$parsedSource["window"]);
@@ -664,7 +603,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType24;
+        const $$createField1_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -694,7 +633,7 @@ export class Snapshot {
      */
     static createFrom($$source: any = {}): Snapshot {
         const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType26;
+        const $$createField1_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -729,7 +668,7 @@ export class SpeedBucket {
      * Creates a new SpeedBucket instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedBucket {
-        const $$createField1_0 = $$createType28;
+        const $$createField1_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
@@ -896,8 +835,8 @@ export class SpeedReport {
      */
     static createFrom($$source: any = {}): SpeedReport {
         const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType30;
-        const $$createField2_0 = $$createType32;
+        const $$createField1_0 = $$createType28;
+        const $$createField2_0 = $$createType30;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -928,21 +867,19 @@ const $$createType11 = quota$0.CycleValue.createFrom;
 const $$createType12 = $Create.Array($$createType11);
 const $$createType13 = accounting$0.Window.createFrom;
 const $$createType14 = LossTotals.createFrom;
-const $$createType15 = LossKindCount.createFrom;
+const $$createType15 = LossDay.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = LossDay.createFrom;
+const $$createType17 = LossEvent.createFrom;
 const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = LossEvent.createFrom;
+const $$createType19 = ReceiptItem.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = ReceiptItem.createFrom;
-const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = $Create.Array($Create.Any);
-const $$createType24 = Configuration.createFrom;
-const $$createType25 = EnvironmentState.createFrom;
+const $$createType21 = $Create.Array($Create.Any);
+const $$createType22 = Configuration.createFrom;
+const $$createType23 = EnvironmentState.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = SpeedBucketModel.createFrom;
 const $$createType26 = $Create.Array($$createType25);
-const $$createType27 = SpeedBucketModel.createFrom;
+const $$createType27 = SpeedModel.createFrom;
 const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = SpeedModel.createFrom;
+const $$createType29 = SpeedBucket.createFrom;
 const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = SpeedBucket.createFrom;
-const $$createType32 = $Create.Array($$createType31);
