@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/w32"
+	"syscall"
 	"unsafe"
 )
 
@@ -38,4 +39,12 @@ func setNativeAppearance(window *application.WebviewWindow, isDark bool, red, gr
 		}
 		return nil
 	})
+}
+
+var allowSetForegroundWindow = syscall.NewLazyDLL("user32.dll").NewProc("AllowSetForegroundWindow")
+
+// allowForegroundHandoff lets the running instance focus itself when a relaunch delegates to it.
+func allowForegroundHandoff() {
+	const anyProcess = ^uintptr(0)
+	allowSetForegroundWindow.Call(anyProcess)
 }

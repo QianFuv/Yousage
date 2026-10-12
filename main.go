@@ -34,12 +34,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var singleInstance *application.SingleInstanceOptions
+	if !hasNativeSmokeArgument() {
+		allowForegroundHandoff()
+		singleInstance = &application.SingleInstanceOptions{
+			UniqueID:               "app.yousage.desktop",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) { service.ShowWindow() },
+		}
+	}
 	nativeApp := application.New(application.Options{
 		Name: "Yousage", Description: "Usage monitoring and themes",
-		Services: []application.Service{application.NewService(service)},
-		Assets:   application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
-		Mac:      application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
-		Windows:  application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview")},
+		Services:       []application.Service{application.NewService(service)},
+		SingleInstance: singleInstance,
+		Assets:         application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
+		Mac:            application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+		Windows:        application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview")},
 	})
 	service.nativeApp = nativeApp
 	service.window = nativeApp.Window.NewWithOptions(application.WebviewWindowOptions{
