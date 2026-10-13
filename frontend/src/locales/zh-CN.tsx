@@ -677,8 +677,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Loss period": "损耗统计时间段",
   "Extra spend · {count} event": "额外花费 · {count} 次事件",
   "Extra spend · {count} events": "额外花费 · {count} 次事件",
-  "Cache expiry": "缓存过期",
-  "{count} rewrites · {tokens} tokens": "重写 {count} 次 · {tokens} Token",
+  "{count} rewrite": "重写 {count} 次",
+  "{count} rewrites": "重写 {count} 次",
+  "{share} of extra spend · {tokens} tokens":
+    "占额外花费 {share} · {tokens} Token",
   "Show all {count} events": "显示全部 {count} 条",
   "Show fewer": "收起",
   "Daily extra spend": "每日额外花费",

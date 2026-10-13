@@ -4,6 +4,7 @@ import { Events } from "@wailsio/runtime";
 import { RefreshCwIcon } from "lucide-react";
 import {
   formatCount,
+  formatPercent,
   formatTokens,
   formatUsd,
 } from "@t3tools/shared/usageFormat";
@@ -17,21 +18,19 @@ import { useData } from "../usage/controller";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
 import { SeriesChart } from "../usage/SeriesChart";
+import {
+  orderProviders,
+  ProviderSummaryRow,
+} from "../usage/ProviderSummaryRow";
 import type { UsageProviderKind } from "../usage/contracts";
 import * as nativeApi from "../../bindings/yousage/app";
 import type {
   LossDay,
   LossEvent,
+  LossProvider,
   LossReport,
 } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
-
-/** A neutral step between background and foreground, matching the usage mixes. */
-const ink = (percent: number) =>
-  `color-mix(in oklab, var(--foreground) ${percent}%, var(--background))`;
-
-/** Cache-expiry color shared by the totals, the daily chart and the event table. */
-const CACHE_EXPIRY_COLOR = ink(100);
 
 /**
  * Loss analysis page: cache-expiry rewrites over a trailing window.
@@ -103,7 +102,7 @@ export function LossPage({ isActive }: { isActive: boolean }) {
 }
 
 /**
- * Cache-expiry totals, daily chart and the event list of one report.
+ * Cache-expiry totals per provider, their daily chart and the event list of one report.
  *
  * @param props - The loss report.
  * @returns The page content.
@@ -111,6 +110,10 @@ export function LossPage({ isActive }: { isActive: boolean }) {
 function LossContent({ report }: { report: LossReport }) {
   const totalUsd = report.cacheExpiry.costUsd;
   const totalEvents = report.cacheExpiry.events;
+  const providers = orderProviders(
+    report.providers,
+    (provider) => provider.events > 0,
+  );
   return (
     <div className="flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 md:grid-cols-[18rem_minmax(0,1fr)]">
@@ -128,15 +131,20 @@ function LossContent({ report }: { report: LossReport }) {
               )}
             </span>
           </div>
-          <LossTotal
-            color={CACHE_EXPIRY_COLOR}
-            label={t("Cache expiry")}
-            costUsd={report.cacheExpiry.costUsd}
-            detail={t("{count} rewrites · {tokens} tokens", {
-              count: formatCount(report.cacheExpiry.events),
-              tokens: formatTokens(report.cacheExpiry.tokens),
-            })}
-          />
+          {providers.map((provider) => (
+            <ProviderSummaryRow
+              key={provider.provider}
+              provider={provider.provider}
+              count={rewriteCount(provider.events)}
+              value={formatUsd(provider.costUsd)}
+              detail={t("{share} of extra spend · {tokens} tokens", {
+                share: formatPercent(
+                  totalUsd > 0 ? provider.costUsd / totalUsd : 0,
+                ),
+                tokens: formatTokens(provider.tokens),
+              })}
+            />
+          ))}
         </div>
         <div className="flex min-w-0 flex-col gap-3">
           <h2 className="text-sm font-medium">
@@ -145,7 +153,11 @@ function LossContent({ report }: { report: LossReport }) {
               : t("Daily extra spend")}
           </h2>
           {totalEvents > 0 ? (
-            <LossChart days={report.days} reportWindow={report.window} />
+            <LossChart
+              days={report.days}
+              providers={providers}
+              reportWindow={report.window}
+            />
           ) : (
             <EmptyState>{t("No loss in this window.")}</EmptyState>
           )}
@@ -160,65 +172,57 @@ function LossContent({ report }: { report: LossReport }) {
 }
 
 /**
- * One loss category in the summary column.
+ * Localized count of cache rewrites.
  *
- * @param props - Series color, label, cost and detail line.
- * @returns The total row.
+ * @param count - Number of rewrites.
+ * @returns `1 rewrite` or `{count} rewrites`.
  */
-function LossTotal({
-  color,
-  label,
-  costUsd,
-  detail,
-}: {
-  color: string;
-  label: string;
-  costUsd: number;
-  detail: string;
-}) {
+function rewriteCount(count: number): string {
+  return t(count === 1 ? msg("{count} rewrite") : msg("{count} rewrites"), {
+    count: formatCount(count),
+  });
+}
+
+/**
+ * One provider's share of a bucket.
+ *
+ * @param day - The bucket.
+ * @param provider - Provider kind.
+ * @returns Its cost and rewrite count, zero when it had no loss.
+ */
+function providerDay(day: LossDay, provider: string) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-          <span
-            aria-hidden
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-          {label}
-        </span>
-        <span className="shrink-0 text-sm font-medium tabular-nums">
-          {formatUsd(costUsd)}
-        </span>
-      </div>
-      <span className="text-xs text-muted-foreground">{detail}</span>
-    </div>
+    day.providers.find((entry) => entry.provider === provider) ?? {
+      costUsd: 0,
+      count: 0,
+    }
   );
 }
 
 /**
- * Cache-expiry spend per day, or per hour in a 24-hour window.
+ * Cache-expiry spend per provider and day, or per hour in a 24-hour window, as layered lines.
  *
- * @param props - Every bucket of the window, ascending, and the report window.
+ * @param props - Every bucket of the window ascending, the providers with loss and the report window.
  * @returns The chart element.
  */
 function LossChart({
   days,
+  providers,
   reportWindow,
 }: {
   days: readonly LossDay[];
+  providers: readonly (LossProvider & { provider: UsageProviderKind })[];
   reportWindow: Window;
 }) {
   const labels = bucketLabels(reportWindow);
   const series = useMemo(
-    () => [
-      {
-        id: "cacheExpiry",
-        color: CACHE_EXPIRY_COLOR,
-        values: days.map((day) => day.cacheExpiryUsd),
-      },
-    ],
-    [days],
+    () =>
+      providers.map(({ provider }) => ({
+        id: provider,
+        color: PROVIDER_PRESENTATION[provider].color,
+        values: days.map((day) => providerDay(day, provider).costUsd),
+      })),
+    [days, providers],
   );
   return (
     <SeriesChart
@@ -230,16 +234,19 @@ function LossChart({
       }
       formatPeriod={labels.axis}
       formatTooltipPeriod={labels.full}
-      renderTooltip={(index) => {
-        const day = days[index];
-        return (
-          <TooltipRow
-            color={CACHE_EXPIRY_COLOR}
-            label={`${t("Cache expiry")} · ${formatCount(day.cacheExpiryCount)}`}
-            value={formatUsd(day.cacheExpiryUsd)}
-          />
-        );
-      }}
+      renderTooltip={(index) =>
+        providers.map(({ provider }) => {
+          const entry = providerDay(days[index], provider);
+          return (
+            <TooltipRow
+              key={provider}
+              color={PROVIDER_PRESENTATION[provider].color}
+              label={`${PROVIDER_PRESENTATION[provider].label} · ${rewriteCount(entry.count)}`}
+              value={formatUsd(entry.costUsd)}
+            />
+          );
+        })
+      }
     />
   );
 }

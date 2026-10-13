@@ -360,3 +360,26 @@ func TestLossOrdersTiedEventsDeterministically(t *testing.T) {
 		}
 	}
 }
+
+// TestLossGroupsByProvider totals and buckets cache expiry per provider, like the provider rows of Usage.
+func TestLossGroupsByProvider(t *testing.T) {
+	before, after, options, now := lossFixture()
+	codexBefore, codexAfter := before, after
+	codexBefore.Provider, codexAfter.Provider = domain.Codex, domain.Codex
+	codexAfter.Totals = domain.Tokens{UncachedInputTokens: 100000, OutputTokens: 100}
+	earlier, earlierAfter := before, after
+	earlier.SessionId, earlierAfter.SessionId = "earlier", "earlier"
+	earlier.TimestampMs -= 24 * time.Hour.Milliseconds()
+	earlierAfter.TimestampMs -= 24 * time.Hour.Milliseconds()
+	report := analyzeLoss([]domain.Record{before, after, codexBefore, codexAfter, earlier, earlierAfter}, options, now)
+	if len(report.Providers) != 2 || report.Providers[0].Provider != "claude" || report.Providers[0].Events != 2 || report.Providers[0].Tokens != 200000 || report.Providers[1].Provider != "codex" || report.Providers[1].Events != 1 {
+		t.Fatal("providers must total every event, most expensive first", report.Providers)
+	}
+	if math.Abs(report.Providers[0].CostUsd+report.Providers[1].CostUsd-report.CacheExpiry.CostUsd) > 1e-12 {
+		t.Fatal("provider costs must add up to the total", report)
+	}
+	today, yesterday := report.Days[6].Providers, report.Days[5].Providers
+	if len(today) != 2 || today[0].Provider != "claude" || today[1].Provider != "codex" || today[0].Count != 1 || today[1].Count != 1 || len(yesterday) != 1 || yesterday[0].Provider != "claude" || report.Days[0].Providers == nil {
+		t.Fatal("buckets must split loss by provider", report.Days)
+	}
+}

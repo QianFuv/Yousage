@@ -173,6 +173,7 @@ export class LossDay {
     "day": string;
     "cacheExpiryUsd": number;
     "cacheExpiryCount": number;
+    "providers": LossProviderDay[];
 
     /** Creates a new LossDay instance. */
     constructor($$source: Partial<LossDay> = {}) {
@@ -185,6 +186,9 @@ export class LossDay {
         if (!("cacheExpiryCount" in $$source)) {
             this["cacheExpiryCount"] = 0;
         }
+        if (!("providers" in $$source)) {
+            this["providers"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -193,7 +197,11 @@ export class LossDay {
      * Creates a new LossDay instance from a string or object.
      */
     static createFrom($$source: any = {}): LossDay {
+        const $$createField3_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("providers" in $$parsedSource) {
+            $$parsedSource["providers"] = $$createField3_0($$parsedSource["providers"]);
+        }
         return new LossDay($$parsedSource as Partial<LossDay>);
     }
 }
@@ -255,11 +263,80 @@ export class LossEvent {
 }
 
 /**
+ * LossProvider totals one provider's cache-expiry rewrites, like the provider rows of Usage.
+ */
+export class LossProvider {
+    "provider": string;
+    "events": number;
+    "tokens": number;
+    "costUsd": number;
+
+    /** Creates a new LossProvider instance. */
+    constructor($$source: Partial<LossProvider> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("events" in $$source)) {
+            this["events"] = 0;
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossProvider instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossProvider {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossProvider($$parsedSource as Partial<LossProvider>);
+    }
+}
+
+/**
+ * LossProviderDay is one provider's share of a bucket; providers without loss in it are omitted.
+ */
+export class LossProviderDay {
+    "provider": string;
+    "costUsd": number;
+    "count": number;
+
+    /** Creates a new LossProviderDay instance. */
+    constructor($$source: Partial<LossProviderDay> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LossProviderDay instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LossProviderDay {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LossProviderDay($$parsedSource as Partial<LossProviderDay>);
+    }
+}
+
+/**
  * LossReport summarizes local cache-expiry rewrites.
  */
 export class LossReport {
     "window": accounting$0.Window;
     "cacheExpiry": LossTotals;
+    "providers": LossProvider[];
     "days": LossDay[];
     "events": LossEvent[];
     "cacheWriteTokens": number;
@@ -271,6 +348,9 @@ export class LossReport {
         }
         if (!("cacheExpiry" in $$source)) {
             this["cacheExpiry"] = (new LossTotals());
+        }
+        if (!("providers" in $$source)) {
+            this["providers"] = [];
         }
         if (!("days" in $$source)) {
             this["days"] = [];
@@ -289,10 +369,11 @@ export class LossReport {
      * Creates a new LossReport instance from a string or object.
      */
     static createFrom($$source: any = {}): LossReport {
-        const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType14;
-        const $$createField2_0 = $$createType16;
-        const $$createField3_0 = $$createType18;
+        const $$createField0_0 = $$createType15;
+        const $$createField1_0 = $$createType16;
+        const $$createField2_0 = $$createType18;
+        const $$createField3_0 = $$createType20;
+        const $$createField4_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -300,11 +381,14 @@ export class LossReport {
         if ("cacheExpiry" in $$parsedSource) {
             $$parsedSource["cacheExpiry"] = $$createField1_0($$parsedSource["cacheExpiry"]);
         }
+        if ("providers" in $$parsedSource) {
+            $$parsedSource["providers"] = $$createField2_0($$parsedSource["providers"]);
+        }
         if ("days" in $$parsedSource) {
-            $$parsedSource["days"] = $$createField2_0($$parsedSource["days"]);
+            $$parsedSource["days"] = $$createField3_0($$parsedSource["days"]);
         }
         if ("events" in $$parsedSource) {
-            $$parsedSource["events"] = $$createField3_0($$parsedSource["events"]);
+            $$parsedSource["events"] = $$createField4_0($$parsedSource["events"]);
         }
         return new LossReport($$parsedSource as Partial<LossReport>);
     }
@@ -522,9 +606,9 @@ export class Receipt {
      * Creates a new Receipt instance from a string or object.
      */
     static createFrom($$source: any = {}): Receipt {
-        const $$createField1_0 = $$createType13;
-        const $$createField8_0 = $$createType20;
-        const $$createField20_0 = $$createType21;
+        const $$createField1_0 = $$createType15;
+        const $$createField8_0 = $$createType24;
+        const $$createField20_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField1_0($$parsedSource["window"]);
@@ -603,7 +687,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType22;
+        const $$createField1_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -632,8 +716,8 @@ export class Snapshot {
      * Creates a new Snapshot instance from a string or object.
      */
     static createFrom($$source: any = {}): Snapshot {
-        const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType24;
+        const $$createField0_0 = $$createType15;
+        const $$createField1_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -668,7 +752,7 @@ export class SpeedBucket {
      * Creates a new SpeedBucket instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedBucket {
-        const $$createField1_0 = $$createType26;
+        const $$createField1_0 = $$createType30;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
@@ -834,9 +918,9 @@ export class SpeedReport {
      * Creates a new SpeedReport instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedReport {
-        const $$createField0_0 = $$createType13;
-        const $$createField1_0 = $$createType28;
-        const $$createField2_0 = $$createType30;
+        const $$createField0_0 = $$createType15;
+        const $$createField1_0 = $$createType32;
+        const $$createField2_0 = $$createType34;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -865,21 +949,25 @@ const $$createType9 = remote$0.Summary.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
 const $$createType11 = quota$0.CycleValue.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = accounting$0.Window.createFrom;
-const $$createType14 = LossTotals.createFrom;
-const $$createType15 = LossDay.createFrom;
-const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = LossEvent.createFrom;
+const $$createType13 = LossProviderDay.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = accounting$0.Window.createFrom;
+const $$createType16 = LossTotals.createFrom;
+const $$createType17 = LossProvider.createFrom;
 const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = ReceiptItem.createFrom;
+const $$createType19 = LossDay.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = $Create.Array($Create.Any);
-const $$createType22 = Configuration.createFrom;
-const $$createType23 = EnvironmentState.createFrom;
+const $$createType21 = LossEvent.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = ReceiptItem.createFrom;
 const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = SpeedBucketModel.createFrom;
-const $$createType26 = $Create.Array($$createType25);
-const $$createType27 = SpeedModel.createFrom;
+const $$createType25 = $Create.Array($Create.Any);
+const $$createType26 = Configuration.createFrom;
+const $$createType27 = EnvironmentState.createFrom;
 const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = SpeedBucket.createFrom;
+const $$createType29 = SpeedBucketModel.createFrom;
 const $$createType30 = $Create.Array($$createType29);
+const $$createType31 = SpeedModel.createFrom;
+const $$createType32 = $Create.Array($$createType31);
+const $$createType33 = SpeedBucket.createFrom;
+const $$createType34 = $Create.Array($$createType33);

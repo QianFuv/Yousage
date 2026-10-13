@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"time"
 	"yousage/internal/accounting"
@@ -33,6 +34,7 @@ const LossEventLimit = 200
 type LossReport struct {
 	Window           accounting.Window `json:"window"`
 	CacheExpiry      LossTotals        `json:"cacheExpiry"`
+	Providers        []LossProvider    `json:"providers"`
 	Days             []LossDay         `json:"days"`
 	Events           []LossEvent       `json:"events"`
 	CacheWriteTokens int64             `json:"cacheWriteTokens"`
@@ -45,11 +47,27 @@ type LossTotals struct {
 	CostUsd float64 `json:"costUsd"`
 }
 
+// LossProvider totals one provider's cache-expiry rewrites, like the provider rows of Usage.
+type LossProvider struct {
+	Provider string  `json:"provider"`
+	Events   int     `json:"events"`
+	Tokens   int64   `json:"tokens"`
+	CostUsd  float64 `json:"costUsd"`
+}
+
 // LossDay includes every daily or hourly bucket, even when no loss was observed.
 type LossDay struct {
-	Day              string  `json:"day"`
-	CacheExpiryUsd   float64 `json:"cacheExpiryUsd"`
-	CacheExpiryCount int     `json:"cacheExpiryCount"`
+	Day              string            `json:"day"`
+	CacheExpiryUsd   float64           `json:"cacheExpiryUsd"`
+	CacheExpiryCount int               `json:"cacheExpiryCount"`
+	Providers        []LossProviderDay `json:"providers"`
+}
+
+// LossProviderDay is one provider's share of a bucket; providers without loss in it are omitted.
+type LossProviderDay struct {
+	Provider string  `json:"provider"`
+	CostUsd  float64 `json:"costUsd"`
+	Count    int     `json:"count"`
 }
 
 // LossEvent contains only request metadata and derived costs, never diagnostic or transcript text.
@@ -131,12 +149,12 @@ func cacheTtl(previous domain.Record) int64 {
 
 // analyzeLoss compares requests only within one native transcript context and assigns losses to window buckets.
 func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, now time.Time) LossReport {
-	result := LossReport{Window: options.Window, Days: []LossDay{}, Events: []LossEvent{}}
+	result := LossReport{Window: options.Window, Providers: []LossProvider{}, Days: []LossDay{}, Events: []LossEvent{}}
 	pricer := accounting.NewPricer(options.Rates, options.Overrides)
 	dayPositions := map[string]int{}
 	for _, label := range options.Window.BucketLabels() {
 		dayPositions[label] = len(result.Days)
-		result.Days = append(result.Days, LossDay{Day: label})
+		result.Days = append(result.Days, LossDay{Day: label, Providers: []LossProviderDay{}})
 	}
 	inWindow := func(record domain.Record) bool {
 		_, isIncluded := reportBucket(options.Window, record.TimestampMs, now)
@@ -178,6 +196,7 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 			previous = &current
 		}
 	}
+	providers := map[string]*LossProvider{}
 	for _, event := range result.Events {
 		day, _ := reportBucket(options.Window, event.AtMs, now)
 		daily := &result.Days[dayPositions[day]]
@@ -186,7 +205,31 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 		result.CacheExpiry.Events++
 		result.CacheExpiry.Tokens += event.Tokens
 		result.CacheExpiry.CostUsd += event.CostUsd
+		provider := providers[event.Provider]
+		if provider == nil {
+			provider = &LossProvider{Provider: event.Provider}
+			providers[event.Provider] = provider
+		}
+		provider.Events++
+		provider.Tokens += event.Tokens
+		provider.CostUsd += event.CostUsd
+		position := sort.Search(len(daily.Providers), func(index int) bool { return daily.Providers[index].Provider >= event.Provider })
+		if position == len(daily.Providers) || daily.Providers[position].Provider != event.Provider {
+			daily.Providers = slices.Insert(daily.Providers, position, LossProviderDay{Provider: event.Provider})
+		}
+		daily.Providers[position].CostUsd += event.CostUsd
+		daily.Providers[position].Count++
 	}
+	for _, provider := range providers {
+		result.Providers = append(result.Providers, *provider)
+	}
+	sort.Slice(result.Providers, func(first, second int) bool {
+		left, right := result.Providers[first], result.Providers[second]
+		if left.CostUsd != right.CostUsd {
+			return left.CostUsd > right.CostUsd
+		}
+		return left.Provider < right.Provider
+	})
 	sort.Slice(result.Events, func(first, second int) bool {
 		left, right := result.Events[first], result.Events[second]
 		if left.AtMs != right.AtMs {
