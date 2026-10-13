@@ -19,7 +19,7 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 ### 额度监控（Ctrl+2）
 
-- 显示 Codex、Claude、Grok、Cursor、OpenCode 订阅账户的额度窗口、已用百分比、
+- 显示 Codex、Claude Code 订阅账户的额度窗口、已用百分比、
   重置时间和消耗节奏（超出 / 符合 / 低于时间窗口的均匀消耗线）。
 - 同一账户在多个来源中出现时自动合并；多个账户可汇总为“总额度”。
 - **本周期价值**：结合本机历史费用与额度变化，估算当前订阅周期的 API 等值价值，
@@ -75,12 +75,8 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 | --- | --- | --- |
 | Codex | 本地 `sessions` 会话日志 | `account/rateLimits/read`（不发起模型请求） |
 | Claude Code | 本地 `projects` 会话日志 | `initialize` / `get_usage` 控制协议 |
-| Grok Build | `~/.grok/sessions/**/updates.jsonl` | 官方 OAuth 账单接口 |
-| Cursor | 已登录账户的 Dashboard 历史 | Dashboard 当前周期用量 |
-| OpenCode | 本地 SQLite 数据库与旧版 JSON | OpenCode Go 订阅用量 |
-| Antigravity | 本地会话数据库 | 不支持 |
 
-- 默认只启用本机的 Codex 和 Claude Code，其余可在“数据来源”中开启。
+- 只支持 Codex 和 Claude Code；旧版本保存的其他来源设置会被忽略。
 - 历史目录在每次扫描时自动解析（PATH、npm 原生包和标准环境变量位置），无需手动填写路径；
   已有的自定义路径会保留，直到你主动改回自动识别。
 - 历史读取全部为只读，增量解析，保留最近 90 天；读取失败时保留已缓存的数据。

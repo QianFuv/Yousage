@@ -6,18 +6,14 @@
 
 - **Codex**：`initialize` / `account/read` / `account/rateLimits/read`，不发起模型请求。
 - **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
-- **Cursor、Grok、OpenCode Go**：使用各自的认证 HTTP 接口和认证优先级。
-- **Antigravity**：没有原生额度接口。
 
 百分比会被截断到有效范围；Codex 主额度不包含 Spark 等模型专属额度；重置时间保留 Provider 的原始单位；
-Claude 的分区窗口保留稳定 ID；Grok 成功返回空额度后仍可在之后恢复。探测失败时保留上次成功的额度条，
+Claude 的分区窗口保留稳定 ID。探测失败时保留上次成功的额度条，
 只有明确的“不支持”结果才会替换它。没有变化的稀疏更新保留检查时间。格式错误的显式 null
 不会被悄悄当成不支持的账户。
 
 原生子进程由 `managedprocess` 管理（Windows 上原子地加入 Job Object，Unix 上使用进程组和自有管道），
-所有路径都会结束子孙进程并排空、关闭管道。Grok 的凭据读取在一个限时 10 秒的自有辅助进程中运行，
-之后的账单请求另外限时 10 秒。Cursor 的钥匙串访问需要用户授权，且仅限默认端点。
-系统凭据库的子进程通过继承的 stdin 而不是命令行参数传递凭据。
+所有路径都会结束子孙进程并排空、关闭管道。系统凭据库的子进程通过继承的 stdin 而不是命令行参数传递凭据。
 
 测试不发起模型请求或重置请求，覆盖分片与关联的响应、超时、脱敏、账户身份、结构错误，
 以及 Windows 上父进程、子进程和孙进程的结束。

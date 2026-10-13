@@ -56,7 +56,7 @@ pnpm --dir tools/parity test                  # 参考实现对照测试，见 d
 go run ./tools/spikes/theme --app bin/yousage.exe  # 用真实可执行文件验证命令行主题
 ```
 
-- `go test` 使用合成的 Codex / Claude / Grok / OpenCode / Cursor / Antigravity 数据
+- `go test` 使用合成的 Codex / Claude 数据
   覆盖解析、去重、定价、时间窗口、额度合并和损耗、速率、小票等报表，不会读取真实账户，
   也不会消耗重置券。
 - `tools/spikes/claude` 是 Claude 控制协议的测试替身，`tools/spikes/theme`
