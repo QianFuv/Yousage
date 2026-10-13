@@ -40,10 +40,6 @@ export function getDriverOption(driver: string) {
         {
           codex: "Codex",
           claudeAgent: "Claude Code",
-          cursor: "Cursor",
-          grok: "Grok Build",
-          opencode: "OpenCode",
-          antigravity: "Antigravity",
         } as Record<string, string>
       )[driver] ?? driver,
   };

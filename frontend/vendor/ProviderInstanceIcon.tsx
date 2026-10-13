@@ -1,9 +1,8 @@
-/** The six history harness marks with native account initials and the original provider glyphs. */
-import {ClaudeAI,OpenAI,CursorIcon,AntigravityIcon,type Icon} from "../../tools/parity/upstream/apps/web/src/components/Icons";
-import {GrokIcon,OpenCodeIcon} from "./providerIcons";
+/** The history harness marks with native account initials and the original provider glyphs. */
+import {ClaudeAI,OpenAI,type Icon} from "../../tools/parity/upstream/apps/web/src/components/Icons";
 import {providerInstanceInitials} from "../../tools/parity/src/bridges/instance";
 import {cn} from "../../tools/parity/src/bridges/utils";
-const MARKS:Record<string,Icon>={codex:OpenAI,claudeAgent:ClaudeAI,cursor:CursorIcon,grok:GrokIcon,opencode:OpenCodeIcon,antigravity:AntigravityIcon};
+const MARKS:Record<string,Icon>={codex:OpenAI,claudeAgent:ClaudeAI};
 /** Render the account/harness mark without requesting an unrelated agent registry. */
 export function ProviderInstanceIcon({driverKind,displayName,accentColor,showBadge=false,indicatorBackground="var(--card)",className,iconClassName}:{driverKind:string;displayName:string;accentColor?:string;showBadge?:boolean;indicatorBackground?:string;className?:string;iconClassName?:string}){
 	const Mark=MARKS[driverKind];

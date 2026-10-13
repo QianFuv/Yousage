@@ -32,7 +32,6 @@ import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
 import { PeriodToggle } from "./PeriodToggle";
-import { Request } from "../../bindings/yousage/internal/refresh/models";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 
 /** Preserve null All and explicit empty selection while exposing coverage inside the environment filter. */
@@ -59,7 +58,6 @@ export function UsagePage({
   const refreshRef = useRef(data.refresh);
   refreshRef.current = data.refresh;
   const [limitsNow, setLimitsNow] = useState(Date.now);
-  const [cursorError, setCursorError] = useState("");
   const environmentKey =
     data.snapshot?.environments
       .filter(
@@ -119,79 +117,13 @@ export function UsagePage({
       },
     ]),
   );
-  const cursorTargets = selected.filter(
-    (environment) =>
-      environment.canOperate &&
-      environment.summary?.sources.some(
-        (source) => source.action === "enableCursorKeychain",
-      ),
-  );
-  const hasCursorAccount = selected.some((environment) =>
-    environment.summary?.sources.some(
-      (source) =>
-        source.fingerprint.provider === "cursor" &&
-        source.fingerprint.hostId === "cursor.com",
-    ),
-  );
-  const cursorPrompt =
-    !hasCursorAccount && cursorTargets.length > 0 ? (
-      <Notice
-        tone={cursorError ? "error" : "default"}
-        action={
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={data.isBusy}
-            onClick={async () => {
-              try {
-                const outcomes = await nativeApi.EnableCursorKeychain(
-                  cursorTargets.map((environment) => environment.environmentId),
-                );
-                const failure = outcomes.find((outcome) => !outcome.saved);
-                if (failure) throw new Error(failure.error);
-                const identities = cursorTargets.map(
-                  (environment) => environment.environmentId,
-                );
-                const request = Request.createFrom({
-                  IsManual: true,
-                  IsVisible: document.visibilityState === "visible",
-                  IsUsagePage: isActive,
-                  IsAutoEnabled: false,
-                  AfterPending: true,
-                });
-                await Promise.all([
-                  nativeApi.RefreshUsage(
-                    data.display.value.windowDays,
-                    Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-                    identities,
-                    request,
-                  ),
-                  nativeApi.RefreshLimits(identities, request),
-                ]);
-                await data.reload();
-              } catch (cause) {
-                setCursorError(String(cause));
-              }
-            }}
-          >
-            {t("Enable Keychain access")}
-          </Button>
-        }
-      >
-        {cursorError ||
-          t("Cursor usage requires explicit macOS Keychain access.")}
-      </Notice>
-    ) : null;
   const sourceMessages = [
     ...new Set(
       selected.flatMap(
         (value) =>
           value.summary?.sources.flatMap((source) =>
             source.message &&
-            !source.action &&
-            (source.status === "partial" ||
-              source.status === "failed" ||
-              source.fingerprint.provider === "cursor")
+            (source.status === "partial" || source.status === "failed")
               ? [source.message]
               : [],
           ) ?? [],
@@ -281,19 +213,16 @@ export function UsagePage({
             <UsageLimitsPooled
               presentations={presentations}
               now={limitsNow}
-              cursorPrompt={cursorPrompt}
               cycleValues={indexCycleValues(selected)}
             />
           </Suspense>
         ) : (
           usageWindow && (
             <>
-              {(cursorPrompt ||
-                (answered > 0 && stillReporting > 0) ||
+              {((answered > 0 && stillReporting > 0) ||
                 sourceMessages.length > 0 ||
                 hasNoHistory) && (
                 <div className="flex flex-col gap-2">
-                  {cursorPrompt}
                   {answered > 0 && stillReporting > 0 && (
                     <Notice>
                       {t(

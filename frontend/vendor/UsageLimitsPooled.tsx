@@ -4,7 +4,6 @@ import {
   collectExternalUsageLinks,
   collectLimitNotices,
   collectLimitPools,
-  cursorUsageWindowDetails,
   displayLimitWindows,
   type LimitAccount,
   type LimitPool,
@@ -14,7 +13,7 @@ import {
 } from "@t3tools/shared/usageLimits";
 import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
 import { formatUsd } from "@t3tools/shared/usageFormat";
-import { Fragment, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   basisText,
@@ -682,15 +681,11 @@ function PoolWindowCard({
   pool,
   color,
   now,
-  label,
-  description,
   cycleValues,
 }: {
   readonly pool: LimitPoolWindow;
   readonly color: string;
   readonly now: number;
-  readonly label?: string | undefined;
-  readonly description?: string | undefined;
   readonly cycleValues: CycleValueIndex;
 }) {
   // The soonest reset that hands anything back; an untouched account resets to no effect.
@@ -699,7 +694,7 @@ function PoolWindowCard({
     <div className="grid items-center gap-x-6 gap-y-3 rounded-lg border border-border/60 p-4 md:grid-cols-[11rem_minmax(0,1fr)]">
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-foreground">
-          {label ?? t(pool.label)}
+          {t(pool.label)}
         </span>
         <span className="flex items-baseline gap-2">
           <span className="text-3xl font-semibold text-foreground tabular-nums">
@@ -715,11 +710,6 @@ function PoolWindowCard({
         ) : null}
       </div>
       <PoolBar pool={pool} color={color} now={now} cycleValues={cycleValues} />
-      {description ? (
-        <p className="text-xs text-muted-foreground md:col-span-2">
-          {description}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -748,23 +738,15 @@ function PoolSection({
         />
         {label}
       </h2>
-      {windows.map((window) => {
-        const details =
-          pool.driver === "cursor"
-            ? cursorUsageWindowDetails(window.id)
-            : undefined;
-        return (
-          <PoolWindowCard
-            key={`${window.kind}:${window.id}`}
-            pool={window}
-            color={color}
-            now={now}
-            label={details?.label}
-            description={details?.description}
-            cycleValues={cycleValues}
-          />
-        );
-      })}
+      {windows.map((window) => (
+        <PoolWindowCard
+          key={`${window.kind}:${window.id}`}
+          pool={window}
+          color={color}
+          now={now}
+          cycleValues={cycleValues}
+        />
+      ))}
     </section>
   );
 }
@@ -777,27 +759,19 @@ function PoolSection({
 export function UsageLimitsPooled({
   presentations,
   now,
-  cursorPrompt,
   cycleValues = new Map(),
 }: {
   readonly presentations: Parameters<typeof collectLimitAccounts>[0];
   readonly now: number;
-  readonly cursorPrompt?: ReactNode;
   readonly cycleValues?: CycleValueIndex;
 }) {
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
   const notices = collectLimitNotices(presentations);
   const externalLinks = collectExternalUsageLinks(presentations);
-  const cursorPromptAt =
-    Math.max(
-      pools.findIndex((pool) => pool.driver === "codex"),
-      pools.findIndex((pool) => pool.driver === "claudeAgent"),
-    ) + 1;
   return (
     <div className="flex flex-col gap-8">
       {pools.length === 0 &&
       notices.length === 0 &&
-      !cursorPrompt &&
       externalLinks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t(
@@ -805,13 +779,14 @@ export function UsageLimitsPooled({
           )}
         </p>
       ) : null}
-      {pools.map((pool, index) => (
-        <Fragment key={pool.driver}>
-          {index === cursorPromptAt ? cursorPrompt : null}
-          <PoolSection pool={pool} now={now} cycleValues={cycleValues} />
-        </Fragment>
+      {pools.map((pool) => (
+        <PoolSection
+          key={pool.driver}
+          pool={pool}
+          now={now}
+          cycleValues={cycleValues}
+        />
       ))}
-      {cursorPromptAt === pools.length ? cursorPrompt : null}
       {externalLinks.map((link) => (
         <section
           key={link.url}

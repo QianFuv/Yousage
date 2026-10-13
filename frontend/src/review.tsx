@@ -40,18 +40,10 @@ let configuration = {
     providers: [],
     hubs: [],
     primaryEnvironmentId: "local-fixture",
-    cursorKeychainEnabled: false,
   },
 };
 const ENVIRONMENTS = ["local-fixture", "remote-fixture"];
-const PROVIDERS = [
-  "codex",
-  "claude",
-  "grok",
-  "cursor",
-  "opencode",
-  "antigravity",
-];
+const PROVIDERS = ["codex", "claude"];
 const SETTINGS = Object.fromEntries(
   ENVIRONMENTS.map((identity) => [
     identity,

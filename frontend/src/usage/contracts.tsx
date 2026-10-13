@@ -2,13 +2,7 @@
 export type EnvironmentId = string;
 export type ProviderInstanceId = string;
 export type ProviderDriverKind = string;
-export type UsageProviderKind =
-  | "codex"
-  | "claude"
-  | "grok"
-  | "cursor"
-  | "opencode"
-  | "antigravity";
+export type UsageProviderKind = "codex" | "claude";
 export type UsageDay = string;
 export type UsageResolution = "day" | "hour";
 export type UsageSummaryInput = {
@@ -54,7 +48,6 @@ export type UsageSource = {
   malformedRecords: number;
   distinctSessions: number;
   message: string | null;
-  action?: "enableCursorKeychain";
 };
 export type UsageBucket = {
   day: string;

@@ -115,8 +115,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Could not use the reset credit.": "无法使用重置券。",
   "Create theme": "创建主题",
   "Current match": "当前匹配",
-  "Cursor usage requires explicit macOS Keychain access.":
-    "读取 Cursor 用量需要授权访问 macOS 钥匙串。",
   "Custom configuration": "自定义配置",
   "Custom history location": "自定义历史位置",
   "Custom model prices": "自定义模型价格",
@@ -148,7 +146,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Edit: "编辑",
   "Edit theme": "编辑主题",
   Effects: "效果",
-  "Enable Keychain access": "授权访问钥匙串",
   "Enable {label}": "启用 {label}",
   "Enter a model ID.": "请输入模型 ID。",
   Environment: "环境",
