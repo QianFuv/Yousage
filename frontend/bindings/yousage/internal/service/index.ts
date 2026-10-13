@@ -19,6 +19,9 @@ export {
     Snapshot,
     SpeedBucket,
     SpeedBucketModel,
+    SpeedBucketProvider,
     SpeedModel,
-    SpeedReport
+    SpeedProvider,
+    SpeedReport,
+    SpeedStats
 } from "./models.js";

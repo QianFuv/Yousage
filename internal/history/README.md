@@ -33,6 +33,14 @@ Numeric timestamp values are rejected. Locale-specific implementation-dependent
 JavaScript Date.parse strings are not a provider format contract or a compatibility
 claim. Raw sources/oracles remain unchanged at t3code51f7f77.
 
+Parser version 8 adds time to first token. Codex dates it from the earliest
+`item_completed` `started_at_ms` of a Reasoning or AgentMessage item after the
+request start; responses that only call tools stay unmeasured. Claude derives it
+from a leading thinking block (`apiBlockIndex` 0) by subtracting its
+`thinkingDurationMs` from its timestamp. A later block of the same Claude message
+replaces earlier blocks within one read, so a request ends at its last block.
+Only item types, start times, block indexes and thinking durations are projected.
+
 Parser version 7 replays retained older checkpoints for generation timing and
 explicit Claude cache TTL observations without saving error events. Claude
 `api_error` and `isApiErrorMessage` markers, Codex `turn_aborted`, transport errors

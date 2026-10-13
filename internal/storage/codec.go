@@ -54,7 +54,7 @@ func (reader *payloadReader) number() float64 {
 // newPayloadReader checks the payload format version.
 func newPayloadReader(data []byte) payloadReader {
 	reader := payloadReader{data: data}
-	if len(data) == 0 || (data[0] != 1 && data[0] != 2 && data[0] != 3 && data[0] != 4) {
+	if len(data) == 0 || (data[0] < 1 || data[0] > 5) {
 		reader.err = errors.New("unsupported storage payload version")
 		return reader
 	}
@@ -74,9 +74,9 @@ func (reader *payloadReader) finish() error {
 	return nil
 }
 
-// encodeRecord writes payload v4 with the original slots and a native context identity.
+// encodeRecord writes payload v5 with the original slots, a native context identity and time to first token.
 func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]byte, error) {
-	writer := payloadWriter{data: []byte{4}}
+	writer := payloadWriter{data: []byte{5}}
 	for _, value := range []string{string(record.Provider), record.Model, record.RateModel, record.SessionId, record.Speed, record.DedupeKey, record.SourcePath} {
 		identity, err := intern(value)
 		if err != nil {
@@ -113,10 +113,11 @@ func encodeRecord(record domain.Record, intern func(string) (int64, error)) ([]b
 		return nil, err
 	}
 	writer.integer(contextId)
+	writer.integer(record.TtftMs)
 	return writer.data, nil
 }
 
-// decodeRecord restores v1 through v4 facts with relational timestamp, bucket and observation fields.
+// decodeRecord restores v1 through v5 facts with relational timestamp, bucket and observation fields.
 func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool, quota []byte, lookup func(int64) (string, bool)) (domain.Record, error) {
 	reader := newPayloadReader(data)
 	values := make([]string, 7)
@@ -156,6 +157,9 @@ func decodeRecord(data []byte, timestamp int64, bucket string, isQuotaOnly bool,
 			reader.err = errUnknownString
 		}
 		record.ContextId = contextId
+	}
+	if reader.version >= 5 {
+		record.TtftMs = reader.integer()
 	}
 	if err := reader.finish(); err != nil {
 		return record, err

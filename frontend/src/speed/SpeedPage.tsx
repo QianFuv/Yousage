@@ -2,7 +2,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Events } from "@wailsio/runtime";
 import { RefreshCwIcon } from "lucide-react";
-import { formatCount, formatTokens } from "@t3tools/shared/usageFormat";
+import {
+  formatCount,
+  formatPercent,
+  formatTokens,
+} from "@t3tools/shared/usageFormat";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
@@ -14,37 +18,23 @@ import type { UsageProviderKind } from "../usage/contracts";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
 import { SeriesChart } from "../usage/SeriesChart";
+import { Metric } from "../usage/UsageStatsPanel";
+import {
+  orderProviders,
+  ProviderSummaryRow,
+} from "../usage/ProviderSummaryRow";
 import * as nativeApi from "../../bindings/yousage/app";
 import type {
   SpeedBucket,
   SpeedModel,
+  SpeedProvider,
   SpeedReport,
+  SpeedStats,
 } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
 
-/** Color of models without a provider color, in the chart and the speed bars. */
+/** Color of models without a provider color in the speed bars. */
 const LINE_COLOR = "var(--foreground)";
-
-/** Provider color share by rank within one provider; their count caps the chart. */
-const CHART_SHADES = [100, 62, 34] as const;
-
-/**
- * Line color of a charted model: its provider color, lighter for each more used model of the same provider.
- *
- * @param models - The charted models, by token usage.
- * @param index - Position of the model to color.
- * @returns A CSS color.
- */
-function chartColor(models: readonly SpeedModel[], index: number): string {
-  const model = models[index];
-  const rank = models
-    .slice(0, index)
-    .filter((other) => other.provider === model.provider).length;
-  const base =
-    PROVIDER_PRESENTATION[model.provider as UsageProviderKind]?.color ??
-    LINE_COLOR;
-  return `color-mix(in oklab, ${base} ${CHART_SHADES[rank]}%, var(--background))`;
-}
 
 /** Labels of the faster billing tiers; standard rows carry no badge. */
 const TIER_LABELS: Record<string, string> = {
@@ -88,6 +78,19 @@ function formatSpeed(tokensPerSecond: number): string {
   return tokensPerSecond > 0
     ? t("{rate} tok/s", { rate: formatRate(tokensPerSecond) })
     : "—";
+}
+
+/**
+ * Format a latency with milliseconds below a second and one decimal of seconds above.
+ *
+ * @param milliseconds - Elapsed milliseconds.
+ * @returns `850 ms` or `1.2 s`, or a dash without a measurement.
+ */
+function formatLatency(milliseconds: number): string {
+  if (milliseconds <= 0) return "—";
+  return milliseconds < 1000
+    ? t("{value} ms", { value: formatCount(Math.round(milliseconds)) })
+    : t("{value} s", { value: (milliseconds / 1000).toFixed(1) });
 }
 
 /**
@@ -160,32 +163,24 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
 }
 
 /**
- * Summary with the charted models as legend, their trend chart and the per-model table.
+ * Summary per provider, their trend chart, latency and context metrics and the per-model table.
  *
  * @param props - The speed report.
  * @returns The page content.
  */
 function SpeedContent({ report }: { report: SpeedReport }) {
-  const outputTokens = report.models.reduce(
-    (sum, model) => sum + model.outputTokens,
-    0,
-  );
-  const generationMs = report.models.reduce(
-    (sum, model) => sum + model.generationMs,
-    0,
-  );
-  const overall = generationMs > 0 ? (outputTokens * 1000) / generationMs : 0;
   const labels = bucketLabels(report.window);
-  const charted = report.models
-    .filter((model) => model.requests > 0)
-    .slice(0, CHART_SHADES.length);
+  const providers = orderProviders(
+    report.providers,
+    (provider) => provider.requests > 0,
+  );
   return (
     <div className="flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 md:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
-              {formatSpeed(overall)}
+              {formatSpeed(report.overall.tokensPerSecond)}
             </span>
             <span className="text-xs text-muted-foreground">
               {t("Average output speed · {count} measured requests", {
@@ -193,29 +188,32 @@ function SpeedContent({ report }: { report: SpeedReport }) {
               })}
             </span>
           </div>
-          {charted.map((model, index) => (
-            <SpeedTotal
-              key={rowKey(model)}
-              color={chartColor(charted, index)}
-              model={model}
+          {providers.map((provider) => (
+            <ProviderSummaryRow
+              key={provider.provider}
+              provider={provider.provider}
+              count={t(
+                provider.requests === 1
+                  ? msg("{count} request")
+                  : msg("{count} requests"),
+                { count: formatCount(provider.requests) },
+              )}
+              value={formatSpeed(provider.tokensPerSecond)}
+              detail={t("TTFT {ttft} · generation {rate}", {
+                ttft: formatLatency(provider.medianTtftMs),
+                rate: formatSpeed(provider.decodeTokensPerSecond),
+              })}
             />
           ))}
-          {report.unmeasuredRequests > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {t("{count} requests have no usable timing and are excluded.", {
-                count: formatCount(report.unmeasuredRequests),
-              })}
-            </span>
-          )}
         </div>
         <div className="flex min-w-0 flex-col gap-3">
           <h2 className="text-sm font-medium">
             {labels.isHourly ? t("Hourly speed") : t("Daily speed")}
           </h2>
-          {charted.length > 0 ? (
+          {providers.length > 0 ? (
             <SpeedChart
               buckets={report.buckets}
-              models={charted}
+              providers={providers}
               reportWindow={report.window}
             />
           ) : (
@@ -223,6 +221,7 @@ function SpeedContent({ report }: { report: SpeedReport }) {
           )}
         </div>
       </section>
+      <LatencyMetrics stats={report.overall} />
       <section className="flex min-w-0 flex-col gap-3">
         <h2 className="text-sm font-medium">{t("Models")}</h2>
         <SpeedTable models={report.models} />
@@ -232,35 +231,64 @@ function SpeedContent({ report }: { report: SpeedReport }) {
 }
 
 /**
- * One charted model in the summary column, doubling as the chart legend.
+ * Window-wide time to first token, generation speed, latency and context, like the Usage totals.
  *
- * @param props - Line color and model row.
- * @returns The total row.
+ * @param props - Statistics of every request in the window.
+ * @returns The metrics section.
  */
-function SpeedTotal({ color, model }: { color: string; model: SpeedModel }) {
+function LatencyMetrics({ stats }: { stats: SpeedStats }) {
+  const requests = stats.requests + stats.unmeasuredRequests;
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-          <span
-            aria-hidden
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-          <ModelName model={model} />
-        </span>
-        <span className="shrink-0 text-sm font-medium tabular-nums">
-          {formatSpeed(model.tokensPerSecond)}
+    <section className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-sm font-medium">{t("Latency and context")}</h2>
+        <span className="text-xs text-muted-foreground">
+          {t("First-token timing from {count} of {total} requests", {
+            count: formatCount(stats.ttftRequests),
+            total: formatCount(requests),
+          })}
         </span>
       </div>
-      <span className="text-xs text-muted-foreground">
-        {t("Median {median} · P10–P90 {low}–{high}", {
-          median: formatSpeed(model.medianTokensPerSecond),
-          low: formatRate(model.p10TokensPerSecond),
-          high: formatRate(model.p90TokensPerSecond),
-        })}
-      </span>
-    </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-1 md:grid-cols-4">
+        <Metric
+          label={t("Median TTFT")}
+          value={formatLatency(stats.medianTtftMs)}
+        />
+        <Metric label={t("P90 TTFT")} value={formatLatency(stats.p90TtftMs)} />
+        <Metric
+          label={t("Generation speed")}
+          value={formatSpeed(stats.decodeTokensPerSecond)}
+        />
+        <Metric
+          label={t("Cache hit rate")}
+          value={requests > 0 ? formatPercent(stats.cacheHitRate) : "—"}
+        />
+        <Metric
+          label={t("Median latency")}
+          value={formatLatency(stats.medianLatencyMs)}
+        />
+        <Metric
+          label={t("P90 latency")}
+          value={formatLatency(stats.p90LatencyMs)}
+        />
+        <Metric
+          label={t("Context per request")}
+          value={
+            requests > 0
+              ? formatTokens(Math.round(stats.contextTokensPerRequest))
+              : "—"
+          }
+        />
+        <Metric
+          label={t("Output per request")}
+          value={
+            requests > 0
+              ? formatTokens(Math.round(stats.outputTokensPerRequest))
+              : "—"
+          }
+        />
+      </div>
+    </section>
   );
 }
 
@@ -294,40 +322,40 @@ function ModelName({ model }: { model: SpeedModel }) {
 }
 
 /**
- * Output rate of the most used measured models in every bucket of the window, each in its provider color, lighter for less used models of the same provider.
+ * Output rate of every measured provider in every bucket of the window, each in its provider color.
  *
  * Buckets without a measurement are drawn at zero, like idle periods on the Usage chart.
  *
- * @param props - Every bucket ascending, the charted models by token usage and the report window.
+ * @param props - Every bucket ascending, the measured providers and the report window.
  * @returns The chart element.
  */
 function SpeedChart({
   buckets,
-  models,
+  providers,
   reportWindow,
 }: {
   buckets: readonly SpeedBucket[];
-  models: readonly SpeedModel[];
+  providers: readonly (SpeedProvider & { provider: UsageProviderKind })[];
   reportWindow: Window;
 }) {
   const labels = bucketLabels(reportWindow);
   const entries = useMemo(
     () =>
       buckets.map((bucket) =>
-        models.map((model) =>
-          bucket.models.find((entry) => rowKey(entry) === rowKey(model)),
+        providers.map(({ provider }) =>
+          bucket.providers.find((entry) => entry.provider === provider),
         ),
       ),
-    [buckets, models],
+    [buckets, providers],
   );
   const series = useMemo(
     () =>
-      models.map((model, index) => ({
-        id: rowKey(model),
-        color: chartColor(models, index),
+      providers.map(({ provider }, index) => ({
+        id: provider,
+        color: PROVIDER_PRESENTATION[provider].color,
         values: entries.map((row) => row[index]?.tokensPerSecond ?? 0),
       })),
-    [entries, models],
+    [entries, providers],
   );
   return (
     <SeriesChart
@@ -345,11 +373,11 @@ function SpeedChart({
               {t("No measured requests")}
             </div>
           );
-        return models.map((model, position) => (
+        return providers.map(({ provider }, position) => (
           <TooltipRow
-            key={rowKey(model)}
-            color={chartColor(models, position)}
-            model={model}
+            key={provider}
+            color={PROVIDER_PRESENTATION[provider].color}
+            label={PROVIDER_PRESENTATION[provider].label}
             value={formatSpeed(row[position]?.tokensPerSecond ?? 0)}
           />
         ));
@@ -359,18 +387,18 @@ function SpeedChart({
 }
 
 /**
- * One model in the chart readout: its line color, name and rate.
+ * One provider in the chart readout: its line color, name and rate.
  *
- * @param props - Line color, model row and formatted rate.
+ * @param props - Line color, provider name and formatted rate.
  * @returns The readout row.
  */
 function TooltipRow({
   color,
-  model,
+  label,
   value,
 }: {
   color: string;
-  model: SpeedModel;
+  label: string;
   value: string;
 }) {
   return (
@@ -381,7 +409,7 @@ function TooltipRow({
           className="size-2 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <ModelName model={model} />
+        {label}
       </span>
       <span className="shrink-0 text-foreground tabular-nums">{value}</span>
     </div>
@@ -389,7 +417,8 @@ function TooltipRow({
 }
 
 /**
- * Per-model rates ranked like the Usage breakdown, with a provider-colored bar of relative speed.
+ * Per-model rates, first-token time, latency and cache use ranked like the Usage breakdown,
+ * with a provider-colored bar of relative speed.
  *
  * @param props - Models by token usage.
  * @returns The model table.
@@ -407,23 +436,26 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
           <tr className="border-b border-border text-right text-xs text-muted-foreground">
             <th className="py-2 pr-3 text-left font-normal">#</th>
             <th className="w-full py-2 text-left font-normal">{t("Model")}</th>
-            <th className="py-2 pl-6 font-normal">{t("Output speed")}</th>
-            <th className="py-2 pl-6 font-normal">{t("Median")}</th>
-            <th className="hidden py-2 pl-6 font-normal md:table-cell">
-              P10–P90
+            <th className="py-2 pl-4 font-normal">{t("Output speed")}</th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Generation speed")}
             </th>
-            <th className="py-2 pl-6 font-normal">{t("Requests")}</th>
-            <th className="py-2 pl-6 font-normal">{t("Tokens")}</th>
-            <th className="hidden py-2 pl-6 font-normal md:table-cell">
-              {t("Output")}
+            <th className="py-2 pl-4 font-normal">TTFT</th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Latency")}
             </th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Cache hit")}
+            </th>
+            <th className="py-2 pl-4 font-normal">{t("Requests")}</th>
+            <th className="py-2 pl-4 font-normal">{t("Tokens")}</th>
           </tr>
         </thead>
         <tbody>
           {models.length === 0 ? (
             <tr>
               <td
-                colSpan={8}
+                colSpan={9}
                 className="py-6 text-center text-muted-foreground"
               >
                 {t("No measured requests in this window.")}
@@ -458,18 +490,35 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                       />
                     </div>
                   </td>
-                  <td className="py-2.5 pl-6 text-foreground">
+                  <td
+                    className="py-2.5 pl-4 text-foreground"
+                    title={
+                      isMeasured
+                        ? t("Median {median} · P10–P90 {low}–{high}", {
+                            median: formatSpeed(model.medianTokensPerSecond),
+                            low: formatRate(model.p10TokensPerSecond),
+                            high: formatRate(model.p90TokensPerSecond),
+                          })
+                        : undefined
+                    }
+                  >
                     {formatSpeed(model.tokensPerSecond)}
                   </td>
-                  <td className="py-2.5 pl-6">
-                    {isMeasured ? formatRate(model.medianTokensPerSecond) : "—"}
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
+                    {formatSpeed(model.decodeTokensPerSecond)}
                   </td>
-                  <td className="hidden py-2.5 pl-6 md:table-cell">
-                    {isMeasured
-                      ? `${formatRate(model.p10TokensPerSecond)}–${formatRate(model.p90TokensPerSecond)}`
+                  <td className="py-2.5 pl-4">
+                    {formatLatency(model.medianTtftMs)}
+                  </td>
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
+                    {formatLatency(model.medianLatencyMs)}
+                  </td>
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
+                    {model.inputTokens > 0
+                      ? formatPercent(model.cacheHitRate)
                       : "—"}
                   </td>
-                  <td className="py-2.5 pl-6">
+                  <td className="py-2.5 pl-4">
                     {formatCount(model.requests)}
                     {model.unmeasuredRequests > 0 && (
                       <span
@@ -482,11 +531,8 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="py-2.5 pl-6">
+                  <td className="py-2.5 pl-4">
                     {formatTokens(model.totalTokens)}
-                  </td>
-                  <td className="hidden py-2.5 pl-6 md:table-cell">
-                    {formatTokens(model.outputTokens)}
                   </td>
                 </tr>
               );

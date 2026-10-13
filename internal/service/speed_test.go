@@ -49,6 +49,16 @@ func TestSpeedAggregation(test *testing.T) {
 	if len(report.Buckets[6].Models) != 2 || report.Buckets[6].Models[1].TokensPerSecond != standard.TokensPerSecond {
 		test.Fatal(report.Buckets)
 	}
+	if len(report.Providers) != 2 || report.Providers[1].Provider != "claude" || report.Providers[1].Requests != 0 || report.Providers[1].UnmeasuredRequests != 1 || report.Providers[1].TokensPerSecond != 0 {
+		test.Fatal("providers must include unmeasured-only providers after measured ones", report.Providers)
+	}
+	codex := report.Providers[0]
+	if codex.Provider != "codex" || codex.Requests != 4 || codex.UnmeasuredRequests != 1 || codex.TotalTokens != 1279 || codex.OutputTokens != 280 || codex.GenerationMs != 7000 || codex.TokensPerSecond != 40 || codex.MedianTokensPerSecond != 25 || math.Abs(codex.P10TokensPerSecond-13) > 1e-12 || math.Abs(codex.P90TokensPerSecond-107) > 1e-12 {
+		test.Fatal("provider rates must weight every model and tier of the provider", codex)
+	}
+	if providers := report.Buckets[6].Providers; len(providers) != 1 || providers[0].Provider != "codex" || providers[0].Requests != 4 || providers[0].TokensPerSecond != 40 || report.Buckets[0].Providers == nil {
+		test.Fatal("bucket providers must combine measured models", report.Buckets)
+	}
 }
 
 // TestSpeedWindowBuckets applies exact half-open hourly bounds and local daily assignment across DST.
@@ -99,5 +109,42 @@ func TestSpeedReportLocalHistory(test *testing.T) {
 	}
 	if _, err := service.SpeedReport(ctx, 2, "UTC"); err == nil {
 		test.Fatal("invalid period accepted")
+	}
+}
+
+// TestSpeedLatencyAndContextMetrics separates time to first token from generation, keeps first tokens of
+// untimed requests, and averages context and output over every request of each scope.
+func TestSpeedLatencyAndContextMetrics(test *testing.T) {
+	now := time.Date(2026, 10, 9, 14, 5, 30, 0, time.UTC)
+	window, _ := accounting.BuildWindow(now, 7, "UTC")
+	at := now.Add(-time.Hour).UnixMilli()
+	codex := func(output, uncached, cached, generation, ttft int64) domain.Record {
+		return domain.Record{Provider: domain.Codex, Model: "model", Speed: "standard", TimestampMs: at, Totals: domain.Tokens{UncachedInputTokens: uncached, CachedInputTokens: cached, OutputTokens: output}, GenerationMs: generation, TtftMs: ttft}
+	}
+	records := []domain.Record{
+		codex(100, 400, 600, 2000, 500),
+		codex(300, 1000, 0, 4000, 1000),
+		codex(50, 200, 0, 0, 0),
+		codex(40, 800, 0, 0, 700),
+		{Provider: domain.Claude, Model: "claude", Speed: "standard", TimestampMs: at, Totals: domain.Tokens{UncachedInputTokens: 1000, OutputTokens: 200}, GenerationMs: 1000},
+	}
+	report := analyzeSpeed(records, window, nil, now)
+	near := func(actual, expected float64) bool { return math.Abs(actual-expected) < 1e-9 }
+	model := report.Models[0].SpeedStats
+	if report.Models[0].Provider != "codex" || model.Requests != 2 || model.UnmeasuredRequests != 2 || model.TtftRequests != 3 || model.MedianTtftMs != 700 || !near(model.P90TtftMs, 940) {
+		test.Fatal("first tokens of untimed requests still count", model)
+	}
+	if !near(model.DecodeTokensPerSecond, 400000.0/4500) || !near(model.TokensPerSecond, 400000.0/6000) || model.MedianLatencyMs != 3000 || !near(model.P90LatencyMs, 3800) {
+		test.Fatal("generation must exclude time to first token", model)
+	}
+	if model.InputTokens != 3000 || !near(model.CacheHitRate, 0.2) || model.ContextTokensPerRequest != 750 || model.OutputTokensPerRequest != 122.5 {
+		test.Fatal("context averages must cover every request", model)
+	}
+	overall := report.Overall
+	if overall.Requests != 3 || overall.TtftRequests != 3 || overall.MedianLatencyMs != 2000 || !near(overall.DecodeTokensPerSecond, model.DecodeTokensPerSecond) || !near(overall.CacheHitRate, 0.15) || overall.ContextTokensPerRequest != 800 || overall.OutputTokensPerRequest != 138 {
+		test.Fatal("overall must combine every provider", overall)
+	}
+	if len(report.Providers) != 2 || report.Providers[1].Provider != "claude" || report.Providers[1].TtftRequests != 0 || report.Providers[1].DecodeTokensPerSecond != 0 {
+		test.Fatal("providers without first-token timing stay unmeasured", report.Providers)
 	}
 }

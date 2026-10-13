@@ -25,6 +25,8 @@ type CodexState struct {
 	GenerationStartMs     int64       `json:"generationStartMs,omitempty"`
 	ResponseEndMs         int64       `json:"responseEndMs,omitempty"`
 	NextGenerationMs      int64       `json:"nextGenerationMs,omitempty"`
+	FirstOutputMs         int64       `json:"firstOutputMs,omitempty"`
+	NextFirstOutputMs     int64       `json:"nextFirstOutputMs,omitempty"`
 	IsTimingAmbiguous     bool        `json:"isTimingAmbiguous,omitempty"`
 	Claude                ClaudeState `json:"claude,omitzero"`
 }
@@ -56,10 +58,12 @@ type ClaudeEntry struct {
 	TimestampMs int64  `json:"timestampMs"`
 }
 
-// ClaudeStart is the request start of a message, or zero when it cannot be established.
+// ClaudeStart is the request start of a message, or zero when it cannot be established, and its
+// time to first token when the message began with a timed thinking block.
 type ClaudeStart struct {
 	Key     string `json:"key"`
 	StartMs int64  `json:"startMs,omitempty"`
+	TtftMs  int64  `json:"ttftMs,omitempty"`
 }
 
 // claudeEntryLimit bounds the retained parent chain; a request's starting entry is always recent.
@@ -151,15 +155,18 @@ func ParseClaude(data []byte) *domain.Record {
 // the message ends with a null stop reason and partial usage; those wait for the final block and are
 // emitted untimed only when another message begins without one. A request that hit an API error is
 // not timed, because the interval would include the failed attempt and its retry delay.
-// Explicit compaction boundaries start a separate loss-analysis context.
+// Explicit compaction boundaries start a separate loss-analysis context. A first thinking block that
+// reports its duration began streaming that long before it was written, which gives time to first token.
 func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
 	var line struct {
-		Type       string `json:"type"`
-		Subtype    string `json:"subtype"`
-		Uuid       string `json:"uuid"`
-		ParentUuid string `json:"parentUuid"`
-		Timestamp  string `json:"timestamp"`
-		Message    struct {
+		Type               string `json:"type"`
+		Subtype            string `json:"subtype"`
+		Uuid               string `json:"uuid"`
+		ParentUuid         string `json:"parentUuid"`
+		Timestamp          string `json:"timestamp"`
+		ThinkingDurationMs int64  `json:"thinkingDurationMs"`
+		ApiBlockIndex      *int   `json:"apiBlockIndex"`
+		Message            struct {
 			StopReason json.RawMessage `json:"stop_reason"`
 		} `json:"message"`
 	}
@@ -197,16 +204,21 @@ func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
 			result = append(result, held)
 		}
 	}
-	start, isKnown := int64(0), false
-	for _, known := range state.Starts {
+	position := -1
+	for index, known := range state.Starts {
 		if known.Key == key {
-			start, isKnown = known.StartMs, true
+			position = index
 		}
 	}
-	if !isKnown {
-		start = state.requestStart(line.ParentUuid)
-		starts := append(state.Starts, ClaudeStart{Key: key, StartMs: start})
+	if position < 0 {
+		starts := append(state.Starts, ClaudeStart{Key: key, StartMs: state.requestStart(line.ParentUuid)})
 		state.Starts = starts[max(0, len(starts)-claudeStartLimit):]
+		position = len(state.Starts) - 1
+	}
+	known := &state.Starts[position]
+	start := known.StartMs
+	if start > 0 && line.ApiBlockIndex != nil && *line.ApiBlockIndex == 0 && line.ThinkingDurationMs > 0 {
+		known.TtftMs = record.TimestampMs - line.ThinkingDurationMs - start
 	}
 	if string(line.Message.StopReason) == "null" {
 		state.Pending = []domain.Record{*record}
@@ -215,6 +227,7 @@ func ParseClaudeLine(data []byte, state *ClaudeState) []domain.Record {
 	state.Pending = nil
 	if start > 0 && (state.LastErrorMs < start || state.LastErrorMs > record.TimestampMs) {
 		record.GenerationMs = domain.ReliableGenerationMs(record.TimestampMs-start, record.Totals.OutputTokens)
+		record.TtftMs = domain.ReliableTtftMs(known.TtftMs, record.GenerationMs)
 	}
 	return append(result, *record)
 }
@@ -362,22 +375,26 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 	if totals.Total() == 0 {
 		return nil
 	}
-	duration := int64(0)
+	duration, ttft := int64(0), int64(0)
 	if !state.IsTimingAmbiguous && state.GenerationStartMs > 0 && state.ResponseEndMs <= instant {
 		duration = domain.ReliableGenerationMs(state.ResponseEndMs-state.GenerationStartMs, output)
+		if state.FirstOutputMs > 0 && state.FirstOutputMs <= state.ResponseEndMs {
+			ttft = domain.ReliableTtftMs(state.FirstOutputMs-state.GenerationStartMs, duration)
+		}
 	}
 	if state.IsTimingAmbiguous {
-		state.GenerationStartMs = 0
+		state.GenerationStartMs, state.FirstOutputMs = 0, 0
 	} else {
-		state.GenerationStartMs = state.NextGenerationMs
+		state.GenerationStartMs, state.FirstOutputMs = state.NextGenerationMs, state.NextFirstOutputMs
 	}
-	state.ResponseEndMs, state.NextGenerationMs, state.IsTimingAmbiguous = 0, 0, false
-	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, ContextId: transcriptContextId(state.TranscriptId, state.ContextEpoch), Speed: state.Speed, Totals: totals, GenerationMs: duration}
+	state.ResponseEndMs, state.NextGenerationMs, state.NextFirstOutputMs, state.IsTimingAmbiguous = 0, 0, 0, false
+	return &domain.Record{Provider: domain.Codex, TimestampMs: instant, Model: state.Model, SessionId: state.SessionId, ContextId: transcriptContextId(state.TranscriptId, state.ContextEpoch), Speed: state.Speed, Totals: totals, GenerationMs: duration, TtftMs: ttft}
 }
 
 // clearCodexTiming invalidates timing when a turn ends or fails.
 func clearCodexTiming(state *CodexState) {
 	state.GenerationStartMs, state.ResponseEndMs, state.NextGenerationMs, state.IsTimingAmbiguous = 0, 0, 0, false
+	state.FirstOutputMs, state.NextFirstOutputMs = 0, 0
 }
 
 // updateCodexTiming preserves a finished response while tool outputs establish the next request.
@@ -395,6 +412,20 @@ func updateCodexTiming(record, payload map[string]any, state *CodexState) {
 	if kind == "task_started" || kind == "user_message" || (record["type"] == "response_item" && kind == "message" && payload["role"] == "user") {
 		clearCodexTiming(state)
 		state.GenerationStartMs = instant
+		return
+	}
+	if kind == "item_completed" {
+		// A reasoning or reply item starts when its first tokens stream, after any tool output that started the request.
+		itemType := text(object(payload["item"])["type"])
+		started := integer(payload["started_at_ms"])
+		if (itemType != "Reasoning" && itemType != "AgentMessage") || started == 0 {
+			return
+		}
+		if state.NextGenerationMs > 0 && started >= state.NextGenerationMs {
+			state.NextFirstOutputMs = earliest(state.NextFirstOutputMs, started)
+		} else if state.GenerationStartMs > 0 && started >= state.GenerationStartMs {
+			state.FirstOutputMs = earliest(state.FirstOutputMs, started)
+		}
 		return
 	}
 	if record["type"] != "response_item" {
@@ -416,6 +447,14 @@ func updateCodexTiming(record, payload map[string]any, state *CodexState) {
 		}
 		state.ResponseEndMs = max(state.ResponseEndMs, instant)
 	}
+}
+
+// earliest keeps the earlier of a recorded instant and a candidate, treating zero as unrecorded.
+func earliest(recorded, candidate int64) int64 {
+	if recorded == 0 {
+		return candidate
+	}
+	return min(recorded, candidate)
 }
 
 // codexQuota maps positional log windows to their live probe identities.

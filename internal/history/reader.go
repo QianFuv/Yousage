@@ -14,8 +14,8 @@ import (
 	"yousage/internal/history/grok"
 )
 
-// ParserVersion replays retained transcripts to omit persisted error observations.
-const ParserVersion = 7
+// ParserVersion replays retained transcripts to add time to first token and end Claude requests at their last block.
+const ParserVersion = 8
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -118,11 +118,16 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 				if record.ErrorKind != "" {
 					continue
 				}
-				if stream.hasNewline {
-					result.Records = append(result.Records, record)
-				} else {
-					result.Tail = append(result.Tail, record)
+				target := &result.Records
+				if !stream.hasNewline {
+					target = &result.Tail
 				}
+				// Claude writes every block of a message with its final usage; the last block ends the request.
+				if last := len(*target) - 1; provider == domain.Claude && record.DedupeKey != "" && last >= 0 && (*target)[last].DedupeKey == record.DedupeKey {
+					(*target)[last] = record
+					continue
+				}
+				*target = append(*target, record)
 			}
 		}
 		if stream.hasNewline {

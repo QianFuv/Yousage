@@ -735,6 +735,7 @@ export class Snapshot {
 export class SpeedBucket {
     "label": string;
     "models": SpeedBucketModel[];
+    "providers": SpeedBucketProvider[];
 
     /** Creates a new SpeedBucket instance. */
     constructor($$source: Partial<SpeedBucket> = {}) {
@@ -743,6 +744,9 @@ export class SpeedBucket {
         }
         if (!("models" in $$source)) {
             this["models"] = [];
+        }
+        if (!("providers" in $$source)) {
+            this["providers"] = [];
         }
 
         Object.assign(this, $$source);
@@ -753,9 +757,13 @@ export class SpeedBucket {
      */
     static createFrom($$source: any = {}): SpeedBucket {
         const $$createField1_0 = $$createType30;
+        const $$createField2_0 = $$createType32;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
+        }
+        if ("providers" in $$parsedSource) {
+            $$parsedSource["providers"] = $$createField2_0($$parsedSource["providers"]);
         }
         return new SpeedBucket($$parsedSource as Partial<SpeedBucket>);
     }
@@ -810,8 +818,47 @@ export class SpeedBucketModel {
 }
 
 /**
- * SpeedModel separates billing tiers and includes request-rate percentiles.
- * TotalTokens counts input and output of every included request, measured or not.
+ * SpeedBucketProvider contains only measured requests of one provider in a bucket.
+ */
+export class SpeedBucketProvider {
+    "provider": string;
+    "requests": number;
+    "outputTokens": number;
+    "generationMs": number;
+    "tokensPerSecond": number;
+
+    /** Creates a new SpeedBucketProvider instance. */
+    constructor($$source: Partial<SpeedBucketProvider> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("requests" in $$source)) {
+            this["requests"] = 0;
+        }
+        if (!("outputTokens" in $$source)) {
+            this["outputTokens"] = 0;
+        }
+        if (!("generationMs" in $$source)) {
+            this["generationMs"] = 0;
+        }
+        if (!("tokensPerSecond" in $$source)) {
+            this["tokensPerSecond"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedBucketProvider instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedBucketProvider {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SpeedBucketProvider($$parsedSource as Partial<SpeedBucketProvider>);
+    }
+}
+
+/**
+ * SpeedModel separates billing tiers of one provider's model.
  */
 export class SpeedModel {
     "provider": string;
@@ -826,6 +873,17 @@ export class SpeedModel {
     "medianTokensPerSecond": number;
     "p10TokensPerSecond": number;
     "p90TokensPerSecond": number;
+    "ttftRequests": number;
+    "medianTtftMs": number;
+    "p90TtftMs": number;
+    "decodeTokensPerSecond": number;
+    "medianLatencyMs": number;
+    "p90LatencyMs": number;
+    "inputTokens": number;
+    "cachedInputTokens": number;
+    "cacheHitRate": number;
+    "contextTokensPerRequest": number;
+    "outputTokensPerRequest": number;
 
     /** Creates a new SpeedModel instance. */
     constructor($$source: Partial<SpeedModel> = {}) {
@@ -865,6 +923,39 @@ export class SpeedModel {
         if (!("p90TokensPerSecond" in $$source)) {
             this["p90TokensPerSecond"] = 0;
         }
+        if (!("ttftRequests" in $$source)) {
+            this["ttftRequests"] = 0;
+        }
+        if (!("medianTtftMs" in $$source)) {
+            this["medianTtftMs"] = 0;
+        }
+        if (!("p90TtftMs" in $$source)) {
+            this["p90TtftMs"] = 0;
+        }
+        if (!("decodeTokensPerSecond" in $$source)) {
+            this["decodeTokensPerSecond"] = 0;
+        }
+        if (!("medianLatencyMs" in $$source)) {
+            this["medianLatencyMs"] = 0;
+        }
+        if (!("p90LatencyMs" in $$source)) {
+            this["p90LatencyMs"] = 0;
+        }
+        if (!("inputTokens" in $$source)) {
+            this["inputTokens"] = 0;
+        }
+        if (!("cachedInputTokens" in $$source)) {
+            this["cachedInputTokens"] = 0;
+        }
+        if (!("cacheHitRate" in $$source)) {
+            this["cacheHitRate"] = 0;
+        }
+        if (!("contextTokensPerRequest" in $$source)) {
+            this["contextTokensPerRequest"] = 0;
+        }
+        if (!("outputTokensPerRequest" in $$source)) {
+            this["outputTokensPerRequest"] = 0;
+        }
 
         Object.assign(this, $$source);
     }
@@ -879,16 +970,123 @@ export class SpeedModel {
 }
 
 /**
- * SpeedReport summarizes inclusive output throughput from local retained request facts.
- * OpenCode uses native assistant creation/completion times; Codex uses explicit request
- * boundaries and model response timestamps, excluding intervening tool execution; Claude
- * runs from the prompt or tool result that started a message to its final content block.
- * These elapsed intervals include time to first token. Missing, nonpositive, over-ten-minute
- * and implausibly fast intervals are unmeasured; providers without reliable timing stay unmeasured.
+ * SpeedProvider aggregates every model and billing tier of one provider, like the provider rows of Usage.
+ */
+export class SpeedProvider {
+    "provider": string;
+    "requests": number;
+    "unmeasuredRequests": number;
+    "totalTokens": number;
+    "outputTokens": number;
+    "generationMs": number;
+    "tokensPerSecond": number;
+    "medianTokensPerSecond": number;
+    "p10TokensPerSecond": number;
+    "p90TokensPerSecond": number;
+    "ttftRequests": number;
+    "medianTtftMs": number;
+    "p90TtftMs": number;
+    "decodeTokensPerSecond": number;
+    "medianLatencyMs": number;
+    "p90LatencyMs": number;
+    "inputTokens": number;
+    "cachedInputTokens": number;
+    "cacheHitRate": number;
+    "contextTokensPerRequest": number;
+    "outputTokensPerRequest": number;
+
+    /** Creates a new SpeedProvider instance. */
+    constructor($$source: Partial<SpeedProvider> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("requests" in $$source)) {
+            this["requests"] = 0;
+        }
+        if (!("unmeasuredRequests" in $$source)) {
+            this["unmeasuredRequests"] = 0;
+        }
+        if (!("totalTokens" in $$source)) {
+            this["totalTokens"] = 0;
+        }
+        if (!("outputTokens" in $$source)) {
+            this["outputTokens"] = 0;
+        }
+        if (!("generationMs" in $$source)) {
+            this["generationMs"] = 0;
+        }
+        if (!("tokensPerSecond" in $$source)) {
+            this["tokensPerSecond"] = 0;
+        }
+        if (!("medianTokensPerSecond" in $$source)) {
+            this["medianTokensPerSecond"] = 0;
+        }
+        if (!("p10TokensPerSecond" in $$source)) {
+            this["p10TokensPerSecond"] = 0;
+        }
+        if (!("p90TokensPerSecond" in $$source)) {
+            this["p90TokensPerSecond"] = 0;
+        }
+        if (!("ttftRequests" in $$source)) {
+            this["ttftRequests"] = 0;
+        }
+        if (!("medianTtftMs" in $$source)) {
+            this["medianTtftMs"] = 0;
+        }
+        if (!("p90TtftMs" in $$source)) {
+            this["p90TtftMs"] = 0;
+        }
+        if (!("decodeTokensPerSecond" in $$source)) {
+            this["decodeTokensPerSecond"] = 0;
+        }
+        if (!("medianLatencyMs" in $$source)) {
+            this["medianLatencyMs"] = 0;
+        }
+        if (!("p90LatencyMs" in $$source)) {
+            this["p90LatencyMs"] = 0;
+        }
+        if (!("inputTokens" in $$source)) {
+            this["inputTokens"] = 0;
+        }
+        if (!("cachedInputTokens" in $$source)) {
+            this["cachedInputTokens"] = 0;
+        }
+        if (!("cacheHitRate" in $$source)) {
+            this["cacheHitRate"] = 0;
+        }
+        if (!("contextTokensPerRequest" in $$source)) {
+            this["contextTokensPerRequest"] = 0;
+        }
+        if (!("outputTokensPerRequest" in $$source)) {
+            this["outputTokensPerRequest"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedProvider instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedProvider {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SpeedProvider($$parsedSource as Partial<SpeedProvider>);
+    }
+}
+
+/**
+ * SpeedReport summarizes output throughput, time to first token, latency and context from local
+ * retained request facts. OpenCode uses native assistant creation/completion times; Codex uses
+ * explicit request boundaries and model response timestamps, excluding intervening tool execution;
+ * Claude runs from the prompt or tool result that started a message to its last content block.
+ * These elapsed intervals include time to first token, which Codex and Claude measure separately
+ * where they record when output began streaming. Missing, nonpositive, over-ten-minute and
+ * implausibly fast intervals are unmeasured.
  */
 export class SpeedReport {
     "window": accounting$0.Window;
+    "overall": SpeedStats;
     "models": SpeedModel[];
+    "providers": SpeedProvider[];
     "buckets": SpeedBucket[];
     "measuredRequests": number;
     "unmeasuredRequests": number;
@@ -898,8 +1096,14 @@ export class SpeedReport {
         if (!("window" in $$source)) {
             this["window"] = (new accounting$0.Window());
         }
+        if (!("overall" in $$source)) {
+            this["overall"] = (new SpeedStats());
+        }
         if (!("models" in $$source)) {
             this["models"] = [];
+        }
+        if (!("providers" in $$source)) {
+            this["providers"] = [];
         }
         if (!("buckets" in $$source)) {
             this["buckets"] = [];
@@ -919,19 +1123,130 @@ export class SpeedReport {
      */
     static createFrom($$source: any = {}): SpeedReport {
         const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType32;
-        const $$createField2_0 = $$createType34;
+        const $$createField1_0 = $$createType33;
+        const $$createField2_0 = $$createType35;
+        const $$createField3_0 = $$createType37;
+        const $$createField4_0 = $$createType39;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
         }
+        if ("overall" in $$parsedSource) {
+            $$parsedSource["overall"] = $$createField1_0($$parsedSource["overall"]);
+        }
         if ("models" in $$parsedSource) {
-            $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
+            $$parsedSource["models"] = $$createField2_0($$parsedSource["models"]);
+        }
+        if ("providers" in $$parsedSource) {
+            $$parsedSource["providers"] = $$createField3_0($$parsedSource["providers"]);
         }
         if ("buckets" in $$parsedSource) {
-            $$parsedSource["buckets"] = $$createField2_0($$parsedSource["buckets"]);
+            $$parsedSource["buckets"] = $$createField4_0($$parsedSource["buckets"]);
         }
         return new SpeedReport($$parsedSource as Partial<SpeedReport>);
+    }
+}
+
+/**
+ * SpeedStats aggregates the requests of one scope: a model and billing tier, a provider or the window.
+ * Requests and the rates count timed requests only; TotalTokens, the cache hit rate and the per-request
+ * averages count every included request. The generation rate excludes time to first token and uses only
+ * requests with both measurements. Percentiles weight every request equally.
+ */
+export class SpeedStats {
+    "requests": number;
+    "unmeasuredRequests": number;
+    "totalTokens": number;
+    "outputTokens": number;
+    "generationMs": number;
+    "tokensPerSecond": number;
+    "medianTokensPerSecond": number;
+    "p10TokensPerSecond": number;
+    "p90TokensPerSecond": number;
+    "ttftRequests": number;
+    "medianTtftMs": number;
+    "p90TtftMs": number;
+    "decodeTokensPerSecond": number;
+    "medianLatencyMs": number;
+    "p90LatencyMs": number;
+    "inputTokens": number;
+    "cachedInputTokens": number;
+    "cacheHitRate": number;
+    "contextTokensPerRequest": number;
+    "outputTokensPerRequest": number;
+
+    /** Creates a new SpeedStats instance. */
+    constructor($$source: Partial<SpeedStats> = {}) {
+        if (!("requests" in $$source)) {
+            this["requests"] = 0;
+        }
+        if (!("unmeasuredRequests" in $$source)) {
+            this["unmeasuredRequests"] = 0;
+        }
+        if (!("totalTokens" in $$source)) {
+            this["totalTokens"] = 0;
+        }
+        if (!("outputTokens" in $$source)) {
+            this["outputTokens"] = 0;
+        }
+        if (!("generationMs" in $$source)) {
+            this["generationMs"] = 0;
+        }
+        if (!("tokensPerSecond" in $$source)) {
+            this["tokensPerSecond"] = 0;
+        }
+        if (!("medianTokensPerSecond" in $$source)) {
+            this["medianTokensPerSecond"] = 0;
+        }
+        if (!("p10TokensPerSecond" in $$source)) {
+            this["p10TokensPerSecond"] = 0;
+        }
+        if (!("p90TokensPerSecond" in $$source)) {
+            this["p90TokensPerSecond"] = 0;
+        }
+        if (!("ttftRequests" in $$source)) {
+            this["ttftRequests"] = 0;
+        }
+        if (!("medianTtftMs" in $$source)) {
+            this["medianTtftMs"] = 0;
+        }
+        if (!("p90TtftMs" in $$source)) {
+            this["p90TtftMs"] = 0;
+        }
+        if (!("decodeTokensPerSecond" in $$source)) {
+            this["decodeTokensPerSecond"] = 0;
+        }
+        if (!("medianLatencyMs" in $$source)) {
+            this["medianLatencyMs"] = 0;
+        }
+        if (!("p90LatencyMs" in $$source)) {
+            this["p90LatencyMs"] = 0;
+        }
+        if (!("inputTokens" in $$source)) {
+            this["inputTokens"] = 0;
+        }
+        if (!("cachedInputTokens" in $$source)) {
+            this["cachedInputTokens"] = 0;
+        }
+        if (!("cacheHitRate" in $$source)) {
+            this["cacheHitRate"] = 0;
+        }
+        if (!("contextTokensPerRequest" in $$source)) {
+            this["contextTokensPerRequest"] = 0;
+        }
+        if (!("outputTokensPerRequest" in $$source)) {
+            this["outputTokensPerRequest"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SpeedStats instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SpeedStats {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SpeedStats($$parsedSource as Partial<SpeedStats>);
     }
 }
 
@@ -967,7 +1282,12 @@ const $$createType27 = EnvironmentState.createFrom;
 const $$createType28 = $Create.Array($$createType27);
 const $$createType29 = SpeedBucketModel.createFrom;
 const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = SpeedModel.createFrom;
+const $$createType31 = SpeedBucketProvider.createFrom;
 const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = SpeedBucket.createFrom;
-const $$createType34 = $Create.Array($$createType33);
+const $$createType33 = SpeedStats.createFrom;
+const $$createType34 = SpeedModel.createFrom;
+const $$createType35 = $Create.Array($$createType34);
+const $$createType36 = SpeedProvider.createFrom;
+const $$createType37 = $Create.Array($$createType36);
+const $$createType38 = SpeedBucket.createFrom;
+const $$createType39 = $Create.Array($$createType38);

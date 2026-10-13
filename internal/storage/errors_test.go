@@ -27,7 +27,7 @@ func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = data[:len(data)-4]
+	data = data[:len(data)-5]
 	data[0] = 1
 	decoded, err := decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
 	if err != nil || !reflect.DeepEqual(decoded, legacy) {
@@ -37,7 +37,7 @@ func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = data[:len(data)-2]
+	data = data[:len(data)-3]
 	data[0] = 2
 	decoded, err = decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
 	if err != nil || !reflect.DeepEqual(decoded, legacy) {
@@ -47,11 +47,21 @@ func TestLegacyPayloadAndExtendedFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = data[:len(data)-1]
+	data = data[:len(data)-2]
 	data[0] = 3
 	decoded, err = decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
 	if err != nil || !reflect.DeepEqual(decoded, legacy) {
 		t.Fatal("v3 facts changed", decoded, legacy, err)
+	}
+	data, err = encodeRecord(legacy, intern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = data[:len(data)-1]
+	data[0] = 4
+	decoded, err = decodeRecord(data, legacy.TimestampMs, "", false, nil, lookup)
+	if err != nil || !reflect.DeepEqual(decoded, legacy) {
+		t.Fatal("v4 facts changed", decoded, legacy, err)
 	}
 	for _, record := range []domain.Record{{Provider: domain.Claude, SessionId: "session", TimestampMs: 123, ErrorKind: "rateLimit"}, {Provider: domain.Claude, Model: "model", SessionId: "session", TimestampMs: 124, Speed: "fast", CacheTtlMs: 3600000, Totals: domain.Tokens{CacheCreationTokens: 50000}}} {
 		data, err := encodeRecord(record, intern)
@@ -79,7 +89,7 @@ func TestMixedPayloadUpgradeReplacementAndRetention(t *testing.T) {
 	if err := store.database.QueryRowContext(ctx, `SELECT data FROM records`).Scan(&payload); err != nil {
 		t.Fatal(err)
 	}
-	payload = payload[:len(payload)-4]
+	payload = payload[:len(payload)-5]
 	payload[0] = 1
 	if _, err := store.database.ExecContext(ctx, `UPDATE records SET data=?`, payload); err != nil {
 		t.Fatal(err)

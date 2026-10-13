@@ -83,6 +83,7 @@ type Record struct {
 	ErrorKind       string            `json:"errorKind,omitempty"`
 	CacheTtlMs      int64             `json:"cacheTtlMs,omitempty"`
 	GenerationMs    int64             `json:"generationMs,omitempty"`
+	TtftMs          int64             `json:"ttftMs,omitempty"`
 	IsQuotaOnly     bool              `json:"quotaOnly,omitempty"`
 }
 
@@ -104,6 +105,9 @@ type QuotaObservation struct {
 func (record Record) Validate() error {
 	if record.GenerationMs < 0 {
 		return errors.New("negative generation duration")
+	}
+	if record.TtftMs < 0 || (record.TtftMs > 0 && (record.ErrorKind != "" || record.IsQuotaOnly)) {
+		return errors.New("invalid time to first token")
 	}
 	if record.ErrorKind != "" {
 		if (record.Provider != Codex && record.Provider != Claude) || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 || record.GenerationMs != 0 {
