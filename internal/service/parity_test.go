@@ -36,9 +36,6 @@ func TestRawHistoryToDesktopSummaryAndRepricing(test *testing.T) {
 `, 70, 20, 10, 40, 15, 0.00047},
 		{domain.Claude, "projects/fixture.jsonl", `{"type":"assistant","timestamp":"2026-10-06T10:00:01Z","sessionId":"fixture-claude","requestId":"fixture-request","costUSD":0.5,"message":{"id":"fixture-message","model":"fixture","usage":{"input_tokens":70,"cache_read_input_tokens":20,"cache_creation_input_tokens":10,"output_tokens":40}}}
 `, 70, 20, 10, 40, 0, 0.5},
-		{domain.Grok, "sessions/fixture/updates.jsonl", `{"timestamp":1791280801,"params":{"sessionId":"fixture-grok","update":{"sessionUpdate":"turn_completed","prompt_id":"fixture-prompt","usage":{"costUsdTicks":10000000000,"modelUsage":{"fixture":{"inputTokens":100,"cachedReadTokens":20,"cacheCreationTokens":10,"outputTokens":40,"reasoningTokens":15}}}}}}
-`, 70, 20, 10, 40, 15, 1},
-		{domain.OpenCode, "storage/message/fixture/message.json", `{"role":"assistant","sessionID":"fixture-opencode","modelID":"fixture","time":{"created":1791280801000},"tokens":{"input":70,"output":25,"reasoning":15,"cache":{"read":20,"write":10}},"cost":0.25}`, 70, 20, 10, 40, 15, 0.25},
 	}
 	sources := []preferences.Source{}
 	for _, fixture := range fixtures {
@@ -69,7 +66,7 @@ func TestRawHistoryToDesktopSummaryAndRepricing(test *testing.T) {
 			test.Fatal(err)
 		}
 		summary := snapshot.Environments[0].Summary
-		if summary == nil || len(summary.Buckets) != 4 || len(summary.Sources) != 4 {
+		if summary == nil || len(summary.Buckets) != 2 || len(summary.Sources) != 2 {
 			test.Fatalf("%dd snapshot missing sources: %+v", days, summary)
 		}
 		for _, fixture := range fixtures {
@@ -133,78 +130,27 @@ func TestPriceCacheFailureDoesNotBlockHistoryOrFreshRates(test *testing.T) {
 	}
 }
 
-func TestInactiveCursorCannotExposePreviousAccountHistory(test *testing.T) {
-	for _, environment := range []map[string]string{{"AGENT_CLI_CREDENTIAL_STORE": "memory"}, {"CURSOR_API_KEY": "fixture-api"}, {"CURSOR_AUTH_TOKEN": "fixture-ephemeral"}, {}} {
-		test.Run(stringMustJson(environment), func(test *testing.T) {
-			service := testService(test)
-			ctx := context.Background()
-			root := test.TempDir()
-			service.Platform = "windows"
-			service.Environment = environment
-			fingerprint := domain.SourceFingerprint{HostId: "cursor-account", Provider: domain.Cursor, ResolvedHomePath: "fixture-account-A", VolumeId: "account"}
-			record := domain.Record{Provider: domain.Cursor, SessionId: "session", Model: "fixture", Speed: "standard", TimestampMs: service.Now().Add(-time.Hour).UnixMilli(), DedupeKey: "billed-event", Totals: domain.Tokens{OutputTokens: 10}}
-			if err := service.storeSnapshot(ctx, fingerprint, []domain.Record{record}, "ok", "", service.Now()); err != nil {
-				test.Fatal(err)
-			}
-			entry := sourceIndex{ConfigurationId: "cursor", Source: remote.Source{Fingerprint: fingerprint, Status: "ok"}, IsSnapshot: true}
-			if _, err := service.Store.WriteSetting(ctx, "history-index", 0, []sourceIndex{entry}); err != nil {
-				test.Fatal(err)
-			}
-			_, revision, _ := service.Sources(ctx)
-			if _, err := service.SaveSources(ctx, []preferences.Source{{Id: "cursor", Provider: domain.Cursor, Root: filepath.Join(root, "absent-auth.json"), IsEnabled: true}}, revision); err != nil {
-				test.Fatal(err)
-			}
-			if _, err := service.scanHistory(ctx); err != nil {
-				test.Fatal(err)
-			}
-			window, _ := accounting.BuildWindow(service.Now(), 30, "UTC")
-			summary, err := service.localSummary(ctx, window)
-			if err != nil || len(summary.Buckets) != 0 || len(summary.Sources) != 0 {
-				test.Fatal("inactive saved login leaked old account", summary, err)
-			}
-			records, err := service.Store.Records(ctx, fingerprint.Id())
-			if err != nil || len(records) != 1 {
-				test.Fatal("suppression deleted retained account records", err)
-			}
-		})
-	}
-}
-
-func stringMustJson(value any) string { data, _ := json.Marshal(value); return string(data) }
-
-func TestMissingCursorOnlyOffersActualKeychainOptIn(test *testing.T) {
+func TestRetiredProviderStateIsIgnored(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
-	root := test.TempDir()
-	service.Platform = "darwin"
-	service.Environment = map[string]string{}
-	previousAccount := domain.SourceFingerprint{HostId: "cursor-account", Provider: domain.Cursor, ResolvedHomePath: "old-account", VolumeId: "account"}
-	instant := service.Now()
-	if err := service.storeSnapshot(ctx, previousAccount, []domain.Record{{Provider: domain.Cursor, SessionId: "session", Model: "fixture", Speed: "standard", TimestampMs: instant.UnixMilli(), Totals: domain.Tokens{OutputTokens: 1}}}, "ok", "", instant); err != nil {
+	retired := domain.SourceFingerprint{HostId: "fixture-host", Provider: domain.Provider("cursor"), ResolvedHomePath: "fixture-account", VolumeId: "account"}
+	if _, err := service.Store.WriteSetting(ctx, "history-index", 0, []sourceIndex{{ConfigurationId: "cursor", Source: remote.Source{Fingerprint: retired, Status: "ok"}, IsSnapshot: true}}); err != nil {
 		test.Fatal(err)
 	}
-	if _, err := service.Store.WriteSetting(ctx, "history-index", 0, []sourceIndex{{ConfigurationId: "cursor", Source: remote.Source{Fingerprint: previousAccount, Status: "ok"}, IsSnapshot: true}}); err != nil {
-		test.Fatal(err)
-	}
-	_, revision, _ := service.Sources(ctx)
-	if _, err := service.SaveSources(ctx, []preferences.Source{{Id: "cursor", Provider: domain.Cursor, Root: filepath.Join(root, "auth.json"), IsEnabled: true}}, revision); err != nil {
-		test.Fatal(err)
-	}
-	if _, err := service.scanHistory(ctx); err != nil {
+	_, revision, _ := service.Preferences.Sources(ctx)
+	if _, err := service.Store.WriteSetting(ctx, "sources", revision, []preferences.Source{{Id: "grok", Provider: domain.Provider("grok"), Root: test.TempDir(), IsEnabled: true}}); err != nil {
 		test.Fatal(err)
 	}
 	window, _ := accounting.BuildWindow(service.Now(), 30, "UTC")
-	summary, err := service.localSummary(ctx, window)
-	if err != nil || len(summary.Sources) != 1 || summary.Sources[0].Action != "enableCursorKeychain" || len(summary.Buckets) != 0 {
-		test.Fatal(summary, err)
+	if summary, err := service.localSummary(ctx, window); err != nil || len(summary.Sources) != 0 {
+		test.Fatal("retired provider appeared before rescanning", summary, err)
 	}
-	service.Now = func() time.Time { return instant.Add(91 * 24 * time.Hour) }
 	if _, err := service.scanHistory(ctx); err != nil {
-		test.Fatal(err)
+		test.Fatal("retired provider blocked history scanning", err)
 	}
-	records, err := service.Store.Records(ctx, previousAccount.Id())
-	if err != nil || len(records) != 0 {
-		test.Fatal("orphaned previous account escaped retention", err)
+	entries, _, err := service.sourceIndex(ctx)
+	if err != nil || len(entries) != 0 {
+		test.Fatal("retired provider remained in the source index", entries, err)
 	}
 }
 

@@ -13,12 +13,8 @@ import (
 type Provider string
 
 const (
-	Codex       Provider = "codex"
-	Claude      Provider = "claude"
-	Grok        Provider = "grok"
-	OpenCode    Provider = "opencode"
-	Antigravity Provider = "antigravity"
-	Cursor      Provider = "cursor"
+	Codex  Provider = "codex"
+	Claude Provider = "claude"
 )
 
 // SourceFingerprint identifies physical history independently of its environment connection.
@@ -37,7 +33,7 @@ func (source SourceFingerprint) Id() string {
 
 func (provider Provider) Valid() bool {
 	switch provider {
-	case Codex, Claude, Grok, OpenCode, Antigravity, Cursor:
+	case Codex, Claude:
 		return true
 	}
 	return false

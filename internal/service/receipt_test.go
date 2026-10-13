@@ -74,7 +74,7 @@ func seedReportRecords(t *testing.T, service *Service, records []domain.Record) 
 		groups[record.Provider] = append(groups[record.Provider], record)
 	}
 	entries := []sourceIndex{}
-	for _, provider := range []domain.Provider{domain.Claude, domain.Codex, domain.Cursor} {
+	for _, provider := range []domain.Provider{domain.Claude, domain.Codex} {
 		if len(groups[provider]) == 0 {
 			continue
 		}
@@ -98,7 +98,7 @@ func TestReceiptMatchesUsageAndSubscriptionSplit(t *testing.T) {
 		{Provider: domain.Claude, Model: "alias", SessionId: "shared", TimestampMs: now.Add(-time.Hour).UnixMilli(), Speed: "fast", Totals: domain.Tokens{UncachedInputTokens: 50000, CachedInputTokens: 100000, OutputTokens: 1000}},
 		{Provider: domain.Claude, Model: "unpriced", SessionId: "shared", TimestampMs: now.Add(-2 * time.Hour).UnixMilli(), Speed: "standard", Totals: domain.Tokens{OutputTokens: 20}},
 		{Provider: domain.Codex, Model: "gpt-5.4", SessionId: "shared", TimestampMs: now.Add(-3 * time.Hour).UnixMilli(), Speed: "ultrafast", Totals: domain.Tokens{UncachedInputTokens: 10000, CachedInputTokens: 40000, OutputTokens: 1000}},
-		{Provider: domain.Cursor, Model: "reported", SessionId: "cursor", TimestampMs: now.Add(-4 * time.Hour).UnixMilli(), Speed: "standard", ReportedCostUsd: &cost, Totals: domain.Tokens{OutputTokens: 5}},
+		{Provider: domain.Codex, Model: "reported", SessionId: "reported", TimestampMs: now.Add(-4 * time.Hour).UnixMilli(), Speed: "standard", ReportedCostUsd: &cost, Totals: domain.Tokens{OutputTokens: 5}},
 		{Provider: domain.Claude, Model: "claude-opus-4-8", SessionId: "future", TimestampMs: now.Add(time.Hour).UnixMilli(), Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: 999999}},
 		{Provider: domain.Claude, SessionId: "error-only", TimestampMs: now.Add(-time.Minute).UnixMilli(), ErrorKind: "server"},
 	}
@@ -147,7 +147,7 @@ func TestReceiptMatchesUsageAndSubscriptionSplit(t *testing.T) {
 	if receipt.FirstAtMs == nil || *receipt.FirstAtMs != records[3].TimestampMs || receipt.LastAtMs == nil || *receipt.LastAtMs != records[0].TimestampMs {
 		t.Fatal(receipt)
 	}
-	if len(receipt.Items) != 4 || receipt.Items[0].Provider != "cursor" || !receipt.Items[1].IsSubscription {
+	if len(receipt.Items) != 4 || receipt.Items[0].Provider != "codex" || receipt.Items[0].Model != "reported" || !receipt.Items[1].IsSubscription {
 		t.Fatal(receipt.Items)
 	}
 	assertQrFinderPatterns(t, receipt.QrModules)

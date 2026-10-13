@@ -17,7 +17,6 @@ type selection struct {
 var allFields = &selection{all: true}
 var errorFields = &selection{children: map[string]*selection{"type": allFields, "code": allFields, "status": allFields, "message": allFields}}
 var transcriptFields = &selection{children: map[string]*selection{
-	"params": {children: map[string]*selection{"sessionId": allFields, "_meta": {children: map[string]*selection{"agentTimestampMs": allFields}}, "update": {children: map[string]*selection{"sessionUpdate": allFields, "prompt_id": allFields, "usage": allFields}}}},
 	"reason": allFields, "subtype": allFields, "isApiErrorMessage": allFields, "error": errorFields,
 	"type": allFields, "timestamp": allFields, "costUSD": allFields, "sessionId": allFields, "requestId": allFields,
 	"uuid": allFields, "parentUuid": allFields, "thinkingDurationMs": allFields, "apiBlockIndex": allFields,

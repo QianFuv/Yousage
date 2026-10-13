@@ -44,10 +44,10 @@ func TestAutomaticSourcesFollowEnvironmentWithoutChangingLegacyRoots(test *testi
 	service := testService(test)
 	service.Home = test.TempDir()
 	first, second := test.TempDir(), test.TempDir()
-	service.Environment = map[string]string{"CODEX_HOME": first, "OPENCODE_DATA_DIR": first + "," + second + "," + first}
-	sources := []preferences.Source{{Id: "auto", Provider: domain.Codex, IsAutomatic: true}, {Id: "legacy", Provider: domain.Claude, Root: second}, {Id: "multi", Provider: domain.OpenCode, IsAutomatic: true}}
+	service.Environment = map[string]string{"CODEX_HOME": first}
+	sources := []preferences.Source{{Id: "auto", Provider: domain.Codex, IsAutomatic: true}, {Id: "legacy", Provider: domain.Claude, Root: second}}
 	expanded := service.expandedSources(sources)
-	if len(expanded) != 4 || expanded[0].Root != first || expanded[1].Root != second || expanded[2].Id == expanded[3].Id {
+	if len(expanded) != 2 || expanded[0].Root != first || expanded[1].Root != second {
 		test.Fatalf("automatic roots or legacy compatibility lost: %+v", expanded)
 	}
 	service.Environment["CODEX_HOME"] = second
@@ -116,19 +116,13 @@ func TestWindowsDiscoveryUsesNativePayloadWithoutExecutingShims(test *testing.T)
 	}
 }
 
-func TestAutomaticRootsRejectEmptyOverridesAndRelativeXdg(test *testing.T) {
+func TestUnixEnvironmentKeysStayCaseSensitive(test *testing.T) {
 	service := testService(test)
 	service.Home = test.TempDir()
 	service.Platform = "linux"
-	service.Environment = map[string]string{"OPENCODE_DATA_DIR": ", ,", "ANTIGRAVITY_DATA_DIR": ",,", "XDG_DATA_HOME": "relative", "Path": "wrong", "PATH": "correct", "codex_home": "wrong"}
+	service.Environment = map[string]string{"Path": "wrong", "PATH": "correct", "codex_home": "wrong"}
 	if service.environmentValue("PATH") != "correct" || service.environmentValue("CODEX_HOME") != "" {
 		test.Fatal("Unix environment keys became case-insensitive")
-	}
-	if roots := service.historyRoots(domain.OpenCode); len(roots) != 1 || roots[0] != filepath.Join(service.Home, ".local", "share", "opencode") {
-		test.Fatal("invalid overrides disabled default discovery", roots)
-	}
-	if len(service.historyRoots(domain.Antigravity)) != 5 {
-		test.Fatal("empty override disabled Antigravity defaults")
 	}
 }
 

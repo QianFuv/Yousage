@@ -359,7 +359,6 @@ export class Source {
     "malformedRecords": number;
     "distinctSessions": number;
     "message": string | null;
-    "action"?: string;
 
     /** Creates a new Source instance. */
     constructor($$source: Partial<Source> = {}) {

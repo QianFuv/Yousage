@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"time"
 	"yousage/internal/managedprocess"
-
-	"github.com/zalando/go-keyring"
 )
 
 type helperRequest struct {
@@ -92,18 +90,8 @@ func (store *OwnedStore) Delete(ctx context.Context, id string) error {
 	_, err := store.helper(ctx, helperRequest{Operation: "delete", Id: id})
 	return err
 }
-func (store *OwnedStore) CursorToken(ctx context.Context) (string, error) {
-	if runtime.GOOS != "darwin" {
-		return "", errors.New("Cursor Keychain credentials require macOS")
-	}
-	value, err := store.helper(ctx, helperRequest{Operation: "cursor"})
-	if errors.Is(err, ErrMissing) {
-		return "", nil
-	}
-	return value, err
-}
 
-// RunHelper dispatches only application-owned credentials or the explicitly opted-in Cursor keychain entry.
+// RunHelper dispatches only application-owned credentials.
 func RunHelper(input io.Reader, output io.Writer) int {
 	var request helperRequest
 	response := helperResponse{}
@@ -120,15 +108,6 @@ func RunHelper(input io.Reader, output io.Writer) int {
 			err = store.Put(context.Background(), request.Id, request.Value)
 		case "delete":
 			err = store.Delete(context.Background(), request.Id)
-		case "cursor":
-			if runtime.GOOS != "darwin" {
-				err = errors.New("unsupported")
-			} else {
-				value, err = keyring.Get("cursor-access-token", "cursor-user")
-				if errors.Is(err, keyring.ErrNotFound) {
-					err = ErrMissing
-				}
-			}
 		default:
 			err = errors.New("unsupported")
 		}

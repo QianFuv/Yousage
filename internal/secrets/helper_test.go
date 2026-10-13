@@ -11,14 +11,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"yousage/internal/managedprocess"
 )
 
 func TestCredentialHelperRejectsUnknownAndUnsafeInputs(t *testing.T) {
 	for _, input := range []string{`{"operation":"unknown","value":"secret"}`, `{"operation":"get","id":"../outside"}`, `{"operation":"cursor"}`, `invalid`} {
-		if runtime.GOOS == "darwin" && strings.Contains(input, "cursor") {
-			continue
-		}
 		var output bytes.Buffer
 		if RunHelper(strings.NewReader(input), &output) != 0 || strings.Contains(output.String(), "secret") || strings.Contains(output.String(), "outside") {
 			t.Fatal(output.String())
@@ -42,10 +38,6 @@ func TestPackagedHeadlessHelperUsesInheritedPipesWithoutStartingGui(t *testing.T
 		t.Fatal(string(output), err)
 	}
 	store := &OwnedStore{executable: executable}
-	data, err := managedprocess.Run(ctx, managedprocess.Options{Executable: executable, Arguments: []string{"--quota-credential-helper"}}, []byte(`{"environment":{"XAI_API_KEY":"owned-fixture"}}`), 1024)
-	if err != nil || string(bytes.TrimSpace(data)) != `{"credential":null,"hasError":false}` {
-		t.Fatal("quota headless dispatch", err, string(data))
-	}
 	id := "helper-fixture-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	t.Cleanup(func() { _ = store.native.Delete(context.Background(), id) })
 	if _, err := store.helper(ctx, helperRequest{Operation: "put", Id: id, Value: "owned-helper-fixture"}); err != nil {

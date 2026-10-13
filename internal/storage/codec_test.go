@@ -22,7 +22,7 @@ func TestPayloadRoundTrip(test *testing.T) {
 		return identity, nil
 	}
 	for index := range 2000 {
-		record := domain.Record{Provider: []domain.Provider{domain.Codex, domain.Claude, domain.Grok, domain.OpenCode, domain.Antigravity, domain.Cursor}[index%6], TimestampMs: random.Int63(), Model: "gpt-5.4", RateModel: "rate-model", SessionId: "session-α", Speed: []string{"standard", "fast", "ultrafast"}[index%3], DedupeKey: "dedupe", SourcePath: "/different/路径", QuotaBucket: "codex", IsQuotaOnly: index%7 == 0}
+		record := domain.Record{Provider: []domain.Provider{domain.Codex, domain.Claude}[index%2], TimestampMs: random.Int63(), Model: "gpt-5.4", RateModel: "rate-model", SessionId: "session-α", Speed: []string{"standard", "fast", "ultrafast"}[index%3], DedupeKey: "dedupe", SourcePath: "/different/路径", QuotaBucket: "codex", IsQuotaOnly: index%7 == 0}
 		record.GenerationMs = random.Int63()
 		record.TtftMs = random.Int63()
 		record.ContextId = "transcript.jsonl\x001"

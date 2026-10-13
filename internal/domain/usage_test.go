@@ -16,7 +16,7 @@ func TestPhysicalIdentityAndTokenCategories(t *testing.T) {
 	if tokens.Total() != 3600 {
 		t.Fatal("reasoning was charged twice")
 	}
-	if AccountId(Cursor, " Alice@Example.COM ") != "cursor:alice@example.com" {
+	if AccountId(Claude, " Alice@Example.COM ") != "claude:alice@example.com" {
 		t.Fatal("account normalization")
 	}
 }

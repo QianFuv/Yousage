@@ -10,12 +10,11 @@ import (
 )
 
 // SpeedReport summarizes output throughput, time to first token, latency and context from local
-// retained request facts. OpenCode uses native assistant creation/completion times; Codex uses
-// explicit request boundaries and model response timestamps, excluding intervening tool execution;
-// Claude runs from the prompt or tool result that started a message to its last content block.
-// These elapsed intervals include time to first token, which Codex and Claude measure separately
-// where they record when output began streaming. Missing, nonpositive, over-ten-minute and
-// implausibly fast intervals are unmeasured.
+// retained request facts. Codex uses explicit request boundaries and model response timestamps,
+// excluding intervening tool execution; Claude runs from the prompt or tool result that started a
+// message to its last content block. These elapsed intervals include time to first token, which
+// Codex and Claude measure separately where they record when output began streaming. Missing,
+// nonpositive, over-ten-minute and implausibly fast intervals are unmeasured.
 type SpeedReport struct {
 	Window             accounting.Window `json:"window"`
 	Overall            SpeedStats        `json:"overall"`

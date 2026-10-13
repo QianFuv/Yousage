@@ -164,11 +164,6 @@ func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossRe
 	return service.usage.LossReport(service.context, days, timeZone)
 }
 
-// EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
-func (service *App) EnableCursorKeychain(identities []string) []remote.SaveOutcome {
-	return service.usage.EnableCursorKeychain(service.context, identities)
-}
-
 // RefreshUsage coalesces selected scans with foreground-only automatic refresh policy.
 func (service *App) RefreshUsage(days int, timeZone string, selected []string, request refresh.Request) error {
 	return service.usage.RefreshUsage(service.context, days, timeZone, selected, request)

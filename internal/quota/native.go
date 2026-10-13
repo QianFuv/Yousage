@@ -253,7 +253,3 @@ func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled boo
 	account.Limits = limits
 	return account
 }
-
-func AntigravityLimits(now time.Time) Limits {
-	return unavailable(checked(now), "unsupported", "The pinned Antigravity driver does not report native subscription limits.")
-}

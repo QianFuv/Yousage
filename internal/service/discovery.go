@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 	"yousage/internal/domain"
-	"yousage/internal/history/cursor"
 	"yousage/internal/preferences"
 )
 
@@ -75,20 +74,6 @@ func (service *Service) absoluteHome(value string) string {
 	}
 	return absolute
 }
-func (service *Service) rootList(values string) []string {
-	roots := []string{}
-	seen := map[string]bool{}
-	for _, value := range strings.Split(values, ",") {
-		if value = strings.TrimSpace(value); value != "" {
-			root := service.absoluteHome(value)
-			if !seen[root] {
-				roots = append(roots, root)
-				seen[root] = true
-			}
-		}
-	}
-	return roots
-}
 func (service *Service) historyRoots(provider domain.Provider) []string {
 	defaultRoot := func(variable, directory string) string {
 		if value := service.environmentValue(variable); value != "" {
@@ -101,32 +86,6 @@ func (service *Service) historyRoots(provider domain.Provider) []string {
 		return []string{defaultRoot("CODEX_HOME", ".codex")}
 	case domain.Claude:
 		return []string{defaultRoot("CLAUDE_CONFIG_DIR", ".claude")}
-	case domain.Grok:
-		return []string{defaultRoot("GROK_HOME", ".grok")}
-	case domain.Cursor:
-		credentials := cursor.DiscoverCredentials(service.Platform, service.Home, service.Environment, false)
-		if credentials.Path != "" {
-			return []string{credentials.Path}
-		}
-		return []string{filepath.Join(service.Home, ".cursor", "auth.json")}
-	case domain.OpenCode:
-		if roots := service.rootList(service.environmentValue("OPENCODE_DATA_DIR")); len(roots) > 0 {
-			return roots
-		}
-		base := service.environmentValue("XDG_DATA_HOME")
-		if !filepath.IsAbs(base) {
-			base = filepath.Join(service.Home, ".local", "share")
-		}
-		return []string{filepath.Join(service.absoluteHome(base), "opencode")}
-	case domain.Antigravity:
-		if roots := service.rootList(service.environmentValue("ANTIGRAVITY_DATA_DIR")); len(roots) > 0 {
-			return roots
-		}
-		roots := []string{}
-		for _, name := range []string{"antigravity", "antigravity-cli", "antigravity-ide", "antigravity-backup"} {
-			roots = append(roots, filepath.Join(service.Home, ".gemini", name))
-		}
-		return append(roots, filepath.Join(service.Home, ".config", "antigravity"))
 	}
 	return nil
 }
@@ -234,12 +193,9 @@ func (service *Service) expandedSources(sources []preferences.Source) []preferen
 			result = append(result, source)
 			continue
 		}
-		for index, root := range service.historyRoots(source.Provider) {
+		for _, root := range service.historyRoots(source.Provider) {
 			expanded := source
 			expanded.Root = root
-			if index > 0 {
-				expanded.Id = source.Id + ":" + smallIdentity(root)
-			}
 			result = append(result, expanded)
 		}
 	}
@@ -255,7 +211,7 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 	for _, pair := range []struct {
 		driver   string
 		provider domain.Provider
-	}{{"codex", domain.Codex}, {"claudeAgent", domain.Claude}, {"cursor", domain.Cursor}, {"grok", domain.Grok}, {"opencode", domain.OpenCode}, {"antigravity", domain.Antigravity}} {
+	}{{"codex", domain.Codex}, {"claudeAgent", domain.Claude}} {
 		if !service.isProviderInScope(pair.provider) {
 			continue
 		}
@@ -265,7 +221,7 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 				detection.IsInstalled = true
 			}
 			historyRoot := root
-			if pair.provider == domain.Codex || pair.provider == domain.Grok {
+			if pair.provider == domain.Codex {
 				historyRoot = filepath.Join(root, "sessions")
 			} else if pair.provider == domain.Claude {
 				historyRoot = filepath.Join(root, "projects")
@@ -274,12 +230,8 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 				detection.HasHistory = true
 			}
 		}
-		if pair.driver == "codex" || pair.driver == "claudeAgent" {
-			detection.IsInstalled = service.resolveExecutable(pair.driver, "") != ""
-		}
-		if pair.driver == "antigravity" {
-			detection.Message = "History supported; native quotas unavailable."
-		} else if detection.IsInstalled {
+		detection.IsInstalled = service.resolveExecutable(pair.driver, "") != ""
+		if detection.IsInstalled {
 			detection.Message = "Detected automatically. Account access is checked only after enabling quotas."
 		} else {
 			detection.Message = "Not detected. Install the provider or configure its standard environment location, then detect again."

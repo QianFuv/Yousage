@@ -47,11 +47,7 @@ func DefaultRoots() ([]Root, error) {
 	if claude == "" {
 		claude = filepath.Join(home, ".claude")
 	}
-	grok := strings.TrimSpace(os.Getenv("GROK_HOME"))
-	if grok == "" {
-		grok = filepath.Join(home, ".grok")
-	}
-	return []Root{{domain.Codex, codex}, {domain.Claude, claude}, {domain.Grok, grok}}, nil
+	return []Root{{domain.Codex, codex}, {domain.Claude, claude}}, nil
 }
 func ExpandHome(path string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
@@ -82,7 +78,7 @@ func (collector Collector) scan(ctx context.Context, roots []Root, now time.Time
 	results := []SourceResult{}
 	seen := map[string]bool{}
 	for _, root := range roots {
-		if root.Provider != domain.Codex && root.Provider != domain.Claude && root.Provider != domain.Grok {
+		if root.Provider != domain.Codex && root.Provider != domain.Claude {
 			return nil, errors.New("unsupported history root")
 		}
 		home, err := ExpandHome(root.Home)
@@ -195,9 +191,6 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 			return errors.New("history root is not a directory")
 		}
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
-			return nil
-		}
-		if fingerprint.Provider == domain.Grok && entry.Name() != "updates.jsonl" {
 			return nil
 		}
 		info, err := entry.Info()
@@ -331,9 +324,6 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 	if result.Status == "missing" && len(counts) > 0 {
 		result.Status = "ok"
 		result.Notice = "Original history removed; showing saved usage."
-	}
-	if fingerprint.Provider == domain.Grok && len(counts) == 0 && result.Status == "ok" {
-		result.Notice = "No compatible saved turn_completed usage. Grok Build must persist completed-turn usage in sessions/.../updates.jsonl; past usage cannot be reconstructed."
 	}
 	observation := domain.Observation{SourceId: id, Status: result.Status, AttemptedAt: now.UnixMilli(), Notice: result.Notice}
 	if result.Status == "ok" {

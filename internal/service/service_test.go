@@ -35,6 +35,34 @@ func testService(test *testing.T) *Service {
 	return service
 }
 
+// storeSnapshot seeds one complete source snapshot and its observation for summary fixtures.
+func (service *Service) storeSnapshot(ctx context.Context, fingerprint domain.SourceFingerprint, records []domain.Record, status, notice string, now time.Time) error {
+	id, err := service.Store.RegisterSource(ctx, fingerprint)
+	if err != nil {
+		return err
+	}
+	if status == "ok" {
+		checkpoint, err := service.Store.Checkpoint(ctx, id, "complete-snapshot")
+		if err != nil {
+			return err
+		}
+		for index := range records {
+			records[index].SourcePath = fingerprint.ResolvedHomePath
+		}
+		checkpoint.ModifiedNs = now.UnixNano()
+		checkpoint.ParserVersion = 1
+		if _, err = service.Store.CommitFile(ctx, checkpoint, records, true); err != nil {
+			return err
+		}
+	}
+	observation := domain.Observation{SourceId: id, Status: status, AttemptedAt: now.UnixMilli(), Notice: notice}
+	if status == "ok" {
+		success := now.UnixMilli()
+		observation.SucceededAt = &success
+	}
+	return service.Store.Observe(ctx, observation)
+}
+
 func TestRollingWindowRetainsRemoteCacheAcrossMinute(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
@@ -72,8 +100,8 @@ func TestCrossRootFactsDeduplicateBeforeSourceSessions(test *testing.T) {
 	now := service.Now()
 	entries := []sourceIndex{}
 	for _, root := range []string{test.TempDir(), test.TempDir()} {
-		fingerprint := service.fingerprint(domain.OpenCode, root)
-		record := domain.Record{Provider: domain.OpenCode, SessionId: "one-session", Model: "model", DedupeKey: "same-message", TimestampMs: now.Add(-time.Hour).UnixMilli(), Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: 10}}
+		fingerprint := service.fingerprint(domain.Claude, root)
+		record := domain.Record{Provider: domain.Claude, SessionId: "one-session", Model: "model", DedupeKey: "same-message", TimestampMs: now.Add(-time.Hour).UnixMilli(), Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: 10}}
 		if err := service.storeSnapshot(ctx, fingerprint, []domain.Record{record}, "ok", "", now); err != nil {
 			test.Fatal(err)
 		}
@@ -109,49 +137,10 @@ func TestConfigurationRejectsProviderPrimary(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
 	saved, _ := service.Configuration(ctx)
-	saved.Value.Providers = []NativeProvider{{Id: "provider", Driver: "cursor"}}
+	saved.Value.Providers = []NativeProvider{{Id: "provider", Driver: "codex"}}
 	saved.Value.PrimaryEnvironmentId = "provider"
 	if _, err := service.SaveConfiguration(ctx, saved); err == nil {
 		test.Fatal("provider accepted as primary environment")
-	}
-}
-
-func TestMissingSnapshotRetainsCoverageAndDisabledSourcesExpire(test *testing.T) {
-	service := testService(test)
-	ctx := context.Background()
-	root := test.TempDir()
-	now := service.Now()
-	fingerprint := service.fingerprint(domain.OpenCode, root)
-	record := domain.Record{Provider: domain.OpenCode, SessionId: "session", Model: "model", Speed: "standard", DedupeKey: "message", TimestampMs: now.Add(-time.Hour).UnixMilli(), Totals: domain.Tokens{UncachedInputTokens: 10}}
-	if err := service.storeSnapshot(ctx, fingerprint, []domain.Record{record}, "ok", "", now); err != nil {
-		test.Fatal(err)
-	}
-	entries := []sourceIndex{{ConfigurationId: "source", Source: remote.Source{Fingerprint: fingerprint, Status: "ok"}, IsSnapshot: true}}
-	if _, err := service.Store.WriteSetting(ctx, "history-index", 0, entries); err != nil {
-		test.Fatal(err)
-	}
-	_, revision, _ := service.Sources(ctx)
-	revision, err := service.SaveSources(ctx, []preferences.Source{{Id: "source", Provider: domain.OpenCode, Root: root, IsEnabled: true}}, revision)
-	if err != nil {
-		test.Fatal(err)
-	}
-	if _, err = service.scanHistory(ctx); err != nil {
-		test.Fatal(err)
-	}
-	retained, _, _ := service.sourceIndex(ctx)
-	if retained[0].Source.Status != "partial" {
-		test.Fatal("missing reader excluded retained facts from merge coverage")
-	}
-	if _, err = service.SaveSources(ctx, []preferences.Source{{Id: "source", Provider: domain.OpenCode, Root: root, IsEnabled: false}}, revision); err != nil {
-		test.Fatal(err)
-	}
-	service.Now = func() time.Time { return now.Add(91 * 24 * time.Hour) }
-	if _, err = service.scanHistory(ctx); err != nil {
-		test.Fatal(err)
-	}
-	files, err := service.Store.FileRecords(ctx, fingerprint.Id())
-	if err != nil || len(files) != 0 {
-		test.Fatal("disabled source escaped cache retention", err)
 	}
 }
 

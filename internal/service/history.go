@@ -8,15 +8,12 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
-	"strings"
 	"time"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
 	"yousage/internal/history"
-	"yousage/internal/history/antigravity"
-	"yousage/internal/history/cursor"
-	"yousage/internal/history/opencode"
 	"yousage/internal/preferences"
 	"yousage/internal/refresh"
 	"yousage/internal/remote"
@@ -87,17 +84,14 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	configuration, err := service.Configuration(ctx)
-	if err != nil {
-		return false, err
-	}
+	entries = slices.DeleteFunc(entries, func(entry sourceIndex) bool { return !entry.Source.Fingerprint.Provider.Valid() })
 	now := service.Now()
 	byId := map[string]int{}
 	for index, entry := range entries {
 		byId[entry.ConfigurationId] = index
 	}
-	put := func(identity string, source remote.Source, isSnapshot bool) {
-		entry := sourceIndex{ConfigurationId: identity, Source: source, IsSnapshot: isSnapshot}
+	put := func(identity string, source remote.Source) {
+		entry := sourceIndex{ConfigurationId: identity, Source: source}
 		if index, exists := byId[identity]; exists {
 			entries[index] = entry
 		} else {
@@ -107,134 +101,28 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	}
 	jsonRoots := []history.Root{}
 	jsonIds := map[string]string{}
-	gravityRoots := []string{}
-	gravityIds := map[string]string{}
 	for _, source := range sources {
-		if !source.IsEnabled {
+		if !source.IsEnabled || !source.Provider.Valid() {
 			continue
 		}
 		root, err := history.ExpandHome(source.Root)
 		if err != nil {
 			return false, err
 		}
-		switch source.Provider {
-		case domain.Codex, domain.Claude, domain.Grok:
-			jsonRoots = append(jsonRoots, history.Root{Provider: source.Provider, Home: root})
-			directory := "sessions"
-			if source.Provider == domain.Claude {
-				directory = "projects"
-			}
-			fingerprint := service.fingerprint(source.Provider, filepath.Join(root, directory))
-			jsonIds[string(source.Provider)+":"+fingerprint.ResolvedHomePath] = source.Id
-		case domain.Antigravity:
-			gravityRoots = append(gravityRoots, root)
-			gravityIds[root] = source.Id
+		jsonRoots = append(jsonRoots, history.Root{Provider: source.Provider, Home: root})
+		directory := "sessions"
+		if source.Provider == domain.Claude {
+			directory = "projects"
 		}
+		fingerprint := service.fingerprint(source.Provider, filepath.Join(root, directory))
+		jsonIds[string(source.Provider)+":"+fingerprint.ResolvedHomePath] = source.Id
 	}
 	results, err := (history.Collector{Store: service.Store, HostId: service.hostId()}).Synchronize(ctx, jsonRoots, now)
 	if err != nil {
 		return false, err
 	}
 	for _, result := range results {
-		put(jsonIds[string(result.Fingerprint.Provider)+":"+result.Fingerprint.ResolvedHomePath], remote.Source{Fingerprint: result.Fingerprint, Status: result.Status, ScannedFiles: result.ScannedFiles, SkippedFiles: result.SkippedFiles, MalformedRecords: result.MalformedRecords, Message: sourceMessage(result.Notice)}, false)
-	}
-	if len(gravityRoots) > 0 {
-		result, readError := antigravity.Read(ctx, gravityRoots, now.Add(-90*24*time.Hour).UnixMilli())
-		for _, root := range gravityRoots {
-			fingerprint := service.fingerprint(domain.Antigravity, root)
-			records := []domain.Record{}
-			fileCount := 0
-			for _, file := range result.Files {
-				if file.Root == root {
-					records = append(records, file.Records...)
-					fileCount++
-				}
-			}
-			status, notice := "ok", ""
-			hasRootError := readError != nil
-			for _, failedPath := range result.Errors {
-				if failedPath == root || strings.HasPrefix(failedPath, root+string(filepath.Separator)) {
-					hasRootError = true
-				}
-			}
-			if hasRootError {
-				status, notice = "partial", "Some Antigravity databases could not be read. Cached history is retained."
-			}
-			if fileCount == 0 && status == "ok" {
-				status, notice = "missing", "No Antigravity conversation databases."
-			}
-			if err := service.storeSnapshot(ctx, fingerprint, records, status, notice, now); err != nil {
-				return false, err
-			}
-			put(gravityIds[root], remote.Source{Fingerprint: fingerprint, Status: status, ScannedFiles: fileCount, Message: sourceMessage(notice)}, true)
-		}
-	}
-	for _, source := range sources {
-		if !source.IsEnabled {
-			continue
-		}
-		root, err := history.ExpandHome(source.Root)
-		if err != nil {
-			return false, err
-		}
-		switch source.Provider {
-		case domain.OpenCode:
-			result, readError := opencode.Read(ctx, root, now.Add(-90*24*time.Hour).UnixMilli())
-			fingerprint := service.fingerprint(source.Provider, root)
-			records := []domain.Record{}
-			for _, file := range result.Files {
-				records = append(records, file.Records...)
-			}
-			status, notice := "ok", strings.Join(result.Notices, " ")
-			if readError != nil || result.HasError {
-				status = "partial"
-				notice = "Some OpenCode history could not be read. Cached history is retained."
-			} else if result.IsMissing {
-				status = "missing"
-			}
-			if err := service.storeSnapshot(ctx, fingerprint, records, status, notice, now); err != nil {
-				return false, err
-			}
-			put(source.Id, remote.Source{Fingerprint: fingerprint, Status: status, ScannedFiles: len(result.Files), Message: sourceMessage(notice)}, true)
-		case domain.Cursor:
-			credentials := cursor.DiscoverCredentials(service.Platform, service.Home, service.Environment, configuration.Value.IsCursorKeychainEnabled)
-			if !credentials.IsDisabled && !credentials.IsKeychain {
-				credentials.Path = root
-			}
-			result := cursor.Read(ctx, cursor.Options{Credentials: credentials, KeychainToken: service.keychain.Read}, now.Add(-90*24*time.Hour).UnixMilli(), now.UnixMilli())
-			if result.IsMissing && result.Error == "" {
-				if credentials.NeedsKeychainOptIn {
-					put(source.Id, remote.Source{Fingerprint: service.fingerprint(domain.Cursor, root), Status: "missing", Message: sourceMessage(result.Notice), Action: "enableCursorKeychain"}, true)
-					entries[byId[source.Id]].ShouldExcludeRecords = true
-				} else if previous, exists := byId[source.Id]; exists {
-					entries[previous].IsHidden = true
-					entries[previous].ShouldExcludeRecords = true
-				}
-				continue
-			}
-			fingerprint := result.SourceIdentity()
-			if result.AccountKey == "" {
-				if previous, exists := byId[source.Id]; exists {
-					fingerprint = entries[previous].Source.Fingerprint
-				} else {
-					fingerprint = service.fingerprint(domain.Cursor, root)
-				}
-			}
-			status, notice := "ok", result.Notice
-			if result.Error != "" {
-				status, notice = "failed", result.Error
-			} else if result.IsMissing || credentials.IsDisabled {
-				status = "missing"
-			}
-			if err := service.storeSnapshot(ctx, fingerprint, result.Records, status, notice, now); err != nil {
-				return false, err
-			}
-			action := ""
-			if service.Platform == "darwin" && credentials.IsDisabled && !configuration.Value.IsCursorKeychainEnabled {
-				action = "enableCursorKeychain"
-			}
-			put(source.Id, remote.Source{Fingerprint: fingerprint, Status: status, ScannedFiles: 1, Message: sourceMessage(notice), Action: action}, true)
-		}
+		put(jsonIds[string(result.Fingerprint.Provider)+":"+result.Fingerprint.ResolvedHomePath], remote.Source{Fingerprint: result.Fingerprint, Status: result.Status, ScannedFiles: result.ScannedFiles, SkippedFiles: result.SkippedFiles, MalformedRecords: result.MalformedRecords, Message: sourceMessage(result.Notice)})
 	}
 	if err := service.Store.PruneExpiredHistory(ctx, now.Add(-90*24*time.Hour).UnixNano()); err != nil {
 		return false, err
@@ -258,34 +146,6 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 		service.emit("usage-invalidated", nil)
 	}
 	return true, nil
-}
-
-// storeSnapshot replaces mutable database/dashboard facts only after a complete successful read.
-func (service *Service) storeSnapshot(ctx context.Context, fingerprint domain.SourceFingerprint, records []domain.Record, status, notice string, now time.Time) error {
-	id, err := service.Store.RegisterSource(ctx, fingerprint)
-	if err != nil {
-		return err
-	}
-	if status == "ok" {
-		checkpoint, err := service.Store.Checkpoint(ctx, id, "complete-snapshot")
-		if err != nil {
-			return err
-		}
-		for index := range records {
-			records[index].SourcePath = fingerprint.ResolvedHomePath
-		}
-		checkpoint.ModifiedNs = now.UnixNano()
-		checkpoint.ParserVersion = 1
-		if _, err = service.Store.CommitFile(ctx, checkpoint, records, true); err != nil {
-			return err
-		}
-	}
-	observation := domain.Observation{SourceId: id, Status: status, AttemptedAt: now.UnixMilli(), Notice: notice}
-	if status == "ok" {
-		success := now.UnixMilli()
-		observation.SucceededAt = &success
-	}
-	return service.Store.Observe(ctx, observation)
 }
 
 func windowStart(window accounting.Window) time.Time {
@@ -385,7 +245,7 @@ func (service *Service) localHistoryRecordsBetween(ctx context.Context, entries 
 	owners := []int{}
 	seen := map[string]bool{}
 	for _, entry := range entries {
-		if entry.IsHidden || !service.isProviderInScope(entry.Source.Fingerprint.Provider) {
+		if entry.IsHidden || !entry.Source.Fingerprint.Provider.Valid() || !service.isProviderInScope(entry.Source.Fingerprint.Provider) {
 			continue
 		}
 		id := entry.Source.Fingerprint.Id()

@@ -23,7 +23,6 @@ export class Configuration {
     "providers": NativeProvider[];
     "hubs": quota$0.HubConfig[];
     "primaryEnvironmentId": string;
-    "cursorKeychainEnabled": boolean;
 
     /** Creates a new Configuration instance. */
     constructor($$source: Partial<Configuration> = {}) {
@@ -38,9 +37,6 @@ export class Configuration {
         }
         if (!("primaryEnvironmentId" in $$source)) {
             this["primaryEnvironmentId"] = "";
-        }
-        if (!("cursorKeychainEnabled" in $$source)) {
-            this["cursorKeychainEnabled"] = false;
         }
 
         Object.assign(this, $$source);
@@ -1075,12 +1071,11 @@ export class SpeedProvider {
 
 /**
  * SpeedReport summarizes output throughput, time to first token, latency and context from local
- * retained request facts. OpenCode uses native assistant creation/completion times; Codex uses
- * explicit request boundaries and model response timestamps, excluding intervening tool execution;
- * Claude runs from the prompt or tool result that started a message to its last content block.
- * These elapsed intervals include time to first token, which Codex and Claude measure separately
- * where they record when output began streaming. Missing, nonpositive, over-ten-minute and
- * implausibly fast intervals are unmeasured.
+ * retained request facts. Codex uses explicit request boundaries and model response timestamps,
+ * excluding intervening tool execution; Claude runs from the prompt or tool result that started a
+ * message to its last content block. These elapsed intervals include time to first token, which
+ * Codex and Claude measure separately where they record when output began streaming. Missing,
+ * nonpositive, over-ten-minute and implausibly fast intervals are unmeasured.
  */
 export class SpeedReport {
     "window": accounting$0.Window;

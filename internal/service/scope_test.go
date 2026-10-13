@@ -33,7 +33,7 @@ func TestScopeSeedsFixedQuotaAccountsWithDriverLabels(test *testing.T) {
 // TestScopeFiltersHistorySources hides unmonitored providers while an empty scope keeps every source.
 func TestScopeFiltersHistorySources(test *testing.T) {
 	service := testService(test)
-	sources := []preferences.Source{{Id: "grok", Provider: domain.Grok}, {Id: "codex", Provider: domain.Codex}, {Id: "codex-2", Provider: domain.Codex}, {Id: "claude", Provider: domain.Claude}}
+	sources := []preferences.Source{{Id: "retired", Provider: domain.Provider("grok")}, {Id: "codex", Provider: domain.Codex}, {Id: "codex-2", Provider: domain.Codex}, {Id: "claude", Provider: domain.Claude}}
 	if len(service.scopedSources(sources)) != 4 {
 		test.Fatal("an empty scope filtered sources")
 	}
@@ -42,7 +42,7 @@ func TestScopeFiltersHistorySources(test *testing.T) {
 	if len(scoped) != 2 || scoped[0].Id != "codex" || scoped[1].Id != "claude" {
 		test.Fatalf("history scope not applied: %+v", scoped)
 	}
-	if !service.isProviderInScope(domain.Claude) || service.isProviderInScope(domain.Grok) || service.isDriverInScope("cursor") || !service.isDriverInScope("claudeAgent") {
+	if !service.isProviderInScope(domain.Claude) || service.isProviderInScope(domain.Provider("grok")) || service.isDriverInScope("cursor") || !service.isDriverInScope("claudeAgent") {
 		test.Fatal("scope membership is wrong")
 	}
 }

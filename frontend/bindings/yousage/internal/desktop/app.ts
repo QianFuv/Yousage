@@ -82,15 +82,6 @@ export function DiscardDraftCredentials(identities: string[]): $CancellablePromi
 }
 
 /**
- * EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
- */
-export function EnableCursorKeychain(identities: string[]): $CancellablePromise<remote$0.SaveOutcome[]> {
-    return $Call.ByID(2151426045, identities).then(($result: any) => {
-        return $$createType1($result);
-    });
-}
-
-/**
  * ExportDiagnostics writes only the same whitelisted report after an explicit native Save dialog.
  */
 export function ExportDiagnostics(): $CancellablePromise<boolean> {

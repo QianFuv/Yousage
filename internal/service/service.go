@@ -38,11 +38,10 @@ type ConnectionPreference struct {
 	IsEnabled  bool              `json:"enabled"`
 }
 type Configuration struct {
-	Connections             []ConnectionPreference `json:"connections"`
-	Providers               []NativeProvider       `json:"providers"`
-	Hubs                    []quota.HubConfig      `json:"hubs"`
-	PrimaryEnvironmentId    string                 `json:"primaryEnvironmentId"`
-	IsCursorKeychainEnabled bool                   `json:"cursorKeychainEnabled"`
+	Connections          []ConnectionPreference `json:"connections"`
+	Providers            []NativeProvider       `json:"providers"`
+	Hubs                 []quota.HubConfig      `json:"hubs"`
+	PrimaryEnvironmentId string                 `json:"primaryEnvironmentId"`
 }
 type SavedConfiguration struct {
 	Revision int64         `json:"revision"`
@@ -102,7 +101,6 @@ type Service struct {
 	history           *refresh.Coordinator[bool]
 	limits            *refresh.Coordinator[bool]
 	rates             *refresh.Coordinator[RateSnapshot]
-	keychain          *secrets.CachedReader
 	gate              quota.Gate
 	Emit              func(string, any)
 	Now               func() time.Time
@@ -156,7 +154,6 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 	}
 	service.Secrets = owned
 	service.Connector = remote.Connector{Secrets: owned}
-	service.keychain = secrets.NewCachedReader(owned.CursorToken)
 	sources, revision, err := service.Preferences.Sources(ctx)
 	if err != nil {
 		service.Close()
@@ -172,9 +169,6 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 		}
 	}
 	return service, nil
-}
-func smallIdentity(root string) string {
-	return domain.SourceFingerprint{HostId: "configuration", Provider: domain.OpenCode, ResolvedHomePath: root}.Id()[:12]
 }
 func (service *Service) emit(name string, value any) {
 	if service.Emit != nil && service.owner.Err() == nil {
@@ -226,7 +220,7 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		environments[identity] = true
 	}
 	for _, provider := range saved.Value.Providers {
-		if provider.Id == "" || len(provider.Id) > 96 || len(provider.Label) > 128 || len(provider.Home) > 4096 || (provider.Home != "" && !filepath.IsAbs(provider.Home)) || seen[provider.Id] || (provider.Driver != "codex" && provider.Driver != "claudeAgent" && provider.Driver != "cursor" && provider.Driver != "grok" && provider.Driver != "opencode" && provider.Driver != "antigravity") {
+		if provider.Id == "" || len(provider.Id) > 96 || len(provider.Label) > 128 || len(provider.Home) > 4096 || (provider.Home != "" && !filepath.IsAbs(provider.Home)) || seen[provider.Id] || (provider.Driver != "codex" && provider.Driver != "claudeAgent") {
 			return saved, errors.New("invalid provider target")
 		}
 		if !service.isDriverInScope(provider.Driver) {
@@ -311,9 +305,6 @@ func (service *Service) Close() {
 	service.history.Close()
 	service.limits.Close()
 	service.rates.Close()
-	if service.keychain != nil {
-		service.keychain.Close()
-	}
 	service.workers.Wait()
 }
 

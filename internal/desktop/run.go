@@ -11,16 +11,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
-	"yousage/internal/quota"
 	"yousage/internal/secrets"
 	"yousage/internal/theme"
 )
 
 // Run dispatches headless commands or starts the desktop application with embedded resources.
 func Run(assets fs.FS) {
-	if len(os.Args) > 1 && os.Args[1] == "--quota-credential-helper" {
-		os.Exit(quota.RunCredentialHelper(os.Stdin, os.Stdout))
-	}
 	if len(os.Args) > 1 && os.Args[1] == "--credential-helper" {
 		os.Exit(secrets.RunHelper(os.Stdin, os.Stdout))
 	}

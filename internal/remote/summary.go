@@ -20,7 +20,6 @@ type Source struct {
 	MalformedRecords int                      `json:"malformedRecords"`
 	DistinctSessions int                      `json:"distinctSessions"`
 	Message          *string                  `json:"message"`
-	Action           string                   `json:"action,omitempty"`
 }
 type Pricing struct {
 	Status      string  `json:"status"`
@@ -149,9 +148,6 @@ func validSource(raw json.RawMessage, source Source) bool {
 		return false
 	}
 	if source.Message != nil && strings.TrimSpace(*source.Message) == "" {
-		return false
-	}
-	if _, exists := fields["action"]; exists && source.Action != "enableCursorKeychain" {
 		return false
 	}
 	return true

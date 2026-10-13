@@ -3,8 +3,6 @@ package quota
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,126 +97,6 @@ func TestOptionalQuotaFieldsRejectExplicitNullAndWrongShapes(t *testing.T) {
 		if _, err := MapCodex([]byte(data), "checked"); err == nil {
 			t.Fatal(data)
 		}
-	}
-	for _, data := range []string{`null`, `[]`, `{"planUsage":null}`, `{"planUsage":{"totalPercentUsed":null}}`, `{"billingCycleEnd":false}`} {
-		if _, err := MapCursor([]byte(data), "checked"); err == nil {
-			t.Fatal(data)
-		}
-	}
-	for _, data := range []string{`null`, `[]`, `{"config":null}`, `{"config":{"creditUsagePercent":null}}`, `{"config":{"currentPeriod":{"type":null}}}`} {
-		if _, err := MapGrok([]byte(data), "checked"); err == nil {
-			t.Fatal(data)
-		}
-	}
-}
-
-func TestMalformedCredentialIsFailedRatherThanUnsupported(t *testing.T) {
-	previous := makeLimits("old", []Window{{Id: "primary", UsedPercent: 30}})
-	for _, credential := range []string{`null`, `{"accessToken":null}`} {
-		result := ReadCursor(context.Background(), HttpOptions{IsEnabled: true, Platform: "windows", ReadFile: func(string) ([]byte, error) { return []byte(credential), nil }})
-		if result.Unavailable == nil || result.Unavailable.Reason != "probeFailed" || ResolveProbe(&previous, result).CheckedAt != "old" {
-			t.Fatal(result)
-		}
-	}
-	for _, credential := range []string{`{"bad":null}`, `{"bad":{"key":null}}`, `{"bad":{"email":null}}`} {
-		result := ReadGrok(context.Background(), HttpOptions{IsEnabled: true, ReadFile: noFile, Environment: map[string]string{"GROK_AUTH": credential}})
-		if result.Limits.Unavailable == nil || result.Limits.Unavailable.Reason != "probeFailed" || ResolveProbe(&previous, result.Limits).CheckedAt != "old" {
-			t.Fatal(result)
-		}
-	}
-}
-
-type transportFunc func(*http.Request) (*http.Response, error)
-
-func (transport transportFunc) RoundTrip(request *http.Request) (*http.Response, error) {
-	return transport(request)
-}
-func httpFixture(body string, verify func(*http.Request)) *http.Client {
-	return &http.Client{Transport: transportFunc(func(request *http.Request) (*http.Response, error) {
-		if verify != nil {
-			verify(request)
-		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
-	})}
-}
-func noFile(string) ([]byte, error) { return nil, os.ErrNotExist }
-
-func TestCursorQuotaAuthAndEpochMilliseconds(t *testing.T) {
-	options := HttpOptions{IsEnabled: true, Platform: "windows", Home: t.TempDir(), Environment: map[string]string{"CURSOR_AUTH_TOKEN": "explicit", "CURSOR_API_KEY": "different"}, ReadFile: func(string) ([]byte, error) { t.Fatal("explicit token read saved login"); return nil, nil }}
-	options.Client = httpFixture(`{"billingCycleEnd":"1800000000000","planUsage":{"totalPercentUsed":40,"autoPercentUsed":20,"apiPercentUsed":60}}`, func(request *http.Request) {
-		if request.Header.Get("Authorization") != "Bearer explicit" || request.Method != "POST" || request.Header.Get("connect-protocol-version") != "1" {
-			t.Fatal("Cursor quota request")
-		}
-	})
-	limits := ReadCursor(context.Background(), options)
-	if limits.Unavailable != nil || len(limits.Windows) != 3 || limits.Windows[0].ResetsAt != epoch(number(1800000000000), false) {
-		t.Fatal(limits)
-	}
-	options.Environment = map[string]string{"CURSOR_API_KEY": "key"}
-	if result := ReadCursor(context.Background(), options); result.Unavailable == nil || result.Unavailable.Reason != "unsupported" {
-		t.Fatal(result)
-	}
-	options.Platform = "darwin"
-	options.Environment = nil
-	options.IsKeychainAllowed = true
-	options.CursorEndpoint = "https://custom.example"
-	options.KeychainToken = func(context.Context) (string, error) { t.Fatal("custom endpoint read Keychain"); return "", nil }
-	if result := ReadCursor(context.Background(), options); result.Unavailable == nil || result.Unavailable.Reason != "unsupported" {
-		t.Fatal(result)
-	}
-}
-
-func TestOpenCodeStoredPrecedenceRemoteBoundaryAnd403(t *testing.T) {
-	body := `{"usage":{"rolling":{"percent":10,"resetsAt":"2026-10-06T10:00:00Z"},"weekly":{"percent":20,"resetsAt":"2026-10-10T10:00:00Z"},"monthly":{"percent":30,"resetsAt":"2026-11-01T10:00:00Z"}}}`
-	options := HttpOptions{IsEnabled: true, Home: t.TempDir(), ReadFile: noFile, Environment: map[string]string{"OPENCODE_AUTH_CONTENT": `{"opencode-go":{"type":"api","key":"stored"}}`, "OPENCODE_API_KEY": "environment"}}
-	options.Client = httpFixture(body, func(request *http.Request) {
-		if request.Header.Get("Authorization") != "Bearer stored" {
-			t.Fatal("stored auth did not win")
-		}
-	})
-	limits := ReadOpenCode(context.Background(), options)
-	if limits.Unavailable != nil || len(limits.Windows) != 3 || limits.CredentialFingerprint == "" {
-		t.Fatal(limits)
-	}
-	options.Environment["OPENCODE_AUTH_CONTENT"] = `{"opencode-go":{"type":"api","key":""}}`
-	if result := ReadOpenCode(context.Background(), options); result.Unavailable == nil || result.Unavailable.Reason != "unsupported" {
-		t.Fatal(result)
-	}
-	options.OpenCodeServerUrl = "https://external.example"
-	options.ReadFile = func(string) ([]byte, error) { t.Fatal("external server read host credentials"); return nil, nil }
-	if result := ReadOpenCode(context.Background(), options); result.Unavailable == nil {
-		t.Fatal(result)
-	}
-	options.OpenCodeServerUrl = ""
-	options.ReadFile = noFile
-	options.Environment["OPENCODE_AUTH_CONTENT"] = "{}"
-	options.Client = &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 403, Body: io.NopCloser(strings.NewReader(""))}, nil
-	})}
-	if result := ReadOpenCode(context.Background(), options); result.Unavailable == nil || result.Unavailable.Reason != "unsupported" {
-		t.Fatal(result)
-	}
-}
-
-func TestGrokDefaultAccountEmptyRecoveryAndCustomDeployment(t *testing.T) {
-	options := HttpOptions{IsEnabled: true, Home: t.TempDir(), ReadFile: noFile, Environment: map[string]string{"GROK_AUTH": `{"https://accounts.x.ai/sign-in":{"key":"selected","email":"selected@example.invalid"},"other":{"key":"other","email":"wrong@example.invalid"}}`}}
-	options.Client = httpFixture(`{"config":{}}`, func(request *http.Request) {
-		if request.Header.Get("Authorization") != "Bearer selected" {
-			t.Fatal("wrong Grok credential")
-		}
-	})
-	account := ReadGrok(context.Background(), options)
-	if account.Email != "selected@example.invalid" || account.Limits.Unavailable != nil || len(account.Limits.Windows) != 0 {
-		t.Fatal(account)
-	}
-	updated := ApplyUpdate(&account.Limits, []Window{{Id: "subscription", Kind: "weekly", Label: "Weekly", UsedPercent: 5}}, "new")
-	if updated == nil || len(updated.Windows) != 1 {
-		t.Fatal(updated)
-	}
-	options.Environment["GROK_CLI_CHAT_PROXY_BASE_URL"] = "https://custom.example"
-	options.ReadFile = func(string) ([]byte, error) { t.Fatal("custom Grok auth read saved credentials"); return nil, nil }
-	if account = ReadGrok(context.Background(), options); account.Email != "" || account.Limits.Unavailable == nil || account.Limits.Unavailable.Reason != "unsupported" {
-		t.Fatal(account)
 	}
 }
 

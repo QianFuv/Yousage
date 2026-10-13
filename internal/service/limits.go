@@ -245,7 +245,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					return
 				}
 				options := service.nativeOptions(target)
-				httpOptions := quota.HttpOptions{Environment: service.Environment, Home: service.Home, Platform: service.Platform, IsEnabled: true, IsKeychainAllowed: configuration.Value.IsCursorKeychainEnabled, KeychainToken: service.keychain.Read}
+				httpOptions := quota.HttpOptions{Environment: service.Environment, Home: service.Home}
 				if target.Home != "" {
 					httpOptions.Home = target.Home
 					httpOptions.Environment = make(map[string]string, len(service.Environment))
@@ -253,10 +253,6 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 						httpOptions.Environment[name] = value
 					}
 					httpOptions.Environment["HOME"], httpOptions.Environment["USERPROFILE"] = target.Home, target.Home
-					delete(httpOptions.Environment, "APPDATA")
-					delete(httpOptions.Environment, "XDG_CONFIG_HOME")
-					delete(httpOptions.Environment, "XDG_DATA_HOME")
-					delete(httpOptions.Environment, "GROK_HOME")
 				}
 				var account quota.Account
 				switch target.Driver {
@@ -268,14 +264,6 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 						account.Limits = quota.PreferClaudeLogin(account.Limits, quota.ReadClaudeLogin(ctx, httpOptions, target.Home))
 					}
 					account.WorkspaceId = quota.ReadClaudeOrganization(httpOptions, target.Home)
-				case "cursor":
-					account.Limits = quota.ReadCursor(ctx, httpOptions)
-				case "grok":
-					account = quota.ReadGrok(ctx, httpOptions)
-				case "opencode":
-					account.Limits = quota.ReadOpenCode(ctx, httpOptions)
-				case "antigravity":
-					account.Limits = quota.AntigravityLimits(service.Now())
 				}
 				old := previousProviders[target.Id]
 				isProbeFailed := account.Limits.Unavailable != nil && account.Limits.Unavailable.Reason == "probeFailed"

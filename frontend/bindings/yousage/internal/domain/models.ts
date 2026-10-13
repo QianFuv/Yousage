@@ -40,10 +40,6 @@ export enum Provider {
 
     Codex = "codex",
     Claude = "claude",
-    Grok = "grok",
-    OpenCode = "opencode",
-    Antigravity = "antigravity",
-    Cursor = "cursor",
 };
 
 /**
