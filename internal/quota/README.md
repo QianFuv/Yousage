@@ -1,52 +1,49 @@
-# Native subscription limits
+# 订阅额度
 
-These adapters follow t3code commit
-`51f7f77f87318a5329d3bab15d513fda5654200b`, independently of historical spend.
-Codex uses initialize/account/read/account/rateLimits/read without model turns;
-Claude uses the controlled initialize/get_usage protocol. Cursor, Grok and
-OpenCode Go use the pinned authenticated HTTP endpoints and auth precedence.
-Antigravity has no native quota adapter in this reference.
+## 原生适配器
 
-Percentages are clamped, main Codex buckets exclude Spark, reset timestamps retain
-their provider units, Claude scoped windows retain stable IDs, and successful empty
-Grok limits can recover later. Failed probes preserve last-good bars; authoritative
-unsupported results replace them. Sparse unchanged updates preserve checked time.
-Malformed explicit nulls cannot silently become unsupported accounts.
+额度与历史费用相互独立：
 
-Native children are owned by managedprocess (Windows atomic Job Object assignment;
-Unix process groups and owned pipes). All paths stop descendants and drain/close
-pipes. Grok production credential reads run in an owned, ten-second helper before
-the independently bounded ten-second billing request. Cursor Keychain access is
-opt-in and restricted to the default endpoint. Native keyring subprocesses use a
-separate owned helper, with credentials on inherited stdin rather than arguments.
+- **Codex**：`initialize` / `account/read` / `account/rateLimits/read`，不发起模型请求。
+- **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
+- **Cursor、Grok、OpenCode Go**：使用各自的认证 HTTP 接口和认证优先级。
+- **Antigravity**：没有原生额度接口。
 
-Fixtures send no model turns or reset requests. They verify fragmented/correlated
-replies, deadlines, redaction, account identity, schema failures and Windows parent,
-child and grandchild termination. The actual GUI-subsystem executable's headless
-dispatch is exercised. macOS/Linux native qualification remains deferred; compiling
-or reading their implementation does not establish a native runtime pass.
+百分比会被截断到有效范围；Codex 主额度不包含 Spark 等模型专属额度；重置时间保留 Provider 的原始单位；
+Claude 的分区窗口保留稳定 ID；Grok 成功返回空额度后仍可在之后恢复。探测失败时保留上次成功的额度条，
+只有明确的“不支持”结果才会替换它。没有变化的稀疏更新保留检查时间。格式错误的显式 null
+不会被悄悄当成不支持的账户。
 
-## Hubs, pooling and resets
+原生子进程由 `managedprocess` 管理（Windows 上原子地加入 Job Object，Unix 上使用进程组和自有管道），
+所有路径都会结束子孙进程并排空、关闭管道。Grok 的凭据读取在一个限时 10 秒的自有辅助进程中运行，
+之后的账单请求另外限时 10 秒。Cursor 的钥匙串访问需要用户授权，且仅限默认端点。
+系统凭据库的子进程通过继承的 stdin 而不是命令行参数传递凭据。
 
-CLIProxyAPI uses origin-relative management auth-files, api-call and reset-quota.
-The provider body/data are JSON strings, and the hub substitutes `$TOKEN$`.
-Account requests are limited to four. Credits outages preserve quota windows;
-list failures and account failures stay distinct. Native secrets hold management
-keys; the application integration supplies the key callback rather than serializing
-keys into frontend configuration.
+测试不发起模型请求或重置请求，覆盖分片与关联的响应、超时、脱敏、账户身份、结构错误，
+以及 Windows 上父进程、子进程和孙进程的结束。
 
-Accounts merge by driver plus normalized email, then credential fingerprint, then
-source identity. Parsed instants select fresh windows/credits independently. Hub
-reset routes win because redemption must clear routing cooldown. Pool windows use
-equal account weights, fixed sparse columns, timed-member pace and reset shares.
-Duration minutes obey the pinned server contract's NonNegativeInt (a non-integral
-hub seconds/60 result is rejected rather than publishing an invalid wire value).
+## 额度中心
 
-Reset operations use deterministic hub UUIDv5/account-credit identity or a caller
-persisted native idempotency key. The gate serializes refresh/reset and reads current
-configuration after waiting. Confirmed outcomes cannot replay; failed/unknown
-outcomes require explicit retry. Native consumption rechecks the selected email.
-Successful spend plus failed refresh/cooldown is a warning, not a failed spend.
-Remote operations stay at their owning environment and require operate scope.
-F11 supplies persisted recovery state and frontend confirmation; these library
-fixtures never consume real credits.
+CLIProxyAPI 使用相对于来源的管理接口 `auth-files`、`api-call` 和 `reset-quota`。
+Provider 请求体 / 数据是 JSON 字符串，由额度中心替换其中的 `$TOKEN$`。同时最多请求 4 个账户。
+重置券查询失败时保留额度窗口；账户列表失败和单个账户失败分开记录。管理密钥保存在系统凭据库中，
+由应用通过回调提供，不会序列化到前端配置。
+
+## 合并与汇总
+
+账户依次按 Provider + 规范化邮箱、凭据指纹、来源身份合并。窗口和重置券分别按解析出的时间取最新值。
+额度中心的重置路由优先，因为兑换必须同时清除路由冷却。汇总时各账户等权，保留固定的稀疏列，
+节奏和重置占比按有计时的成员计算。时长分钟数必须是非负整数，额度中心的秒数除以 60 不为整数时拒绝该值。
+
+## 重置券
+
+重置操作使用确定的身份：额度中心使用 UUIDv5 账户 / 重置券身份，原生账户使用调用方持久化的幂等键。
+刷新和重置串行执行，等待结束后重新读取当前配置。已确认的结果不会重放；失败或未知的结果需要用户显式重试。
+原生兑换前会重新核对所选邮箱。兑换成功但随后刷新失败或处于冷却中时，作为警告而不是兑换失败。
+远程环境的操作在其所属环境执行，需要 operate 权限。应用层持久化恢复状态并在前端确认；测试从不消耗真实的重置券。
+
+## 周期价值
+
+`cycle_value.go` 与 `cycle_prior.go` 按观测到的重置把额度观测划分为周期，对额度百分比变化与同期
+API 等值费用做稳健拟合，得到整个周期的价值估计和受实际花费约束的不确定区间。已完成的周期作为先验，
+数据较少时向先验收缩；检测到额度调整（新的周期结构）时不参考旧周期。归属不确定的花费只计入上界。

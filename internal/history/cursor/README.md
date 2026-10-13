@@ -1,21 +1,12 @@
-# Cursor account history
+# Cursor 账户历史
 
-The pinned t3code dashboard reader is commit
-`51f7f77f87318a5329d3bab15d513fda5654200b`, Git blob
-`0931718cea647e3ac39b848091ee03c77a93f0be`. Authentication reads a saved CLI
-access token; ephemeral/API authentication disables this source. Account identity
-hashes the complete JWT subject, never the token. Local JWT parsing is not signature
-validation; the authenticated dashboard validates authorization.
+认证读取 Cursor CLI 保存的访问令牌；临时登录或 API 认证会禁用此来源。账户身份是完整 JWT
+subject 的哈希，从不使用令牌本身。本地解析 JWT 不做签名校验，授权由 Dashboard 服务端验证。
 
-The redirect-free request has a 60 second whole-read deadline and a 10 second
-per-page deadline. Only a short terminal page completes pagination. Raw boundary
-overlap is removed only when the reported total proves excess rows; identical billed
-events otherwise receive stable occurrence indexes. A failed page returns no facts.
-Integration retains the prior successful account snapshot and marks it stale.
+请求不跟随重定向，整次读取限时 60 秒，每页限时 10 秒；只有不满一页的结果才表示分页结束。
+只有当上报的总数证明存在多余行时，才删除页边界的重复行；否则相同的计费事件按出现次序编号保留。
+任一页失败则本次不返回任何事实，应用层保留上次成功的账户快照并标记为过期。
 
-Reported zero monetary cost remains zero. Fresh input, read/write cache and output
-are separate categories. The process-local credential reader shares one native
-Keychain prompt, caches a successful token for five minutes and is cancelled on
-shutdown. Mac Keychain use requires explicit enablement; its native implementation
-is provided by the platform credential adapter. No secrets or raw server bodies are
-returned in diagnostic errors or persisted usage data.
+上报的零费用保持为零。新输入、缓存读、缓存写和输出分别计数。进程内的凭据读取器共享同一次
+钥匙串授权提示，成功的令牌缓存 5 分钟，退出时取消。macOS 钥匙串需要用户显式授权。
+诊断错误和持久化数据中不包含密钥或原始服务端响应。

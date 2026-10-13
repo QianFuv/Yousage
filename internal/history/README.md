@@ -1,84 +1,73 @@
-# Native transcript history
+# 本地会话历史
 
-Codex reads the shared home `sessions` tree; Claude reads `projects`. Explicit
-roots and CODEX_HOME/CLAUDE_CONFIG_DIR defaults are supported. Shadow auth homes
-and archived_sessions are not substituted for Codex's statistics root. Disabled
-account history remains eligible. Directory symlinks resolve before physical
-identity dedup; history files are opened for reading only.
+## 来源与目录
 
-The streaming JSON projection validates syntax but discards unselected tool text
-as it passes, without an import-size budget. Provider reducer state commits only
-through completed LF bytes, including CRLF. Valid unterminated EOF usage is stored
-as a separate tail and replayed later. Growth can resume after a matching final
-64-byte FNV-1a32 guard and parser version; shrink, rewrite and guard mismatch reread.
-The guard is not a whole-file integrity proof. Read errors preserve stored facts.
+Codex 读取共享主目录下的 `sessions`，Claude 读取 `projects`。支持显式指定目录以及
+`CODEX_HOME` / `CLAUDE_CONFIG_DIR` 默认值。Codex 的影子认证目录和 `archived_sessions`
+不会替代其统计目录。已禁用账户的历史仍会统计。目录符号链接先解析再按物理身份去重；
+历史文件只以只读方式打开。
 
-Codex counts last-token deltas, carries model/tier/session context, excludes
-consecutive duplicate usage and suppresses the copied leading fork burst. Across
-files, moved sessions use occurrence-aware keys, retaining repeated equal events
-inside one rollout. Claude de-duplicates assistant content blocks by message and
-request identity. Returned facts carry their canonical source root.
+## 增量读取
 
-Retention is90days by source-file mtime. Removed files and directories retain
-cached usage and their old physical identity while cache facts remain. Repricing
-and window filtering happen later. The collector scans the entire retained
-interval once rather than tying persisted facts to one current viewer window;
-query filtering can apply t3code's36h mtime slack separately. Empty/missing/partial/
-failed roots remain distinct. Pinned `malformedRecords` stays0; the additional
-host diagnostic `malformedLines` reports syntax failures without changing totals.
+流式 JSON 投影会校验语法，但在读取过程中丢弃未选中的工具文本，因此不受导入大小限制。
+解析器状态只在完整的 LF 换行（包括 CRLF）处提交。合法但未以换行结束的末行作为尾部单独保存，
+下次读取时重放。文件增长时，如果末尾 64 字节的 FNV-1a32 校验和解析器版本都匹配，则从上次偏移继续；
+文件缩短、重写或校验不符时完整重读。该校验不是整个文件的完整性证明。读取错误会保留已保存的事实。
 
-Common ISO timestamps (fractional seconds, offsets, minute precision and date
-only), unzoned ISO using the host zone, and standard RFC/ANSIC forms are accepted.
-Numeric timestamp values are rejected. Locale-specific implementation-dependent
-JavaScript Date.parse strings are not a provider format contract or a compatibility
-claim. Raw sources/oracles remain unchanged at t3code51f7f77.
+## 去重
 
-Parser version 8 adds time to first token. Codex dates it from the earliest
-`item_completed` `started_at_ms` of a Reasoning or AgentMessage item after the
-request start; responses that only call tools stay unmeasured. Claude derives it
-from a leading thinking block (`apiBlockIndex` 0) by subtracting its
-`thinkingDurationMs` from its timestamp. A later block of the same Claude message
-replaces earlier blocks within one read, so a request ends at its last block.
-Only item types, start times, block indexes and thinking durations are projected.
+Codex 统计 `last_token_usage` 增量，携带模型 / 档位 / 会话上下文，排除连续重复的用量事件，
+并抑制分叉会话开头复制的那一段。跨文件时，移动过的会话使用按出现次序编号的键，
+同一 rollout 内重复的相同事件仍分别保留。Claude 按消息和请求身份对助手内容块去重。
+返回的事实带有其规范的来源根目录。
 
-Parser version 7 replays retained older checkpoints for generation timing and
-explicit Claude cache TTL observations without saving error events. Claude
-`api_error` and `isApiErrorMessage` markers, Codex `turn_aborted`, transport errors
-and failed `task_complete` records are omitted from committed facts and EOF tails.
-Transient error state still prevents retry waits from inflating generation timing.
-Replayed files atomically replace older cached error facts with usage and quota
-observations only. Arbitrary diagnostics, prompts and response text are never
-persisted.
+## 保留与状态
 
-Parser version 6 also retains the transcript basename and an epoch for explicit
-Claude `compact_boundary` and Codex `compacted` markers as a context identity.
-Loss analysis compares usage only within that context, so a new
-agent or rollout that inherits a session id cannot borrow the parent's cache.
-Appending or resuming the same transcript preserves its context identity; moved
-copies with the same basename retain the existing cross-file deduplication.
+按来源文件的修改时间保留 90 天。已删除的文件和目录在缓存事实仍在时保留其用量和原物理身份。
+重新定价和窗口过滤在之后进行：采集器一次扫描整个保留区间，而不是把持久化事实绑定到当前查看的窗口；
+查询时可以另外放宽 36 小时的修改时间余量。空、缺失、部分和失败的目录是不同状态。
+兼容字段 `malformedRecords` 始终为 0，额外的诊断字段 `malformedLines` 报告语法错误行，不影响合计。
 
-Codex generation timing starts at a timestamped task/user boundary or preceding
-tool output and ends at the latest model response item before its unique usage
-event. Turn context can tighten the start before output. Tool outputs arriving
-before usage establish the next request and do not extend the preceding response.
-Overlapping ambiguous responses, missing boundaries, failures, zero-output
-requests, intervals above ten minutes and rates above 10,000 output tokens/second
-remain unmeasured. Timing includes time to first token and local logging/scheduling
-overhead; observed tool execution and human idle gaps are excluded.
+支持常见 ISO 时间戳（小数秒、时区偏移、精确到分钟和仅日期）、不带时区的 ISO（使用本机时区）
+以及标准 RFC / ANSIC 格式；拒绝数值时间戳。
 
-OpenCode uses paired native assistant `time.created` and `time.completed` values,
-including time to first token, under the same duration/rate bounds. SQL fallback
-timestamps never establish timing. Its full snapshots are replaced on every
-successful scan.
+## 上下文身份
 
-Claude Code writes each assistant message as one line per content block. Blocks
-streamed before the message ends carry a null `stop_reason` and partial usage, and
-tool results may be interleaved before the final block. The Claude reducer keeps
-only entry ids, parent ids and timestamps: it emits each message from its first
-block with a stop reason, so usage is final, and times it from the user prompt or
-tool result reached through the first block's `parentUuid` chain (skipping
-attachments) to that block. A message that never receives a final block is emitted
-untimed with its partial usage when the next message begins. Requests with an API
-error inside the interval, a parent outside the retained chain, or the shared
-duration/rate bounds remain unmeasured. Grok, Cursor and the supported
-Antigravity schema expose no reliable paired per-request times and stay unmeasured.
+每条记录保存转录文件名，以及 Claude `compact_boundary` 和 Codex `compacted` 标记划分出的代次，
+作为上下文身份。损耗分析只在同一上下文内比较用量，因此继承了会话 ID 的新 Agent 或新 rollout
+不会借用父会话的缓存。追加或恢复同一转录时上下文身份不变；文件名相同的移动副本沿用现有的跨文件去重。
+
+## 错误记录
+
+Claude 的 `api_error` 和 `isApiErrorMessage` 标记、Codex 的 `turn_aborted`、传输错误以及失败的
+`task_complete` 不会进入已提交的事实和尾部。临时错误状态仍会阻止重试等待时间拉长生成耗时。
+不会持久化任何诊断信息、提示词或回复文本。
+
+## 生成耗时
+
+- **Codex**：从带时间戳的任务 / 用户边界或前一个工具输出开始，到其唯一用量事件之前的最后一个
+  模型响应项结束；turn context 可以在输出前收紧起点。用量事件之前到达的工具输出属于下一个请求，
+  不会延长上一个响应。
+- **Claude**：Claude Code 为每个内容块写一行。消息结束前流式写出的块 `stop_reason` 为空、
+  用量不完整，中间还可能插入工具结果。读取器只保留条目 ID、父 ID 和时间戳：从第一个带停止原因的块
+  发出该消息（此时用量已是最终值），并沿该块的 `parentUuid` 链（跳过附件）回溯到用户提示或工具结果
+  来计时。从未收到最终块的消息在下一条消息开始时以不完整用量、无计时的形式发出。
+- **OpenCode**：使用助手消息成对的 `time.created` 和 `time.completed`；SQL 回退时间戳不用于计时。
+  其完整快照在每次成功扫描时替换。
+- Grok、Cursor 和受支持的 Antigravity 结构没有可靠的成对请求时间，不计时。
+
+以下情况不计时：响应重叠无法区分、缺少边界、失败、零输出、间隔超过 10 分钟、
+速率超过 10,000 输出 Token/秒、区间内有 API 错误或父条目不在保留链中。
+计时包含首字耗时和本地日志 / 调度开销，排除可观测的工具执行和用户空闲时间。
+
+## 首字耗时
+
+Codex 取请求开始后最早的 Reasoning 或 AgentMessage `item_completed` 的 `started_at_ms`；
+只调用工具的响应不计。Claude 取首个思考块（`apiBlockIndex` 为 0）的时间戳减去其
+`thinkingDurationMs`。同一 Claude 消息的后续块在一次读取中替换之前的块，因此请求结束于最后一个块。
+只投影条目类型、开始时间、块序号和思考时长。
+
+## 解析器版本
+
+当前解析器版本为 8。版本变化时重放已保留的旧检查点，以补齐新字段；
+重放后的文件以原子方式用新的用量和额度观测替换旧的缓存事实。

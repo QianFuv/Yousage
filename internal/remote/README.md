@@ -1,28 +1,18 @@
-# Compatible T3 environments
+# 远程环境
 
-The protocol follows the pinned remote boundary in `docs/parity/remote-contract.md`.
-Discovery validates environment identity and orchestration protocol 2 before
-exchanging a one-time pairing credential. Access tokens enter only authenticated
-HTTP headers and the native credential store; the websocket URL contains a ticket.
-Remote origins require HTTPS; loopback HTTP remains usable for local servers.
-Redirects and raw server error bodies are not forwarded to diagnostics.
+协议细节见 [`docs/parity/remote-contract.md`](../../docs/parity/remote-contract.md)。
+在交换一次性配对凭据之前，先校验环境身份和编排协议版本 2。访问令牌只出现在认证的 HTTP 请求头和
+系统凭据库中，WebSocket URL 只包含票据。远程地址必须使用 HTTPS，本地服务端可使用回环 HTTP。
+不跟随重定向，原始服务端错误内容不会写入诊断。
 
-The framed Effect client correlates object/batch requests, subscription chunks and
-ACKs, cancellation interrupts, tagged failures and Ping/Pong. It owns and closes
-its connection/read/keepalive workers. Reads can be reconnected by the service;
-this client never replays requests. A disconnected or cancelled sent write has an
-unknown outcome. Subscription capability projections are replaced by the service
-on each connection, preventing old optional arrays from surviving a new host.
+分帧客户端负责对象 / 批量请求、订阅数据块与 Ack、取消中断、带标签的失败和 Ping/Pong 的关联，
+并拥有、关闭自己的连接、读取和保活协程。服务层可以重连以继续读取，但客户端从不重放请求；
+已发送的写入在断开或取消后结果未知。每次连接时服务层替换订阅的能力数据，避免旧主机的可选数组残留到新主机。
 
-Statistics contracts 4–6 are supported. Unknown/invalid array entries are dropped
-individually, while an invalid envelope fails the observation. Token data survives
-unpriced cost. Per-environment settings patches preserve omitted map entries and
-explicit null deletion. Destinations settle separately; retry selects failed
-destinations explicitly. The server supplies atomicity, not an invented client CAS.
+支持统计契约 v4–v6。未知或无效的数组条目逐个丢弃，无效的外层结构使本次观测失败；没有价格时保留 Token。
+按环境的设置修补保留未提及的条目，显式 null 表示删除。各目标分别结算，重试只针对失败的目标；
+原子性由服务端保证，客户端不额外实现 CAS。
 
-Credentials use go-keyring v0.2.8: Windows Credential Manager, macOS Keychain and
-Linux Secret Service. Native Windows roundtrip uses a uniquely named fixture and
-deletes it afterward. Other OS native verification remains deferred by the user's
-Windows-first instruction. macOS native store subprocess cancellation is integrated
-through the owned credential helper at the managed-process milestone. No plaintext
-fallback exists. This module's fixture server cannot spend real reset credits.
+凭据使用 go-keyring v0.2.8：Windows 凭据管理器、macOS 钥匙串和 Linux Secret Service。
+Windows 原生往返测试使用唯一命名的测试条目并在结束后删除。macOS 凭据库子进程的取消由自有的凭据辅助进程处理。
+没有明文回退。测试服务端无法消耗真实的重置券。

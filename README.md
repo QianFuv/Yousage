@@ -1,160 +1,138 @@
 # Yousage
 
-A standalone Go/Wails v3 desktop application reproducing Usage statistics and
-themes from [t3code](https://github.com/pingdotgg/t3code/tree/51f7f77f87318a5329d3bab15d513fda5654200b),
-frozen at `51f7f77f87318a5329d3bab15d513fda5654200b`.
+Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它读取 Codex、Claude Code
+等工具在本机保存的会话记录，统计 Token、按 API 价格估算费用，并实时显示各订阅账户的
+额度、重置时间与本周期价值。应用基于 Go 与 Wails v3，前端资源内嵌在单个可执行文件中，
+运行时不需要 Node、开发服务器或任何后台服务。
 
-## Running on Windows
+## 功能概览
 
-Open `bin/yousage.exe` or extract `bin/yousage-0.1.0-windows-amd64.zip` and open
-the included executable. The frontend is embedded; Node, pnpm, a t3code server
-and a development server are unnecessary at runtime. The package is unsigned.
-Windows 11 amd64 is the native qualification target.
+### 用量统计（Ctrl+1）
 
-The [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
-must be installed. This portable package does not install or download it.
+- 按 24 小时 / 7 天 / 30 天 / 90 天统计费用与 Token，可在“费用”和“Token”指标间切换。
+- 各 Provider 的每日或每小时曲线、占比条和合计；未定价记录与真实的零费用分开显示。
+- 模型明细：输入、输出、缓存读写、推理 Token，缓存命中率与缓存节省，按速度档位
+  （标准 / 快速 / 极速）和类型拆分费用；可在多个环境之间对比同一模型。
+- 按日、按小时的用量明细表。
+- **打印小票**：在合计旁生成当前时间段的“消费小票”，包含活跃天数、会话数、缓存节省、
+  实付金额与摘要二维码，可复制为 PNG。
 
-## Usage and Settings
+### 额度监控（Ctrl+2）
 
-The sidebar separates **用量统计** (tokens, estimated cost and history; the
-default page) and **额度监控** (quota/account/reset observations). Only local
-Codex and Claude Code are monitored; both are configured by default and can be
-switched off in Settings. Settings stays at the bottom;
-inside Settings the sidebar lists its sections with a back action, following
-the t3code settings layout. Each page has a sticky header holding its title
-and controls: segmented metric and 24h/7d/30d/90d toggles, an icon refresh action and an
-overflow menu. Statistics provides provider
-charts, clickable model rows with environment comparisons, and time breakdowns.
-The content area scrolls independently. The desktop window keeps one layout:
-it is at least 1024×680 at 100% scale, and dragging its edges keeps it between
-3:4 and 21:9; maximizing and snapping are unrestricted. Viewports narrower than
-768 CSS pixels, such as phone browsers, use a single-column mobile layout with
-a bottom tab bar.
-Controls use the original t3code button, toggle, select, switch, menu and
-dialog primitives. Settings are grouped into cards of title/description/control
-rows; staged source and connection drafts show a floating Apply/Discard bar.
-Compact density reduces page and row spacing; typography and app scale adjust
-text and controls together.
-Totals distinguish unpriced observations from genuine zero cost. Manual and
-foreground automatic refresh use separate bounded schedules. Price overrides
-reprice retained facts without rereading provider logs.
+- 显示 Codex、Claude、Grok、Cursor、OpenCode 订阅账户的额度窗口、已用百分比、
+  重置时间和消耗节奏（超出 / 符合 / 低于时间窗口的均匀消耗线）。
+- 同一账户在多个来源中出现时自动合并；多个账户可汇总为“总额度”。
+- **本周期价值**：结合本机历史费用与额度变化，估算当前订阅周期的 API 等值价值，
+  并给出可信度和区间；额度疑似调整时不参考旧周期。
+- 支持 CLIProxyAPI 额度中心汇总的账户池，以及显式确认后使用重置券。重置结果未知时
+  保留状态，等待用户手动重试，不会自动重放。
 
-Settings is a separate destination with five sections:
+### 损耗分析（Ctrl+3）
 
-- **Appearance:** built-in/custom themes, collections, separate light/dark
-  choices, color editor/inspector, JSON/JSONC/VS Code/OpenVSX imports, fonts with
-  fallbacks, contrast, transparency and motion.
-- **Display & behavior:** comfortable/compact density, 100–200% scale (lowered
-  temporarily when the screen cannot hold the scaled minimum window), regional
-  or explicit 12/24-hour timestamps, refresh and window restoration. Recenter
-  recovers the window after display changes.
-- **Sources & connections:** automatic provider discovery, quota hubs and
-  directly authenticated remote environments. Staged changes use Apply/Discard.
-- **Prices & mappings:** per-environment pricing, aliases, mixed values, undo,
-  discard and retry of failed destinations.
-- **About & diagnostics:** versions, licenses, and explicit preview/copy/export
-  of a redacted report. No diagnostics are automatically uploaded.
+- 识别缓存过期造成的上下文重写：同一上下文在空闲间隔超过缓存有效期（默认 5 分钟，
+  Claude 显式 1 小时缓存按 1 小时计）后重新写入大量缓存，即记为一次损耗事件。
+- 按 Provider 分组显示额外花费、每日 / 每小时额外花费曲线和事件明细（时间、模型、
+  间隔、重写 Token、额外花费）。
+- 每个会话、Agent 或压缩后的上下文单独比较，不会把父会话的缓存算到子会话上；
+  用户中断和报错请求不计入。
 
-Drafts survive navigation. Closing with unapplied changes requires explicit
-discard; closing while account/settings writes are running waits for the result.
-`Ctrl+Alt+A` opens Appearance; `Ctrl+Alt+Shift+A` cycles System/Light/Dark.
-On macOS the shortcuts use Command instead of Control.
+### 速率统计（Ctrl+4）
 
-## Data sources and storage
+- 按模型和 Provider 统计输出速率（tok/s）、首字耗时（TTFT）中位数与 P90、
+  请求耗时中位数与 P90、缓存命中率、每次请求的上下文和输出量。
+- 每小时 / 每日速率曲线，并显示有计时和无计时的请求数。
+- 计时只来自本地记录中可靠的成对时间点，排除工具执行和用户空闲时间；
+  无法可靠计时的请求不参与速率计算。
 
-Read-only collectors support saved Codex, Claude, Grok and OpenCode records,
-Antigravity local databases, and authenticated Cursor Dashboard history.
-Sources & connections discovers registered providers through PATH, supported
-native npm payloads and standard environment locations. History roots resolve
-on each scan; no path entry is required. Re-detection checks metadata without
-querying an account. Existing custom configurations remain usable until you
-explicitly switch them to automatic detection. History scanning and quota
-account enablement remain independent. Cursor requires a supported saved login;
-macOS Keychain access is explicitly enabled. An unavailable login does not
-substitute a previously saved account's history.
+### 设置（Ctrl+,）
 
-Native quota adapters cover Codex, Claude, Grok, Cursor and OpenCode, configured
-independently of history collectors. Antigravity quotas are unsupported.
-CLIProxy hub observations/reset routes retain independent failure states.
-Reset-credit consumption requires a deliberate user action; unknown results
-are retained for recovery instead of automatically replayed.
-Remote environments use direct Bearer-authenticated t3code Effect WebSocket
-connections. Relay DPoP and SSH tunnels are unsupported.
-Rates come from the [models.dev](https://models.dev) catalog, so models used
-through gateways or other providers are priced too. A model's first-party
-provider list price wins over reseller listings, and gateway-prefixed IDs
-(`gateway/model`) price as the bare model. Fast and Ultrafast usage uses the
-official OpenAI and Anthropic per-model multipliers built into the app (no
-online lookup); models without an official faster tier stay at Standard rates.
-Requests are bounded and cached;
-offline views retain available cached rates and expose unpriced data.
-Native account actions require the corresponding installed executable and a
-supported login. No model turn is issued merely to obtain quotas.
+设置分为五个部分，未保存的草稿在切换页面后保留：
 
-Settings, retained 90-day facts, checkpoints and themes are stored under
-`Yousage` in the OS user configuration directory, normally `%APPDATA%\Yousage`
-on Windows. Published themes use `themes/`, `theme-default` and
-`theme-generation`. The application's WebView profile uses its `webview/`
-subdirectory. OS-native credential storage contains owned connection secrets;
-these are excluded from diagnostics.
+- **外观**：内置与自定义主题、主题合集、亮色 / 暗色分别选择、颜色编辑器与取色检查器；
+  支持导入 T3 Code / VS Code 主题 JSON（含 JSONC）、拖入文件、粘贴，
+  以及浏览 Open VSX 主题市场；可调整字体、对比度、毛玻璃和动画。
+- **显示与行为**：界面语言（简体中文 / 英文 / 跟随系统）、舒适 / 紧凑信息密度、
+  100%–200% 界面缩放、12 / 24 小时制、自动刷新、恢复窗口位置、关闭到托盘、窗口居中。
+- **数据来源**：自动识别已安装的 Provider，分别启用历史记录与额度监控；
+  配置额度中心和远程环境。更改需要点击“应用”或“放弃”。
+- **价格与映射**：按环境自定义模型单价、设置模型别名映射，支持撤销、放弃和只重试失败项。
+- **关于与诊断**：版本、许可证，以及可预览、复制、导出的脱敏诊断报告。诊断信息不会自动上传。
 
-## Headless themes
+### 桌面体验
 
-Theme commands run before creating a GUI window:
+- 单实例运行：再次启动时显示已有窗口。
+- 关闭到托盘后可从托盘菜单直接打开各页面，选择“退出”才会真正退出。
+- 窗口最小为 1024×680（100% 缩放），拖动边缘时宽高比保持在 3:4 到 21:9 之间；
+  最大化和贴靠不受限制。窄于 768 CSS 像素时切换为底部标签栏的移动布局。
+- 有未保存草稿或正在写入账户设置时，关闭窗口会先确认。
+- 快捷键：`Ctrl+1`–`Ctrl+4` 切换页面，`Ctrl+,` 打开设置，`Ctrl+R` 刷新当前页面，
+  `Ctrl+Alt+A` 打开外观，`Ctrl+Alt+Shift+A` 在跟随系统 / 亮色 / 暗色之间切换。
+  macOS 上使用 Command 代替 Ctrl。
 
-```powershell
-.\bin\yousage.exe theme set ocean
-.\bin\yousage.exe theme set C:\Themes\my-theme.json
-.\bin\yousage.exe theme show
-.\bin\yousage.exe theme clear
-```
+## 数据来源
 
-`--state-dir <directory>` selects an isolated publication directory; `--id`
-sets a file theme identity. Manual GUI choices override publication until a
-new publication generation arrives. Clearing preserves published theme files.
+| Provider | 历史用量 | 订阅额度 |
+| --- | --- | --- |
+| Codex | 本地 `sessions` 会话日志 | `account/rateLimits/read`（不发起模型请求） |
+| Claude Code | 本地 `projects` 会话日志 | `initialize` / `get_usage` 控制协议 |
+| Grok Build | `~/.grok/sessions/**/updates.jsonl` | 官方 OAuth 账单接口 |
+| Cursor | 已登录账户的 Dashboard 历史 | Dashboard 当前周期用量 |
+| OpenCode | 本地 SQLite 数据库与旧版 JSON | OpenCode Go 订阅用量 |
+| Antigravity | 本地会话数据库 | 不支持 |
 
-## Building
+- 默认只启用本机的 Codex 和 Claude Code，其余可在“数据来源”中开启。
+- 历史目录在每次扫描时自动解析（PATH、npm 原生包和标准环境变量位置），无需手动填写路径；
+  已有的自定义路径会保留，直到你主动改回自动识别。
+- 历史读取全部为只读，增量解析，保留最近 90 天；读取失败时保留已缓存的数据。
+- 价格来自 [models.dev](https://models.dev)，因此通过网关或第三方使用的模型也能定价。
+  官方首方价格优先于转售价格，`gateway/model` 形式的 ID 按裸模型名定价。
+  快速 / 极速档位使用内置的 OpenAI 与 Anthropic 官方倍率。价格表有缓存，离线时继续使用。
+- 远程环境通过 Bearer 认证直连兼容的 T3 Code 服务端；不支持中继、DPoP 和 SSH 隧道。
+- 不会为了查询额度而发起任何模型请求。
 
-Pinned: Go 1.26.2, Node 24.15.0, pnpm 10.32.0, Wails 3.0.0-beta.28.
-Builds use frozen npm lockfiles and retain the Go dependency lock.
+## 数据存储与隐私
+
+- 设置、最近 90 天的统计事实、增量检查点和主题保存在系统用户配置目录下的 `Yousage`
+  目录中，Windows 上通常为 `%APPDATA%\Yousage`。WebView 配置位于其中的 `webview/`。
+- 数据库只保存归一化的用量数字，不保存提示词、回复内容或任何凭据。
+- 额度中心密钥、远程访问令牌等凭据保存在系统凭据库（Windows 凭据管理器、macOS 钥匙串、
+  Linux Secret Service）中，不会写入诊断报告。
+
+## 安装与运行
+
+当前提供 Windows 11 amd64 便携版：
+
+1. 确认已安装 [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+   （Windows 11 通常已自带）。安装包不会自动下载它。
+2. 解压 `yousage-0.1.0-windows-amd64.zip`，运行其中的 `yousage.exe`。
+
+可执行文件未签名，首次运行时 Windows 可能会提示安全警告。
+
+## 命令行主题
+
+主题命令在创建窗口之前执行，可用于脚本化发布默认主题：
 
 ```powershell
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
-wails3 doctor
-wails3 task windows:build ARCH=amd64 -f
-powershell -NoProfile -File build/package-windows.ps1
+.\yousage.exe theme set ocean
+.\yousage.exe theme set C:\Themes\my-theme.json
+.\yousage.exe theme show
+.\yousage.exe theme clear
 ```
 
-Use `wails3 task dev` on Windows for development. Build-time Node tooling is
-not packaged. `build/dependencies.json` and `THIRD_PARTY_NOTICES.md` regenerate
-from installed locked packages, including nested native runtime notices.
+`--state-dir <目录>` 指定独立的发布目录，`--id` 为主题文件指定 ID。
+在界面中手动选择的主题会覆盖发布的主题，直到发布新的一代；`clear` 保留已发布的主题文件。
 
-Native macOS builds require Xcode command-line tools and macOS 12 or later:
-`wails3 task darwin:package ARCH=arm64 -f` or `ARCH=amd64`. The bundle receives
-an ad-hoc signature; distribution signing/notarization is separate.
-Native Linux amd64 builds require a C compiler, `pkg-config`, GTK 4,
-WebKitGTK 6.0 and X11 development headers:
-`wails3 task linux:build ARCH=amd64 -f`.
-These requirements follow pinned Wails source. macOS/Linux native builds and
-runtime qualification are deferred by the Windows-first delivery decision.
+## 开发
 
-## Verification and provenance
+构建、测试和打包说明见 [开发指南](docs/development.md)，整体设计见 [架构说明](docs/architecture.md)。
 
-```powershell
-go test -p 1 ./...
-go vet ./...
-pnpm --dir tools/parity test
-pnpm --dir frontend typecheck
-pnpm --dir frontend lint
-pnpm --dir frontend format:check
-pnpm --dir frontend test
-go run ./tools/spikes/theme --app bin/yousage.exe
-```
+## 许可证与鸣谢
 
-See [integrated acceptance](docs/validation/acceptance.md),
-[Windows qualification](docs/releases/0.1.0-windows.md),
-[research](docs/t3code-usage.md), [feature map](docs/parity/feature-map.md) and
-[third-party notices](THIRD_PARTY_NOTICES.md).
-Original source hashes and tests are immutable oracles. Protocol fixtures do
-not certify live accounts; browser sizing does not certify native DPI/dialogs.
-Yousage is independent and does not imply T3 endorsement.
+第三方依赖的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+Yousage 的用量统计、额度合并、主题引擎和部分界面组件参考并沿用了
+[T3 Code](https://github.com/pingdotgg/t3code)（MIT 许可证）的设计与实现，感谢 T3 Code
+团队的开源工作。Yousage 是独立项目，与 T3 Code 官方没有关联，也不代表其认可。
+
+同时感谢 [Wails](https://wails.io)、[models.dev](https://models.dev)、
+[culori](https://culorijs.org) 和 [Open VSX](https://open-vsx.org) 等项目。

@@ -1,70 +1,49 @@
-# Pinned reference baseline
+# 参考对照测试
 
-The reference is t3code commit `58d253231d83f669a2cdfefa5fe479751d22c582`.
-`tools/parity/sources.json` records the Git blob ID, SHA-256 and byte length of
-each unmodified copied file. `sync-upstream.mjs` retrieves only exact pinned raw
-URLs and verifies the Git blob before writing. `verify-sources.mjs` verifies both
-hashes before tests. The application monorepo is not installed or launched.
+`tools/parity` 存放固定版本的上游参考源码以及基于它的对照测试。这些源码同时被前端直接打包
+（共享界面组件、图表、调色板与主题编辑器），因此它既是测试基线，也是构建输入。
 
-Run `pnpm --dir tools/parity install --frozen-lockfile`, then
-`pnpm --dir tools/parity test` and `pnpm --dir tools/parity reference`.
-The viewer is bound to localhost port 4174. It contains original chart, share bar,
-theme preview, wireframe and UI primitives with synthetic fixed data. The host
-layout is a reference workbench, not a screenshot of the full original Usage page.
+## 源码固定
 
-## Oracle and plumbing boundaries
+- 参考版本记录在 `tools/parity/sources.json` 的 `commit` 字段中，每个文件都记录了
+  Git blob ID、SHA-256 和字节数。
+- `pnpm --dir tools/parity sync` 只从固定版本的原始 URL 下载声明的文件，先校验 Git blob，
+  通过后才写入 `tools/parity/upstream/`。
+- `pnpm --dir tools/parity test` 会先运行 `verify:sources` 校验所有哈希，再运行对照测试。
+- 上游文件保持原样不修改；Git 换行转换对它们禁用。上游的 Effect 补丁中有一行必需的单空格
+  上下文行，因此只有补丁文件关闭了行尾空白检查。
 
-The original pricing, aggregation, transcript parsers, merge, quota math,
-formatting, theme generator/parser and component bodies are unmodified.
-The contracts bridge supplies constants and identity branding for already valid
-fixtures; it does **not** test Effect schema validation or remote interoperability.
-The availability predicate and cn rules are copied from the inspected originals.
-The six provider SVGs and ProviderInstanceIcon are original. ACP is excluded and
-its bridge throws if accidentally rendered. Its unused initials fallback is not
-a provider identity parity claim. There is no credential, filesystem history,
-remote socket, reset-credit or model-turn connection.
+## 对照测试
 
-The original ThemeEditorPanel/inspector and nested color controls are also retained.
-Its library uses this localhost origin's isolated localStorage when Save is used;
-the read-only baseline interactions use Open/Navigate/Cancel only. It cannot access
-the Wails application's separate origin. The workbench editor is mounted above
-fixture navigation and applies a draft to actual component DOM. Morphicons 1.7.1
-uses its React entry; no React Native dependency is installed.
+```powershell
+pnpm --dir tools/parity install --frozen-lockfile
+pnpm --dir tools/parity test         # 校验源码哈希并运行对照测试
+pnpm --dir tools/parity reference    # 在 127.0.0.1:4174 打开参考工作台
+```
 
-Source scripts use `.mjs` because they must run before TypeScript dependencies
-are installed. Application fixture source uses `.tsx`; Vite's config retains its
-tool-standard `.ts` extension. Automatic JSX matches upstream. React/DOM 19.2.6,
-Tailwind 4.3.3, Base UI 1.5.0, lucide-react 0.564.0, culori 4.0.2 and the patched
-Effect 4.0.0-rc.115 match the pinned upstream lock. Vite is the upstream alias
-`@voidzero-dev/vite-plus-core@1.0.0` (bundles Vite 8.3.1), not Vite version 1.
-Scripts invoke its explicit CLI path: this package exposes no `vite` binary,
-so a bare `vite` command accidentally found a global 7.1.12 during preparation.
-That preparation build/screenshot evidence was superseded after correcting it.
-Lucide 0.564.0 publishes its ESM entry below dist/esm/lucide/src despite its
-package module field; the resolver points at the actual original file.
-The alias produces peer-version warnings; actual tests/build determine viability.
-Dependencies and licenses can be reproduced from package.json/pnpm-lock.yaml;
-t3code's retained MIT license is in THIRD_PARTY_NOTICES.md and upstream/LICENSE.
+- 定价、聚合、转录解析、额度合并与汇总、格式化以及调色板生成都与原始实现对照，
+  另有手算用例覆盖推理 Token 包含关系、上报价格与自定义价格、缓存回退、三个时区与夏令时、
+  别名、来源归属、会话去重和稀疏的等权账户汇总。
+- `fixtures/theme-golden.json` 记录六套完整的 61 角色调色板（两种外观、三组种子色，
+  包括灰度、透明度和 OKLCH）。正常测试只做比较；确需更新时运行
+  `UPDATE_REFERENCE=1 pnpm --dir tools/parity test:theme`。Go 侧的
+  `internal/theme` 测试使用同一组金标准。
+- 契约桥接（`fixtures/bridges`）只为已经有效的测试数据提供常量和类型标记，不验证 Effect
+  模式校验或远程互通。
 
-## Comparison method
+## 参考工作台与截图
 
-Use identical fixture inputs, theme, appearance, viewport, zoom/DPI and reference
-time. Compare chart geometry, bands/axes/tooltip, semantic CSS colors, six-provider
-icons, preview geometry, portal layering and focus behavior. Exclude workbench
-heading, native titlebar, browser extensions and OS font rasterization from pixel
-equality. Compare role colors and numeric outputs exactly where upstream rounds;
-for color-conversion ports, require recorded numeric channel tolerance, rather
-than accepting an unspecified visual resemblance. Geometry deviations must be
-measured and recorded. Screenshots alone do not prove focus or native dialogs.
+参考工作台用固定的合成数据渲染原始图表、占比条、主题预览、菜单、对话框和主题编辑器，
+用于在相同输入、主题、视口、缩放和参考时间下比较几何、颜色和焦点行为。它不是完整应用的截图，
+也不连接任何凭据、历史文件、远程环境或重置券。
 
-`fixtures/theme-golden.json` contains six complete 61-role palettes (two modes,
-three seed pairs including grayscale/alpha/oklch). A deliberate update uses
-`UPDATE_REFERENCE=1 pnpm --dir tools/parity test:theme`; normal tests only compare.
-Hand-calculated tests additionally guard token reasoning subsets, reported vs
-override prices, cache fallback, three timezones/DST, aliases, source ownership,
-distinct sessions and quota identity/sparse equal-account pooling.
+截图保存在 `docs/parity/screenshots/`（PNG 不纳入版本控制），其文件摘要记录在
+`screenshots/manifest.json`。截图只能证明视觉外观，不能证明焦点行为或原生对话框。
 
-See [feature map](feature-map.md), [capabilities](capabilities.md),
-[remote contract](remote-contract.md) and [screenshot manifest](screenshots.md).
+## 工具链说明
 
-Vendored upstream bytes disable Git newline conversion. The original Effect patch contains an empty context line whose required single-space prefix triggers trailing-whitespace detection; only patch files disable blank-at-eol checking. Source digests retain that byte and authored files retain normal whitespace checks.
+- 脚本使用 `.mjs`，因为它们需要在安装 TypeScript 依赖之前运行；Vite 配置保留工具约定的 `.ts`。
+- Vite 使用上游别名 `@voidzero-dev/vite-plus-core@1.0.0`（内含 Vite 8），该包不提供
+  `vite` 可执行文件，脚本直接调用其 CLI 路径，避免误用全局安装的其他版本。
+- 别名会产生 peer 版本警告，以实际测试和构建结果为准。
+- 上游许可证保留在 `tools/parity/upstream/LICENSE` 和根目录的 `THIRD_PARTY_NOTICES.md` 中。

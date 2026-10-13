@@ -1,126 +1,117 @@
-# Yousage architecture
+# 架构说明
 
-Reference: t3code `58d253231d83f669a2cdfefa5fe479751d22c582`.
-Execution authority: the user's explicit approval of Wails v3 and subsequent
-in-task changes through completion. Windows qualification is required now;
-macOS/Linux native qualification waits for those environments.
+## 运行时
 
-## Runtime
+Yousage 是单个 Go 程序，使用 Wails `3.0.0-beta.28` 承载内嵌的 React / Vite 前端，
+前端通过生成的 TypeScript 绑定调用 Go 服务。Node 和 pnpm 只在开发与构建时使用。
+外部依赖只有系统 WebView（Windows 上为 WebView2）以及各 Provider 已安装的 CLI，
+它们缺失时以明确的“不可用”状态呈现。
 
-One Go application embeds React/Vite assets in Wails `3.0.0-beta.28`, with matching
-`@wailsio/runtime`. Node/pnpm are development tools, not shipped services. Provider
-CLIs and platform WebViews are external dependencies and have explicit capability
-states. No local t3code server is required. Optional existing remote t3code
-environments use the bounded compatible protocol documented in
-[the remote contract](parity/remote-contract.md).
+启动顺序：Go 先处理内部的 `--credential-helper` 和 `theme` 子命令（都不创建窗口），
+否则初始化服务（打开数据库等）、注册单实例（再次启动时显示已有窗口）、
+以隐藏状态创建窗口和托盘图标，并恢复窗口位置。前端提交主题后把背景色同步给原生窗口
+（Windows 上通过 DWM 属性设置标题栏颜色），再通知 Go 显示窗口。隐藏的 WebView
+可能暂停动画帧，因此显示窗口前不能等待 `requestAnimationFrame`。
 
-The preflight proved Windows production startup/theme synchronization/shutdown,
-managed native Claude JSONL control transport and headless palette publishing.
-It does not prove live usage, full UI interactions, DPI or non-Windows packages.
-Windows frame colors use documented DWM attributes without rebuilding the window.
-The initially hidden WebView must not wait for animation frames before becoming
-visible: hidden WebViews can suspend them. Commit the DOM theme, synchronize its
-native background, then reveal the window. Keep startup failures reviewable.
+## 模块划分
 
-## Domain and storage
+| 目录 | 职责 |
+| --- | --- |
+| `main.go`、`app*.go`、`desktop.go`、`tray.go` | 应用入口、Wails 绑定、窗口尺寸与位置、关闭确认、托盘、剪贴板、诊断导出 |
+| `internal/domain` | 归一化记录、Token 分类、额度窗口等领域类型 |
+| `internal/history` | 各 Provider 的历史读取器、增量检查点与流式 JSON 投影 |
+| `internal/storage` | SQLite 存储：记录、额度观测、检查点、设置与字符串字典 |
+| `internal/accounting` | 定价、时间窗口、聚合与速度档位倍率 |
+| `internal/quota` | 原生额度适配器、额度中心、账户合并与汇总、重置券、周期价值估算 |
+| `internal/service` | 用量、额度、损耗、速率、小票报表，以及来源识别、刷新与远程环境编排 |
+| `internal/refresh` | 按键协调刷新：共享进行中的请求、冷却时间、手动刷新绕过冷却 |
+| `internal/remote` | 兼容远程环境的认证与 WebSocket RPC 客户端 |
+| `internal/preferences` | 显示偏好、窗口状态和来源配置的校验与版本化保存 |
+| `internal/secrets` | 系统凭据库读写（通过独立的受控子进程） |
+| `internal/managedprocess` | 受控子进程：Windows Job Object / Unix 进程组，保证子孙进程随之结束 |
+| `internal/provider/claudeprobe` | Claude Code 额度控制协议探测 |
+| `internal/theme` | 调色板生成、主题库、发布目录、文件监听和命令行主题 |
+| `frontend/src` | 页面（用量、额度、损耗、速率）、设置、主题编辑器、小票、国际化 |
 
-Keep Environment, ProviderInstance, AccountIdentity, SourceIdentity and QuotaRoute
-distinct. One local environment can contain multiple accounts and roots.
-Normalized history records preserve source/session identity, provider, time,
-model, input/output/cache-read/cache-write/reasoning tokens, speed and cost
-provenance. Reasoning is contained in output; no double charge. Alias and price
-overrides reprice historical local records; remote aggregates remain authoritative.
+前端的部分界面组件、调色板与主题编辑器使用 `tools/parity/upstream` 中固定版本、
+带哈希校验的上游源码，由 `frontend/vite.config.ts` 直接打包，见 [参考对照测试](parity/README.md)。
 
-SQLite stores records, incremental checkpoints, settings, prices, aliases and
-observations. Select pure-Go `modernc.org/sqlite v1.60.1`, verified from official Go
-module metadata (Go minimum 1.26.0) and primary driver documentation. Its selected
-graph upgrades x/sys to 0.48.0; rerun the existing Windows subprocess/theme tests
-and native smoke after that change. Use per-connection DSN pragmas for foreign
-keys, bounded busy waits and WAL. Migration and source-record/checkpoint updates
-are transactions. Query dates use injected now/IANA zone inputs with calendar
-and DST semantics; stale time does not imply a periodic scanner.
+## 数据模型
 
-JSONL checkpoints retain completed-newline offsets, metadata, reducer state and
-a 64-byte FNV guard. Separate incomplete tails; invalidate on shrink/rewrite.
-Read failures retain successful cached observations. Remote partial snapshots
-retain nonoverlapping successful data with explicit source identities/freshness.
+环境（Environment）、Provider 实例、账户身份、来源身份和额度路由是相互独立的概念：
+一个本地环境可以包含多个账户和多个历史目录。归一化记录保存来源与会话身份、上下文身份、
+Provider、时间、模型、速度档位，以及输入 / 输出 / 缓存读 / 缓存写 / 推理 Token、
+上报费用、缓存有效期、生成耗时和首字耗时。推理 Token 包含在输出中，不重复计费。
 
-Go/SQLite is the saved-preference authority. Frontend state contains unsaved
-drafts and transient context. The separately published theme default/generation
-file is an external input, not a second display-preference database. Apply each
-generation once to saved theme owners; clear leaves current owners unchanged.
+定价优先级为：用户自定义价格 > Provider 上报费用 > models.dev 公开价格。
+没有价格的记录保留 Token 并标记为未定价。别名和自定义价格变化时直接对已保存的事实重新定价，
+不需要重新读取 Provider 日志；远程环境的汇总以服务端为准。
 
-## Sources and limits
+时间窗口使用注入的当前时间和 IANA 时区（时区数据内嵌，便于 Windows 独立部署）。
+7 / 30 / 90 天窗口按日历日计算并包含今天；24 小时窗口始终是 24 个按时长划分的小时槽，
+夏令时切换时也不变。
 
-Implement the six history providers using the inspected capability table:
-Codex/Claude JSONL, Grok completed-turn records, authenticated Cursor Dashboard
-history, WAL-consistent OpenCode SQLite/legacy JSON, and Antigravity conversation
-databases/profiles. Preserve custom roots/homes and disabled-account history.
-Source absence or missing authentication is a notice, never fabricated totals.
+## 存储
 
-History and subscription limits are independent. Limits adapters include native
-Codex/Claude/Grok/OpenCode/Cursor routes and supported hub routes. Antigravity
-absence of a registered limit path is evidence-backed. API-key/custom endpoints
-that do not expose subscription limits remain unsupported.
+使用纯 Go 的 `modernc.org/sqlite`，每个连接启用外键、有界忙等待和 WAL，写事务立即加锁。
+数据库与 Provider 自己的数据库完全分离，不保存对话文本和凭据。表结构、编码和迁移细节见
+[`internal/storage/README.md`](../internal/storage/README.md)。
 
-Claude sends initialize/get_usage only, with 25-second initialization and 4-second
-usage budgets. Unknown skip_behaviors can fall back once within the same deadline;
-method/auth/timeouts cannot. Windows processes are created atomically inside
-kill-on-close Jobs with restricted inherited handles. Fixtures prove ordinary
-process-tree cleanup, not arbitrary external broker control or live CLI support.
+Go / SQLite 是已保存偏好的唯一来源；前端只保存未应用的草稿和临时状态。
+外部发布的主题默认值 / 代数文件是外部输入，每一代只被采用一次。
 
-Limits share in-flight reads, automatically cool down five minutes from
-completion including failure, and preserve successful observations after errors.
-Manual refresh bypasses cooldown. Deduplicate by account/source and pool equal
-account percentages; retain sparse windows and independent reset credits/routes.
-Reset uses explicit confirmation, operation state and unknown-result handling.
-No implementation test consumes real reset credits or silently retries a timeout.
+## 历史读取与刷新
 
-## User interface and settings
+- JSONL 来源（Codex、Claude、Grok）按完整换行增量读取，检查点保存偏移、解析器状态和
+  末尾 64 字节 FNV 校验；文件缩短、重写或校验不符时完整重读。未结束的末行单独保存，
+  下次追加时重放。读取失败时保留已有数据，不会写入空结果。
+- OpenCode 与 Antigravity 以只读事务读取 SQLite（包括未检查点的 WAL），
+  Cursor 通过已登录账户分页读取 Dashboard 历史。
+- 历史保留 90 天，每次扫描时重新解析目录，路径无需手动配置。
+- 历史数据过期时间为 1 分钟，但没有定时器：只在用量页面可见时按需刷新。
+  额度在上次完成（包括失败）5 分钟后才会自动刷新；手动刷新绕过冷却，但会复用进行中的请求。
+  设置页、隐藏或最小化的窗口不会发起自动查询。
+- 公开价格表 24 小时过期，强制刷新至少间隔 1 分钟，下载失败时继续使用旧表。
 
-Usage and Settings are separate destinations. Usage contains Cost/Tokens/Limits,
-environment filters, totals, shares, charts, token/model details, breakdowns,
-quota rows and account-scoped Manage/reset. First visit uses Limits and 30 days;
-Limits disables the time selector. There is no invented provider/date filter.
+## 额度
 
-Settings contains five sections: Appearance; Display and behavior; Sources and
-connections; Prices and aliases; Advanced and diagnostics. Price drafts have
-fixed transaction targets independent of current view filters, Mixed cells,
-atomic per-environment patches and retries for failed targets only. Display
-preferences apply immediately; theme preview has Save/Cancel; connections and
-prices have explicit Apply.
+各 Provider 的额度适配器与历史读取相互独立。Codex 与 Claude 通过受控子进程使用各自的
+控制协议，不发起模型请求；Grok、Cursor 和 OpenCode Go 使用已登录凭据访问官方接口。
+额度中心（CLIProxyAPI）的账户列表、账户额度与重置路由各自保留失败状态。
 
-Keep the floating theme editor and DOM inspector above routes. Preserve drafts,
-selection and reading context across navigation. Theme modes and light/dark
-owners are separate fields. Preserve all 61 roles, six standard/built-in choices,
-paired variants, imports, collections, advanced families, preview/cancel, fonts,
-contrast, glass, motion, Open VSX and publishing behavior. The preflight hex/OKLCH
-parser is a bounded proof; complete literal CSS import compatibility remains work.
+账户按 Provider + 规范化邮箱、凭据指纹、来源身份依次合并；最新的观测提供窗口，
+最新的实际重置券快照提供重置券信息。多个账户等权汇总为总额度，并保留稀疏窗口列。
+失败的探测保留上次成功的额度条；明确的“不支持”结果才会替换它。
 
-Comfortable retains original spacing; Compact changes only spacing. Density,
-text/UI scale and system DPI are independent. Test both densities at CSS
-480x600,720x800,1024x768, 1440x900, plus 200% text/UI scaling and separate native
-DPI 100/125/150/200%. Wrap filters, constrain editors, limit form width and scroll
-wide tables locally. Keep values, stable quota columns and keyboard focus usable.
+使用重置券需要用户确认，操作有确定的幂等身份，结果未知时保留状态，只能显式重试。
 
-Restore normal bounds/maximized state safely within current monitor work areas;
-never restore minimized. Provide recenter, exact-value copy, keyboard help,
-Ctrl/Cmd+, for Settings and redacted diagnostics. Closing exits with draft and
-external-operation guards. Hidden/minimized/Settings routes start no new automatic
-refresh; existing work settles. No implicit tray, autostart, notifications or upload.
+## 报表
 
-## Verification and limits
+- **用量**：按环境、Provider、模型、日 / 小时聚合，区分会话数、缓存节省和速度档位费用。
+- **周期价值**：把额度百分比的变化与同期本地 API 等值费用做稳健拟合，估算整个订阅周期的价值区间；
+  历史周期作为先验，检测到额度调整时不再参考旧周期。
+- **损耗**：在同一会话、同一上下文、同一模型内比较相邻请求。空闲超过缓存有效期（默认 5 分钟，
+  显式 1 小时缓存按 1 小时），且重新写入的缓存超过 20,000 Token、达到此前缓存上下文的 80%
+  时，记为一次缓存过期重写。Codex 不上报缓存写入，改为估算：上一次请求至少一半输入命中缓存、
+  本次命中率降到 20% 以下，且重新发送的输入超过 20,000 Token。报错记录和用户中断不参与比较。
+- **速率**：只使用可靠的成对时间点计算生成耗时和首字耗时，超过 10 分钟或超过 10,000 tok/s
+  的异常值不参与计算。
+- **小票**：只读取本地事实，与用量页面使用相同的定价；根据当前登录方式区分订阅支付与 API 支付。
 
-Keep accounting, functional, visual and native conclusions separate. Compare
-against immutable TypeScript fixtures plus independent calculations. Current
-native observations are Windows startup/lifecycle and headless execution only.
-Original component captures are browser reference evidence. Final integration
-requires feature interactions, responsive states and fresh Windows observations
-against the delivered executable; browser tests cannot substitute for native DPI,
-dialog/drop, OS appearance and process-exit evidence.
+## 界面
 
-No remote publication, paid signing, store submission, auto-update or unrelated
-Git operations are included. Exact implementation task/commit boundaries and
-execution evidence live in the ignored task contracts.
+页面和设置分开导航。四个主页面按需加载、访问后保留挂载，以保留滚动位置；设置各部分同样保留草稿。
+显示偏好立即生效；主题预览可以保存或取消；数据来源和价格需要显式“应用”。
+主题编辑器和颜色检查器悬浮在所有页面之上。
 
-Primary driver documentation: [modernc SQLite](https://pkg.go.dev/modernc.org/sqlite).
+信息密度、界面缩放和系统 DPI 相互独立：紧凑模式只改变间距，界面缩放同时调整文字和控件。
+窗口最小尺寸随缩放变化，屏幕放不下时临时降低缩放。窗口位置只记录普通状态下的边界，
+恢复时限制在当前显示器的工作区内，永远不会恢复为最小化。
+
+## 主题
+
+主题引擎根据画布色和强调色生成 61 个颜色角色，提供标准主题和五组成对的内置主题，
+亮色和暗色可以分别选择。CSS 颜色字面量通过内嵌的 culori 解析。导入支持 T3 Code /
+VS Code 主题 JSON（Yousage 导出的主题也使用该格式）和 Open VSX 扩展包，扩展包在大小、压缩比、
+文件数、引用深度、校验和与许可证上都有严格限制，批量导入是原子的。主题发布与命令行说明见
+[`internal/theme/README.md`](../internal/theme/README.md)。

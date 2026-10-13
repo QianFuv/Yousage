@@ -1,25 +1,18 @@
-# OpenCode native and legacy history
+# OpenCode 数据库与旧版历史
 
-This reader implements the schema compatibility of t3code51f7f77's
-opencodeUsageReader.ts, without claiming a particular installed OpenCode version.
-OPENCODE_DATA_DIR accepts comma-separated roots; canonical aliases are removed.
-Default is absolute XDG_DATA_HOME/opencode or ~/.local/share/opencode.
+读取器兼容 OpenCode 的数据库与旧版 JSON 结构，不绑定特定的 OpenCode 版本。
+`OPENCODE_DATA_DIR` 支持逗号分隔的多个目录，规范化后去除重复；默认为绝对路径的
+`XDG_DATA_HOME/opencode` 或 `~/.local/share/opencode`。
 
-Recognized top-level opencode*.db files open mode=ro/query_only with100ms busy
-timeout. No immutable flag is used, so live WAL records stay visible. Each read
-uses one deferred read transaction for metadata and both message tables: a writer
-can commit concurrently without mixing old and new table contents in one result.
-The app never changes provider journaling settings, checkpoints, schema or data.
+顶层的 `opencode*.db` 以 `mode=ro` / `query_only` 打开，忙等待 100 毫秒。不使用 immutable 标志，
+因此仍能看到 WAL 中的记录。每次读取在一个延迟读事务中读取元数据和两张消息表，
+写入方并发提交时也不会在一次结果中混合新旧内容。应用从不修改 Provider 的日志模式、检查点、结构或数据。
 
-Main database wins over suffix databases, message over session_message, then valid
-database records win over migrated storage/message/**/*.json copies. Only records
-eligible for the requested window claim IDs; invalid/old DB rows permit valid JSON
-fallback. Legacy symlinks are not followed. Each root retains its own first-seen
-order; global aggregation deduplicates copied message IDs across roots.
+优先级：主数据库高于带后缀的数据库，`message` 高于 `session_message`，有效的数据库记录高于迁移到
+`storage/message/**/*.json` 的副本。只有落在请求窗口内的记录才占用 ID；无效或过旧的数据库行允许
+回退到有效的 JSON。不跟随旧版目录中的符号链接。每个目录保留自己的首见顺序，全局聚合时跨目录对复制的消息 ID 去重。
 
-OpenCode input is uncached; reasoning is separate from output and is added once
-to normalized output. Zero/negative reported cost is unknown and uses shared model
-pricing. Read/schema errors retain already read facts and expose partial status;
-malformed message JSON is skipped. Source/service integration must preserve its
-last stored snapshot on a failed read and replace successful full DB snapshots,
-because rows can update in place and main DB mtime alone cannot represent WAL.
+OpenCode 的输入为非缓存输入；推理 Token 与输出分开上报，归一化时加入输出一次。零或负的上报费用视为未知，
+使用共享的模型定价。读取 / 结构错误时保留已读取的事实并标记为部分结果；格式错误的消息 JSON 会被跳过。
+应用层在读取失败时保留上次保存的快照，成功时整体替换数据库快照——因为行可能原地更新，
+仅凭主数据库的修改时间无法反映 WAL 的变化。

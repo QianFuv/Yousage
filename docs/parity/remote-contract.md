@@ -1,62 +1,63 @@
-# Pinned remote adapter boundary
+# 远程环境协议
 
-T3 `51f7f77f87318a5329d3bab15d513fda5654200b` uses Effect 4.0.0-rc.115
-framed JSON RPC, not JSON-RPC 2.0. Source anchors: contracts/environmentHttp.ts,
-auth.ts, rpc.ts, environment.ts, server.ts; client-runtime/connection/onboarding.ts,
-compatibility.ts, authorization/remote.ts, rpc/session.ts; server/ws.ts and
-auth/RpcAuthorization.ts. The pinned Effect patch adds request hooks without
-changing these envelopes. This document is not an interoperability test.
+Yousage 可以直连兼容的 T3 Code 服务端，读取其用量汇总、额度和主题，并修改其价格与别名设置。
+协议是 Effect 框架的分帧 JSON RPC（不是 JSON-RPC 2.0），实现在 `internal/remote`。
 
-1. GET /.well-known/t3/environment and verify identity/protocol before spending
-   a one-time pairing credential. Current protocol is 2; omitted means 1.
-2. POST /oauth/token form-urlencoded with token-exchange grant, subject_token,
-   subject_token_type=urn:t3:params:oauth:token-type:environment-bootstrap,
-   requested_token_type=urn:ietf:params:oauth:token-type:access_token and optional
-   narrowed scope. Store returned bearer access token in the native secret store.
-   There is no inspected refresh-token endpoint. Re-pair expired/revoked login.
-3. Authenticated POST /api/auth/websocket-ticket returns ticket and expiresAt.
-   Connect /ws?wsTicket=...&orchestrationProtocol=2. Never put access token in URL.
-   Protocol mismatch returns 426 orchestration_protocol_incompatible.
+## 配对与连接
 
-Request envelope: `_tag:Request, id, tag, payload, headers:[]`.
-Terminal: `_tag:Exit, requestId, exit:{_tag:Success,value}` or tagged Failure cause.
-Chunks use values[] and each consumed chunk requires Ack. Cancel uses Interrupt.
-Accept object or array per frame, correlation, Defect and Ping/Pong. Upstream
-ping interval is five seconds; an unanswered preceding ping times out next tick.
+1. `GET /.well-known/t3/environment`：在消耗一次性配对凭据之前，先校验环境身份和协议版本。
+   当前协议版本为 2，缺省视为 1。
+2. `POST /oauth/token`（form-urlencoded）：使用 token-exchange 授权，提交 `subject_token`，
+   `subject_token_type=urn:t3:params:oauth:token-type:environment-bootstrap`、
+   `requested_token_type=urn:ietf:params:oauth:token-type:access_token`，可选缩小 scope。
+   返回的 Bearer 访问令牌保存在系统凭据库中。没有刷新令牌接口，过期或被吊销后需要重新配对。
+3. 携带认证的 `POST /api/auth/websocket-ticket` 返回 `ticket` 和 `expiresAt`，然后连接
+   `/ws?wsTicket=...&orchestrationProtocol=2`。访问令牌永远不会出现在 URL 中。
+   协议不兼容时服务端返回 426 `orchestration_protocol_incompatible`。
 
-| Method | Scope / behavior |
-|---|---|
-| subscribeServerConfig {environmentThemes:true,usageLimitSources:true} | read; snapshot, then provider/settings/theme/hub changes; optional themes/hubs arrive separately from initial snapshot |
-| server.getUsageSummary | read; inclusive sinceDay/untilDay and timezone; optional hourly sinceTime inclusive/untilTime exclusive |
-| server.refreshUsageRates, server.getSettings | read |
-| server.updateSettings | operate; map-entry price/alias patch, null deletes named entry; not full stale map replacement |
-| server.refreshProviders | operate; {} refreshes all hubs too; targeted instance skips all-hub refresh |
-| provider.consumeResetCredit | operate; native instance or source/account/credit route; explicit action only |
-| server.probe | read; capability connectionProbe only; otherwise getConfig |
+远程地址必须使用 HTTPS，回环地址允许 HTTP。不跟随重定向，原始服务端错误内容不会写入诊断。
 
-Scopes above abbreviate orchestration:read/operate. Missing capability means
-unsupported. Flags include usagePriceOverrides, usageModelAliases,
-usageLimitSources, environmentThemes, connectionProbe. Do not advertise
-usageLimitsCommand (the chat command is not handled by this standalone app).
-Clear stale optional projections when switching/reconnecting to an incompatible
-host. No automatic replay of settings/reset writes; settle destinations separately
-and retry only failed targets. Reset outcomes are reset/nothingToReset/noCredit/
-alreadyRedeemed; a warning can accompany a successful redemption.
+## 帧格式
 
-Usage summary v6 merges compatible v4-v6, independent of wire protocol 2.
-Physical key=(hostId,provider,resolvedHomePath,volumeId). Complete beats partial
-beats failed, then newest readAt, then environment ID. Newer partial supplements
-only absent day/hour/provider/model cells. Count owned distinctSessions, not
-summed bucket sessions; supplementation takes max distinctSessions.
+- 请求：`_tag:Request, id, tag, payload, headers:[]`。
+- 结束：`_tag:Exit, requestId, exit:{_tag:Success,value}` 或带标签的 Failure 原因。
+- 数据块使用 `values[]`，每消费一个块都需要回复 Ack；取消使用 Interrupt。
+- 每帧可以是对象或数组；处理请求关联、Defect 和 Ping/Pong。服务端每 5 秒发送一次 ping，
+  上一次 ping 未得到响应时在下一次触发超时。
 
-Quota key is driver+normalized email, then credential fingerprint, then native
-environment/instance or hub source/account fallback. Freshest checkedAt supplies
-windows; freshest actual credit snapshot retains credits. Hub redemption wins
-even when displayed native windows are fresher because it also clears routing
-cooldown. Pool account percentages equally; preserve sparse columns.
+## 方法
 
-The future Go adapter needs offline object/batch/ACK/interrupt/failure, 401/426,
-identity-before-exchange, capability, summary-version/source/credit fixtures.
-Direct bearer cannot claim managed relay, DPoP or SSH parity; those need explicit
-full-contract decisions. Live host, secret store and TLS/proxy behavior remain
-unverified. Returned expiry/error fields govern lifecycle, not guessed constants.
+| 方法 | 权限 / 行为 |
+| --- | --- |
+| `subscribeServerConfig {environmentThemes:true,usageLimitSources:true}` | 读取；先返回快照，之后推送 Provider / 设置 / 主题 / 额度中心变化，可选的主题和额度中心数据单独到达 |
+| `server.getUsageSummary` | 读取；`sinceDay` / `untilDay` 闭区间加时区，可选小时级 `sinceTime`（含）/ `untilTime`（不含） |
+| `server.refreshUsageRates`、`server.getSettings` | 读取 |
+| `server.updateSettings` | 操作；按条目修补价格与别名，`null` 删除对应条目，不整体替换 |
+| `server.refreshProviders` | 操作；`{}` 同时刷新所有额度中心，指定实例时不刷新额度中心 |
+| `provider.consumeResetCredit` | 操作；按原生实例或来源 / 账户 / 重置券路由，只能由用户显式触发 |
+| `server.probe` | 读取；仅在具备 `connectionProbe` 能力时使用，否则使用 getConfig |
+
+“读取 / 操作”分别对应 `orchestration:read` / `orchestration:operate` 权限。
+能力标记包括 `usagePriceOverrides`、`usageModelAliases`、`usageLimitSources`、
+`environmentThemes`、`connectionProbe`，缺失即视为不支持。Yousage 不声明
+`usageLimitsCommand`，因为它不处理聊天命令。
+
+## 写入与结果
+
+- 切换或重连到另一台服务端时，清除上一台留下的可选数据。
+- 设置和重置写入不会自动重放：各目标分别结算，只重试失败的目标。连接断开或取消时，
+  已发送的写入结果视为未知。
+- 重置结果为 `reset` / `nothingToReset` / `noCredit` / `alreadyRedeemed`，成功时也可能附带警告。
+
+## 汇总合并
+
+- 支持用量汇总 v4–v6，与传输协议版本 2 相互独立。无效的数组条目逐个丢弃，无效的外层结构
+  使本次观测失败；没有价格时保留 Token。
+- 物理来源键为 `(hostId, provider, resolvedHomePath, volumeId)`。完整优先于部分，部分优先于失败；
+  其次比较最新的 `readAt`，最后比较环境 ID。较新的部分结果只补充缺失的日 / 小时 / Provider / 模型单元格。
+  会话数使用各来源自己的 `distinctSessions`，不对各时间桶求和；补充时取最大值。
+- 额度账户键依次为 Provider + 规范化邮箱、凭据指纹、原生环境 / 实例或额度中心来源 / 账户。
+  最新的 `checkedAt` 提供窗口，最新的实际重置券快照提供重置券。额度中心的重置路由优先，
+  因为兑换同时会清除路由冷却。账户等权汇总，保留稀疏列。
+
+不支持托管中继、DPoP 和 SSH 隧道。令牌过期时间等生命周期以服务端返回的字段为准。

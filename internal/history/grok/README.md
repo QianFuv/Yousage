@@ -1,19 +1,13 @@
-# Grok Build saved turns
+# Grok Build 已保存的回合
 
-Statistics read only `GROK_HOME/sessions/**/updates.jsonl` (default `~/.grok`).
-Automatic durable production is supported by the pinned official Grok Build
-snapshot2bdd1d6a and the source evidence in docs/parity/capabilities.md. Existing
-installed releases still need compatible completed-turn usage records; text or
-missing files cannot reconstruct previously billed usage.
+统计只读取 `GROK_HOME/sessions/**/updates.jsonl`（默认 `~/.grok`）。Grok Build 会在 TUI、
+无界面和 Agent stdio 模式下自动持久化这些记录。不同版本是否都写出兼容的用量字段需要以实际文件为准；
+纯文本或缺失的文件无法重建历史用量。
 
-Only `params.update.sessionUpdate=turn_completed` emits records. The agent's
-millisecond clock wins over the outer seconds/milliseconds timestamp. Inclusive
-input subtracts cache categories; reasoning remains contained in output. One USD
-equals10^10 cost ticks. Per-model ticked costs remain authoritative; unticked rows
-share the clamped remaining aggregate cost by their own token counts. Zero-token
-rows neither emit nor consume aggregate cost. Unknown cost stays null.
+只有 `params.update.sessionUpdate=turn_completed` 会产生记录。Agent 的毫秒时钟优先于外层的
+秒 / 毫秒时间戳。含缓存的输入减去缓存类别；推理 Token 包含在输出中。1 美元等于 10^10 个费用刻度。
+按模型上报的刻度费用为准；未上报的行按各自 Token 数分摊剩余的总费用（截断为非负）。
+零 Token 的行既不产生记录也不分摊费用；未知费用保持为空。
 
-Saved prompt/session/model identity deduplicates repeated turn updates. The shared
-reader/collector owns streaming, tail replay, guards, persistence and retention.
-No Grok process/account or network endpoint is used for historical statistics.
-Native account billing/limits is a separate F8 adapter.
+已保存的提示 / 会话 / 模型身份用于对重复的回合更新去重。流式读取、尾部重放、校验、持久化和保留
+由共享的读取器与采集器负责。历史统计不启动 Grok 进程，也不访问任何网络接口；账户额度由独立的适配器提供。

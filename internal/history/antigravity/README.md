@@ -1,19 +1,11 @@
-# Antigravity native history
+# Antigravity 本地历史
 
-This reader follows t3code commit `51f7f77f87318a5329d3bab15d513fda5654200b`,
-`apps/server/src/usage/antigravityUsageReader.ts` (Git blob
-`34a88114f42eab0595aa74782ded89482855c51c`). It reads only usage metadata tables
-inside a read-only SQLite transaction, including uncheckpointed WAL records.
-Malformed metadata invalidates that database batch while other stores remain useful.
-The application integration retains its last successful snapshot on failure.
+读取器在只读 SQLite 事务中只读取用量元数据表，包括尚未检查点的 WAL 记录。
+元数据格式错误时该数据库批次作废，其他存储仍可使用；应用层在失败时保留上次成功的快照。
 
-Alias identities merge transitively across every configured store before window
-filtering. Duplicate observations use category maxima, the first record owner and
-the highest quality timestamp, choosing the earliest time on equal quality.
-Reasoning is contained within normalized output. Reported monetary cost is unknown.
+别名身份在窗口过滤之前跨所有已配置存储传递合并。重复观测取各类别的最大值、第一条记录的归属，
+以及质量最高的时间戳（质量相同时取最早时间）。推理 Token 包含在归一化输出中，上报费用未知。
 
-Discovery accepts explicit roots and already resolved T3 instance profile paths;
-it prefers an existing `conversations` child and never creates provider directories.
-T3 profile resolution belongs to connection configuration. Antigravity has no native
-quota reader registered in the pinned T3 provider path; history support does not
-invent one. Live source stores are never modified by this module.
+发现阶段接受显式目录和已解析的实例配置目录，优先使用已存在的 `conversations` 子目录，
+从不创建 Provider 目录。Antigravity 没有可用的原生额度接口，因此不提供额度监控。
+本模块不会修改任何来源数据。

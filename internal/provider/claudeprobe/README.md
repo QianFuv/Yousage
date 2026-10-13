@@ -1,43 +1,34 @@
-# Native Claude control probe
+# Claude 额度控制探测
 
-This package sends only `initialize` and `get_usage` control requests. It does
-not submit a prompt or bundle the Claude SDK, CLI or Node. Windows requires an
-explicit native `.exe`; shell shims are rejected. Source evidence is t3code
-`51f7f77f87318a5329d3bab15d513fda5654200b` and SDK 0.3.276, not a universal CLI
-compatibility guarantee. Actual installed CLI/account qualification remains M4/M7.
+本包只发送 `initialize` 和 `get_usage` 两个控制请求，不提交提示，也不打包 Claude SDK、CLI 或 Node。
+Windows 上需要显式的原生 `.exe`，拒绝 shell 包装脚本。
 
-Initialization has a 25-second budget including spawn; usage receives a separate
-four-second budget. Only a correlated unknown `skip_behaviors` field triggers one
-fallback without that field, within the same usage deadline. Unknown `get_usage`,
-authentication errors and timeouts do not trigger a retry. Usage failure preserves
-the successful initialization result; unavailable quota remains unsupported.
-Utilization is already a percentage from zero through 100.
+## 超时与回退
 
-The argv/environment mirror the inspected SDK's no-prompt transport, strict empty
-MCP configuration, disabled hooks and IDE auto-connect, and no session persistence.
-Managed CLI policy can still override settings; these flags do not certify that
-all possible managed hooks are disabled. Account homes use `CLAUDE_CONFIG_DIR`.
-No private account is queried by the fixture tests.
+初始化（包括启动进程）限时 25 秒，额度请求另外限时 4 秒。只有收到关联的“未知 `skip_behaviors`
+字段”错误时，才在同一额度时限内去掉该字段回退一次；未知的 `get_usage`、认证错误和超时都不重试。
+额度请求失败时保留成功的初始化结果，额度不可用时标记为不支持。`utilization` 本身就是 0–100 的百分比。
 
-Windows creates each process atomically inside its own kill-on-close Job Object
-using `PROC_THREAD_ATTRIBUTE_JOB_LIST`, plus a restricted inherited stdio-handle
-list. There is no assign-after-start race and no fallback to an unmanaged process.
-Cleanup terminates the job, reaps the root and closes/drains pipes on success,
-error, cancellation and deadline. It covers ordinary CreateProcess descendants;
-it does not claim control over existing external brokers/services. POSIX uses an
-isolated process group; native platform qualification remains pending.
+## 进程参数与隔离
 
-JSONL frames are bounded to one MiB and total stdout to 16 MiB. Invalid UTF-8 or
-oversized output fails the probe. Non-JSON banners, unrelated control IDs and
-keep-alives cannot satisfy a request. Stderr is drained without retaining it.
+参数和环境变量对应 SDK 的无提示传输方式：严格的空 MCP 配置、禁用 hooks 和 IDE 自动连接、不持久化会话。
+受管理的 CLI 策略仍可能覆盖这些设置，因此不能保证所有托管 hooks 都被禁用。账户目录通过
+`CLAUDE_CONFIG_DIR` 指定。
+
+Windows 使用 `PROC_THREAD_ATTRIBUTE_JOB_LIST` 在创建进程时原子地放入独立的 kill-on-close Job Object，
+并限制可继承的 stdio 句柄，不存在先启动再加入的竞态，也不会回退到不受管理的进程。成功、错误、取消和超时时
+都会结束 Job、回收根进程并关闭、排空管道。它覆盖普通 CreateProcess 产生的子孙进程，但不控制已存在的外部代理或服务。
+POSIX 上使用独立的进程组。
+
+JSONL 单帧上限 1 MiB，stdout 总量上限 16 MiB；无效 UTF-8 或输出超限都会使探测失败。非 JSON 横幅、
+无关的控制 ID 和保活消息不能满足请求。stderr 会被持续排空但不保留。
+
+## 测试
 
 ```powershell
 go test ./internal/provider/claudeprobe/... -count=1 -timeout=45s
 go vet ./internal/provider/claudeprobe/...
 ```
 
-The controlled Go fixture is `tools/spikes/claude`. Tests cover fragmented/noisy
-output, stderr backpressure, correlation, capability/error states, fallback,
-independent deadlines, cancellation, account isolation, early exit, oversized
-frames and immediate children/grandchildren. They prove transport and lifecycle
-behavior; they do not prove a live subscription response.
+测试替身位于 `tools/spikes/claude`。测试覆盖分片 / 噪声输出、stderr 背压、关联、能力与错误状态、回退、
+独立超时、取消、账户隔离、提前退出、超大帧以及子进程和孙进程，验证的是传输和生命周期行为，不查询任何真实账户。

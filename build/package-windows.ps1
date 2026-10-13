@@ -13,20 +13,13 @@ $packageFiles = @('bin/yousage.exe', 'README.md', 'THIRD_PARTY_NOTICES.md', 'bui
 foreach ($relativePath in $packageFiles) {
     Copy-Item -LiteralPath (Join-Path $workspaceDirectory $relativePath) -Destination $releaseDirectory -Force
 }
-$documentationFiles = @('docs/releases/0.1.0-windows.md', 'docs/validation/acceptance.md', 'docs/t3code-usage.md', 'docs/parity/feature-map.md')
-foreach ($relativePath in $documentationFiles) {
-    $destinationPath = Join-Path $releaseDirectory $relativePath
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationPath) | Out-Null
-    Copy-Item -LiteralPath (Join-Path $workspaceDirectory $relativePath) -Destination $destinationPath -Force
-}
-$checksums = (@('yousage.exe', 'README.md', 'THIRD_PARTY_NOTICES.md', 'dependencies.json') + $documentationFiles) | ForEach-Object {
+$checksums = @('yousage.exe', 'README.md', 'THIRD_PARTY_NOTICES.md', 'dependencies.json') | ForEach-Object {
     $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $releaseDirectory $_)).Hash.ToLowerInvariant()
     "$digest  $_"
 }
 [IO.File]::WriteAllText((Join-Path $releaseDirectory 'SHA256SUMS.txt'), ($checksums -join "`n") + "`n", [Text.Encoding]::ASCII)
 $archivePath = Join-Path $workspaceDirectory 'bin/yousage-0.1.0-windows-amd64.zip'
 $archiveFiles = @('yousage.exe', 'README.md', 'THIRD_PARTY_NOTICES.md', 'dependencies.json', 'SHA256SUMS.txt') | ForEach-Object { Join-Path $releaseDirectory $_ }
-$archiveFiles += Join-Path $releaseDirectory 'docs'
 Compress-Archive -LiteralPath $archiveFiles -DestinationPath $archivePath -Force
 Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath, $archivePath | Format-Table
 $archiveDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()

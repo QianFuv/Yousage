@@ -1,300 +1,88 @@
-# Persistent usage core
+# 持久化存储
 
-The app uses its own SQLite file, never a provider history database. Schema v2
-stores physical source fingerprints, ordered normalized usage facts, replayable
-EOF tails, completed-line checkpoints, source observations and versioned settings.
-It contains neither transcript text nor account credentials. Every connection
-enables foreign keys, a bounded busy timeout and WAL; write transactions acquire
-an immediate lock. Future schema versions are rejected without migration writes.
+应用使用自己的 SQLite 文件，从不写入 Provider 的历史数据库。数据库保存物理来源指纹、有序的归一化用量事实、
+可重放的末尾尾部、完整行检查点、来源观测和版本化设置，不包含转录文本和账户凭据。
+每个连接启用外键、有界忙等待和 WAL；写事务立即加锁。遇到更新版本的结构时拒绝打开，不做迁移写入。
 
-Collectors parse outside the transaction, then call `CommitFileWithTail` with the
-checkpoint revision they read. Rewrites replace committed facts, while append
-retains them. Both paths replace the previous tail, update the reducer/byte offset
-and commit together. Stale writes fail with `ErrConflict`. A read failure must
-call `Observe`, not commit an empty file. Failed observations preserve the last
-success time and all facts. Deduplication keys are not database unique constraints:
-forked copies remain available for window-specific, global aggregation.
+## 写入模型
 
-Prices and aliases are versioned per environment. Preferences validate before
-writing; whole-value saves and patches use compare-and-swap revisions. Unchanged
-environment rows survive patches. A new model alias removes that source model's
-override. Zero prices and omitted cache prices have different representations.
+采集器在事务外解析，然后携带读取时的检查点修订号调用 `CommitFileWithTail`。重写替换已提交的事实，
+追加则保留它们；两种路径都会替换旧尾部，并在同一事务中更新解析器状态和字节偏移。过期的写入返回 `ErrConflict`。
+读取失败时必须调用 `Observe`，而不是提交一个空文件；失败的观测保留上次成功时间和所有事实。
+去重键不是数据库唯一约束：分叉副本仍然保留，以便按窗口和全局分别聚合。
 
-Pure accounting follows t3code commit
-`51f7f77f87318a5329d3bab15d513fda5654200b`: exact custom IDs, override/reported/public
-precedence, contained reasoning, tiered rates, explicit unpriced provenance,
-alias-cycle handling and minute-anchored rolling windows. IANA zone data is
-embedded for independent Windows deployment. Calendar windows include today and
-subtract dates, while 24h windows retain exactly 24 duration-based slots over DST.
+价格和别名按环境版本化保存。偏好在写入前校验，整体保存和修补都使用修订号的比较并交换；
+修补不影响未改动的环境行。新的模型别名会移除该源模型的自定义价格。零价格和省略的缓存价格有不同的表示。
 
-Refresh coordination is per key. Manual requests share pending work and bypass
-automatic cooldown; settings changes can request a second scan after pending
-work settles. Limits cooldown starts at completion, including failure. History
-staleness is one minute, without an automatic timer. Public rates have a separate
-24h stale interval and a one-minute successful-fetch floor for forced refreshes.
-Hidden, minimized or Settings views do not start automatic operations. Caller
-cancellation stops waiting; the app-owned context cancels shared work on shutdown.
+## 计算与刷新
 
-F2 owns file discovery, parser states, 64-byte guards, retention and scanner
-integration. UI/service integration owns saved window/theme adoption and drafts.
-This core is not evidence that all provider or desktop interactions are complete.
+纯计算部分包括：精确的自定义 ID、自定义 / 上报 / 公开价格的优先级、推理 Token 包含在输出中、阶梯价格、
+明确的未定价来源、别名循环处理，以及按分钟对齐的滚动窗口。IANA 时区数据内嵌，便于 Windows 独立部署。
+日历窗口包含今天并按日期相减；24 小时窗口在夏令时切换时仍然恰好是 24 个按时长划分的槽。
 
-## Schema and migration
+刷新按键协调。手动请求共享进行中的工作并绕过自动冷却；设置变化可以在进行中的工作结束后再请求一次扫描。
+额度冷却从完成时（包括失败）开始计算。历史过期时间为 1 分钟，但没有自动定时器。公开价格另有 24 小时的
+过期时间，强制刷新在成功下载后至少间隔 1 分钟。隐藏、最小化或设置页面不会发起自动操作。
+调用方取消只停止等待；应用自有的上下文在退出时取消共享工作。
 
-Schema 2 keeps every normalized event and quota observation. `files` assigns an
-integer identity to each `(source_id, path)` pair. `checkpoints` uses that identity
-and stores revision and file modification time as columns. Sources, observations,
-settings and theme settings retain their existing representations.
+## 表结构（schema 2）
 
-`records` and `quotas` use `WITHOUT ROWID` primary keys
-`(file_id, is_tail, ordinal)`. Each event retains a compact record, including
-quota-only events, so existing readers can reconstruct the exact original
-sequence, counts and deduplication inputs. Every nonnil quota observation has its
-own `quotas` row. No observations are deduplicated or compressed into runs.
-`records_time(timestamp_ms, sequence)` supports bounded reads and preserves the
-legacy rowid tie break for the latest quota observation. There is no duplicate
-record primary-key index.
+- `files` 为每个 `(source_id, path)` 分配整数身份；`checkpoints` 使用该身份，并把修订号和文件修改时间
+  存为列。来源、观测、设置和主题设置沿用原有表示。
+- `records` 和 `quotas` 是 `WITHOUT ROWID` 表，主键为 `(file_id, is_tail, ordinal)`。每个事件都保留一条紧凑记录
+  （包括只含额度的事件），因此可以精确重建原始顺序、计数和去重输入。每个非空额度观测都有自己的 `quotas` 行，
+  观测不去重也不压缩。
+- `records_time(timestamp_ms, sequence)` 支持按时间范围读取，并保留原 rowid 的平局规则以确定最新的额度观测。
+- `strings` 字典使用稳定且永不复用的整数身份，引用计数与记录和额度观测在同一事务中变化；重写、尾部替换和保留清理
+  会回收不再使用的字符串。内存中的解码缓存保留见过的身份直到存储关闭，使较旧的 WAL 读取者能够完成；
+  字典未命中时在读取者已固定的连接和 WAL 快照内解析，不额外占用连接池。
 
-Payloads start with a version byte. Record payload v1 contains seven
-interned string identities, five signed token varints, and a cost-presence marker
-with an optional little-endian IEEE 754 float64. Timestamp, bucket and quota-only
-status live in relational columns. Quota payloads contain an interned plan,
-signed window count (`-1` means nil), and each window's interned identity, exact
-float64 percentage, signed duration and reset varints. Nil and empty observations,
-nil and zero cost pointers, window order and floating point bits are preserved.
-Record payload v2 appends a closed error-kind enum code and cache TTL varint to
-v1's fields. Record payload v3 appends the optional generation duration in
-milliseconds; existing v1/v2 rows remain readable with duration zero without a
-relational migration. The original seven dictionary string slots are unchanged.
-The enum stores no diagnostic text or extra dictionary identities. Quota payloads
-remain v1. Unknown versions and malformed payloads are rejected.
+## 负载编码
 
-The `strings` dictionary uses stable, never-reused integer identities. Reference
-counts change in the same transaction as records and quota observations; rewrites,
-tail replacement and retention reclaim unused strings. The in-memory decoding
-cache retains previously seen identities until the store closes, allowing older
-WAL readers to finish. Dictionary misses are resolved on the reader's already-pinned connection, within
-its WAL snapshot. This preserves concurrent read consistency without requesting
-another pool connection.
+负载首字节为版本号，未知版本和格式错误的负载都会被拒绝。
 
-Migration converts schema 1 in one transaction, including DDL, all records,
-quota JSON, checkpoints and the schema version. A conversion error or process
-termination before commit leaves schema 1 intact. Parser versions, checkpoint
-revisions and cache keys are preserved, so migration does not request reparsing.
-Retention still selects files strictly by checkpoint modification time; it never
-prunes events by their timestamps.
+| 记录负载版本 | 内容 |
+| --- | --- |
+| v1 | 七个字典字符串身份（Provider、模型、计价模型、会话、速度、去重键、来源路径）、五个有符号 Token varint、费用存在标记和可选的小端 IEEE 754 float64 |
+| v2 | 追加封闭的错误类型枚举码和缓存有效期 varint |
+| v3 | 追加生成耗时（毫秒） |
+| v4 | 追加上下文身份（字典字符串） |
+| v5 | 追加首字耗时（毫秒），当前写入版本 |
 
-After migration commits, `Open` runs SQLite's transactional `VACUUM`. SQLite
-publishes rebuilt pages through its normal WAL transaction; there is no manual
-rename or database-file swap. A killed or failed vacuum leaves a valid schema 2
-database. A persistent `vacuum_pending` marker requests another attempt on next
-open. The marker is cleared only after a successful vacuum and a checked
-`wal_checkpoint(TRUNCATE)` result. Reclamation errors explicitly report that the
-schema has migrated and reclamation will retry. Temporary disk space is needed
-for migration pages, the vacuum rebuild and WAL. Once schema 2 commits, older
-builds refuse it.
+旧版本的行仍可读取，缺失字段为零，无需关系迁移。时间戳、时间桶和“只含额度”状态存放在关系列中。
+枚举不保存诊断文本，也不增加字典身份。额度负载为 v1：字典中的套餐、有符号窗口数（`-1` 表示 nil），
+以及每个窗口的字典身份、精确的 float64 百分比、有符号时长和重置 varint。nil 与空观测、nil 与零费用、
+窗口顺序和浮点位都被精确保留。
 
-The existing 4096-byte page size is retained. On the measured real-data copy,
-`WITHOUT ROWID` used 22,323,200 bytes versus 24,915,968 bytes for an integer
-primary key plus a unique file/ordinal index. An 8192-byte page size saved only
-24,576 bytes, while 16384-byte pages were larger; neither justified changing the
-existing page size.
+## 迁移
 
-## Real-data verification
+schema 1 在一个事务中完成转换，包括 DDL、全部记录、额度 JSON、检查点和结构版本。转换出错或进程在提交前终止时，
+schema 1 保持完整。解析器版本、检查点修订号和缓存键都保留，因此迁移不会触发重新解析。
+保留清理仍严格按检查点的修改时间选择文件，从不按事件时间戳删除事件。
 
-The migration was measured with Go 1.26.2 and modernc.org/sqlite on a copy of the
-application database and its WAL/SHM files. The original database hash remained
-unchanged. The harness lived outside the repository; provider histories were read
-only, native probes used the stored `local-quotas` setting, and rate refresh used
-stored rates. No bindings or provider history files were changed.
+迁移提交后，`Open` 执行 SQLite 的事务性 `VACUUM`，重建后的页面通过正常的 WAL 事务发布，不做手动重命名或文件替换。
+被杀死或失败的 vacuum 会留下有效的 schema 2 数据库，持久化的 `vacuum_pending` 标记会在下次打开时重试；
+只有 vacuum 成功且 `wal_checkpoint(TRUNCATE)` 检查通过后才清除该标记。迁移页面、vacuum 重建和 WAL 需要临时磁盘空间。
+schema 2 提交后，旧版本程序会拒绝打开。
 
-Before migration: 195,592,192 bytes. After migration, before reclamation:
-216,645,632 bytes. After reclamation: 22,323,200 bytes (88.6% smaller). Migration
-took 18,711.518 ms; reclamation took 2,097.942 ms. Integrity checking returned `ok`,
-and foreign-key checking returned no rows.
+页面大小保持 4096 字节。在实测数据副本上，`WITHOUT ROWID` 占用 22,323,200 字节，而整数主键加唯一索引需要
+24,915,968 字节；8192 字节页面只节省 24,576 字节，16384 字节页面反而更大。
 
-Post-reclamation `dbstat` sizes:
+## 读取性能
 
-| Objects | Bytes |
-| --- | ---: |
-| records | 9,764,864 |
-| quotas | 6,270,976 |
-| records_time | 4,685,824 |
-| checkpoints | 598,016 |
-| files and unique index | 413,696 |
-| strings and unique index | 233,472 |
-| settings | 331,776 |
-| sources, source/settings indexes, schema, sequence, storage_meta | 24,576 |
+- `HistoryCacheKey` 保持原有字符串格式，并在一个专用观察连接上根据 `PRAGMA data_version` 复用；
+  本地和外部提交都会使其失效，其余四个连接仍可用于连接池。
+- 已保存的价格每个设置修订号只解码一次，其规范 JSON 复用于缓存指纹；每次用量请求中每个 Provider 主目录只解析一次。
+- 最新的 Codex 额度读取缓存解码后的观测，直到历史变化或下一个未来时间戳的额度生效；返回的窗口是副本。
+- 按文件缓存的记录延迟到符合请求窗口时才解码，先按文件过滤再读取记录，保留重放和移动文件的去重顺序；
+  延迟读事务保证检查点修订号与解码的事实来自同一个 WAL 快照。
+- 采集器使用目录项元数据、保留符号链接跟随、批量读取检查点、按文件主键计数记录，并跳过空的保留事务。
 
-All 214,677 records and 170,958 quota observations were retained. Canonical record
-and checkpoint JSON hashes matched. Complete Usage JSON for 24h, 7d, 30d and 90d,
-including cycle values, matched byte for byte at the same fixed clock
-(`2026-10-07T08:00:00Z`). Checkpoint parser versions remained unchanged, including
-443 Codex files still at parser version 1.
+在真实数据副本（约 21 万条记录、17 万次额度观测）上的参考测量：迁移把数据库从 195.6 MB 缩小到 22.3 MB
+（减少 88.6%），`integrity_check` 返回 `ok`，`foreign_key_check` 无结果，迁移前后 24 小时 / 7 天 / 30 天 / 90 天
+的完整用量 JSON（包括周期价值）逐字节一致。五次运行的中位数：24 小时冷读约 1.9 秒，热读约 33 毫秒，
+转录追加后的用量读取约 219 毫秒，无变化的后台跟进约 304 毫秒，`RefreshLimits` 几乎立即返回。
+这些是服务层 API 的测量结果，不含原生进程和网络延迟，也不代表操作系统缓存的冷启动。
 
-Fixture tests cover every record field, nil versus zero costs, exact float bits,
-nil versus empty windows, multiple source/path identities, tails, quota-only
-events, timestamp ties, parser versions, cache keys, accounting and complete
-Usage/cycle views. An injected conversion failure and a killed process after
-conversion but before commit both preserved the complete logical v1 database.
-Concurrent dictionary reads are also tested across another store's rewrite.
-
-Final API timing run (milliseconds), with 24h/7d/30d/90d read in order and each
-window read twice:
-
-| Measurement | Fresh v1 copy | Schema 2 | Supplied round 7 |
-| --- | ---: | ---: | ---: |
-| Usage 24h cold | 6874.853 | 2311.316 | 2017 |
-| Usage 24h warm | 423.807 | 223.861 | 39 |
-| Usage 7d first read | 1207.771 | 797.805 | |
-| Usage 7d warm | 557.440 | 218.920 | |
-| Usage 30d first read | 2094.361 | 1563.344 | |
-| Usage 30d warm | 605.077 | 210.331 | |
-| Usage 90d first read | 9589.120 | 6533.352 | |
-| Usage 90d warm | 609.005 | 202.247 | |
-| Usage 24h after append | 2664.578 | 1286.794 | 167 |
-| No-change background follow-up | 2738.508 | 1928.999 | 1200 |
-
-The append adds one normalized usage fact through CommitFile on the copy; its
-timing covers Usage after invalidation, excluding the commit. Background timing
-uses read-only live provider histories after settling their initial scan. The
-fresh v1 copy's initial follow-up took 83,050.726 ms and included outstanding
-parser-version updates. Migration itself does not change parser versions.
-
-All measured APIs improved over the fresh v1 copy in this session. The historical
-round-7 latencies were not reproduced by the fresh v1 baseline, and the final run
-did not meet those historical figures. No functional or observation reduction
-was used to improve these measurements.
-
-Final checks: `go test -p 1 ./...` reported 270 passes in 20 packages;
-`go vet ./...` and `go build ./...` exited successfully without diagnostics;
-`gofmt -l .` reported no files. Bindings were unchanged by this storage round.
-
-SQLite's [VACUUM documentation](https://www.sqlite.org/lang_vacuum.html) describes
-rebuilding into a temporary database and publishing the rebuilt contents using a
-normal rollback-journal or WAL transaction.
-
-## Latency follow-up (2026-10-08)
-
-The same disposable Go test harness measured the round-8 implementation and this
-follow-up using Go 1.26.2. It copied the application database, WAL and SHM before
-opening any database. Original database/WAL SHA-256 hashes remained unchanged.
-The live Codex and Claude homes were read-only; native probes returned the saved
-`local-quotas` snapshot, and public prices remained local and fresh.
-
-Preparation settled outstanding parser upgrades outside the timing samples
-(82,596.026 ms). The no-change measurement settled each live-history copy again
-immediately before timing `RefreshLimits` and its accepted background worker.
-For Usage, the newest Codex session was copied into a throwaway `CODEX_HOME`;
-only the copied database's source/file identities and configuration were remapped,
-preserving the other cached files. Each of five runs restored that database and
-session, opened a new service, read cold 24h Usage, repeated warm 24h Usage five
-times, appended one synthetic `token_count` event with `rate_limits`, waited for
-the real background history/rates follow-up, then read Usage. The 7d/30d/90d
-windows were each primed and read warm in every run. No direct `CommitFile`
-append was substituted for transcript parsing. The clock and inputs were shared
-between implementations. Preparation, migration and `Open` are excluded from
-the cold Usage metric, matching the earlier round-7 API measurement.
-
-All values below are milliseconds, with five-run medians. The 24h warm result is
-the median of each run's five warm reads, then the median across the five runs.
-
-| Measurement | Round 8, same harness | Latency follow-up | Target |
-| --- | ---: | ---: | ---: |
-| Usage 24h cold | 2811.640 | 1894.259 | <= 2000 |
-| Usage 24h warm | 101.090 | 33.349 | <= 50 |
-| Usage after transcript append | 291.487 | 218.843 | <= 300 |
-| Append background follow-up | 355.133 | 227.429 | |
-| No-change background follow-up | 2499.445 | 304.460 | <= 1200 |
-| Usage 7d warm | 102.015 | 27.229 | |
-| Usage 30d warm | 99.072 | 30.324 | |
-| Usage 90d warm | 96.958 | 30.447 | |
-| RefreshLimits return | 1.124 | 0.553 | approximately immediate |
-
-All requested targets passed. Final cold samples ranged from 833.429 to
-1992.275 ms; after-append samples ranged from 85.612 to 242.684 ms. These are
-API/service cold reads, not cold operating-system caches. Native process and
-network latency is excluded by the requested stored-snapshot stubs.
-
-CPU and allocation profiles were collected separately for 30 warm Usage calls,
-one post-append Usage call, and three no-change follow-ups. Allocation figures
-are sampled `alloc_space` deltas after GC, including a small profiler overhead:
-
-| Profile workload | Before allocated | After allocated | Main costs |
-| --- | ---: | ---: | --- |
-| 30 warm Usage calls | 259.13 MiB | 51.17 MiB | Before: repeated price JSON decoding, path/revision keys and provider-home resolution. After: cache-key JSON compaction and metadata reads. |
-| One post-append Usage | 51.44 MiB | 21.91 MiB | Bounded record reads, deduplication, repricing and active-cycle reconstruction. The final short CPU sample is coarse. |
-| Three follow-ups | 27.33 MiB | 13.40 MiB | Before: Windows file stats and individual checkpoint reads. After: directory enumeration and batched checkpoint decoding. |
-
-Before, warm `Rates` occupied 27.72% of sampled CPU cumulatively and repeated
-physical-home resolution occupied 23.10%. No-change `os.Stat` occupied 74.27%.
-After, warm JSON compaction remained the largest sampled leaf; follow-up
-directory enumeration occupied 50% cumulatively. Cold profiling also identified
-an avoidable SQL ordering sort, repeated negative native-package probes, and
-growing record/observation slices. Query-plan checks showed the old Codex range
-reader used a temporary ORDER BY B-tree; the file-first reader uses existing
-file and record primary-key order without that temporary sort.
-
-The changes retain schema 2 and binary payload version 1:
-
-- `HistoryCacheKey` preserves its exact existing string format and reuses keys
-  under `PRAGMA data_version` on one dedicated observer connection. Local and
-  external commits invalidate that observer; four other pooled connections
-  remain available.
-- Saved prices are decoded once per setting revision and their canonical JSON
-  is reused in cache fingerprints. Provider source selection resolves each home
-  once per Usage call without repeated volume-identity discovery.
-- Latest Codex quota reads cache the decoded observation until history changes
-  or the next future quota timestamp becomes eligible. Returned windows are
-  copied, so callers cannot mutate the cached observation.
-- Collectors use directory-entry metadata, preserve symlink following, batch
-  checkpoints, count records by file primary key, and skip empty retention
-  transactions. Codex range reads filter eligible files before replaying rows.
-- Deduplication, source projections, priced histories and cycle groups avoid
-  repeated slice growth. Cycle groups share disjoint slices of their sorted
-  observations. Windows discovery skips absent native-package directories.
-
-Regression tests cover price-cache reuse and revision invalidation, quota-cache
-reads without record decoding, future/backwards-clock eligibility, independent
-returned windows, and another Store's append/retention invalidation. Safe source
-overlays restored the old functions without changing the working tree: both new
-reuse regressions failed before their fixes, with `warm quota read decoded
-record strings` and `unchanged prices were decoded again`; the full suite passes
-with the fixes. Existing cycle tests continue to pin completed-fit reuse after
-an append. Post-append projections still reread their bounded active ranges;
-this round does not add a general per-record cache or claim that only the new
-event is decoded.
-
-The real v1 copy was also read with the legacy JSON storage implementation and
-equivalent bounded readers. Its complete Usage JSON, including cycleValues,
-matched the migrated implementation byte for byte for 24h, 7d, 30d and 90d at
-`2026-10-07T08:00:00Z`. The exact shared SHA-256 values were:
-
-```text
-24h e0bf5046af3ee6b76d125e8e39b5d1f861eb615fe7416b6f8770011cc761ae8c
-7d  f082c90d19e2c361506c868b99815bd1cf38ba9472c051e4c18248745df152ce
-30d d38459e89578ca115e764a15447d293e16ba83609122eeb90c4bdf30052b4667
-90d f2a5baa6560c9fb9a69278f6477c8e5ef58a536303d80d8b1ca227ef02404b0b
-```
-
-The migrated copy retained 214,677 records and 170,958 quota observations;
-`integrity_check` returned `ok`, and `foreign_key_check` returned zero rows.
-The disposable harness, copied histories/databases, binaries and profiles were
-removed after their results were recorded here. No protected frontend/tools
-files or Git/index state were changed by this follow-up.
-
-Actual final checks:
-
-```text
-go test -p 1 ./...  -> Go test: 273 passed in 20 packages
-go vet ./...       -> exit 0, no diagnostics
-gofmt -l .         -> exit 0, no files
-go build ./...     -> exit 0, no diagnostics
-git diff --check   -> exit 0, no diagnostics
-```
-
-Files changed in this follow-up: `internal/storage/{store.go,history.go,
-cache_test.go,README.md}`, `internal/history/{collector.go,transcripts.go}`,
-`internal/service/{service.go,rates.go,rates_cache_test.go,history.go,
-cycle_values.go,discovery.go}`, and `internal/quota/cycle_prior.go`. Earlier
-uncommitted work was preserved.
+SQLite 的 [VACUUM 文档](https://www.sqlite.org/lang_vacuum.html) 说明了先重建到临时数据库、
+再通过正常回滚日志或 WAL 事务发布重建内容的过程。
