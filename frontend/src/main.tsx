@@ -14,7 +14,7 @@ import { createRoot } from "react-dom/client";
 import { DataProvider, useData } from "./usage/controller";
 import { UsagePage } from "./usage/UsagePage";
 
-import * as nativeApi from "../bindings/yousage/app";
+import * as nativeApi from "../bindings/yousage/internal/desktop/app";
 import { canvasBackground, sidebarBackground } from "./native";
 import { configureTimestampLocale } from "../vendor/timestampFormat";
 import {
@@ -30,7 +30,7 @@ import {
   applySavedAppearance,
   useAppearance,
 } from "./theme/appearance";
-import type { ThemeFileInput } from "../bindings/yousage/models";
+import type { ThemeFileInput } from "../bindings/yousage/internal/desktop/models";
 import {
   ArrowLeftIcon,
   ChartNoAxesCombinedIcon,

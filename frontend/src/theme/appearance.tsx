@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { Events } from "@wailsio/runtime";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import * as models from "../../bindings/yousage/internal/theme/models";
 import {
   applyThemePalette,

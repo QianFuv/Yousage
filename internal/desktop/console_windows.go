@@ -1,4 +1,4 @@
-package main
+package desktop
 
 import (
 	"golang.org/x/sys/windows"

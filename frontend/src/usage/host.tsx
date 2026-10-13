@@ -3,7 +3,7 @@ import { msg, t } from "../i18n";
 import { formatUpcomingTimestamp as upstreamUpcomingTimestamp } from "../../vendor/timestampFormat";
 import { useData } from "./controller";
 import { useRef, useState } from "react";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
 import { RedeemRoute } from "../../bindings/yousage/internal/quota/models";
 import type { ProviderConsumeResetCreditInput } from "./contracts";

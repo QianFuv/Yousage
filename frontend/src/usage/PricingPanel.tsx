@@ -1,7 +1,7 @@
 /** Adapt the native pricing transaction to the original per-environment table. */
 import { SettingsPriceEditor } from "../../vendor/SettingsPriceEditor";
 import { useData } from "./controller";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
 import { PricingPatch } from "../../bindings/yousage/internal/preferences/models";
 import type { UsagePriceTarget } from "../../vendor/usagePriceTargets";

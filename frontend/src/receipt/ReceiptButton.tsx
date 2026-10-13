@@ -12,7 +12,7 @@ import { CopyIcon, ReceiptTextIcon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { t } from "../i18n";
 import { usePeriodDays } from "../usage/PeriodToggle";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import type { Receipt } from "../../bindings/yousage/internal/service/models";
 import { ReceiptPaper } from "./ReceiptPaper";
 import { copyReceiptImage } from "./exportReceipt";

@@ -17,7 +17,8 @@ Yousage 是单个 Go 程序，使用 Wails `3.0.0-beta.28` 承载内嵌的 React
 
 | 目录 | 职责 |
 | --- | --- |
-| `main.go`、`app*.go`、`desktop.go`、`tray.go` | 应用入口、Wails 绑定、窗口尺寸与位置、关闭确认、托盘、剪贴板、诊断导出 |
+| `main.go` | 程序入口与前端、图标资源内嵌 |
+| `internal/desktop` | 应用启动、Wails 绑定、窗口尺寸与位置、关闭确认、托盘、系统区域设置、剪贴板、诊断导出与平台适配 |
 | `internal/domain` | 归一化记录、Token 分类、额度窗口等领域类型 |
 | `internal/history` | 各 Provider 的历史读取器、增量检查点与流式 JSON 投影 |
 | `internal/storage` | SQLite 存储：记录、额度观测、检查点、设置与字符串字典 |

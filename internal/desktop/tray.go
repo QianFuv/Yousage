@@ -1,4 +1,4 @@
-package main
+package desktop
 
 import "github.com/wailsapp/wails/v3/pkg/application"
 
@@ -13,9 +13,9 @@ type TrayLabels struct {
 }
 
 // installTray adds the notification-area icon whose click restores the retained page.
-func (service *App) installTray() {
+func (service *App) installTray(icon []byte) {
 	tray := service.nativeApp.SystemTray.New()
-	tray.SetIcon(trayIcon)
+	tray.SetIcon(icon)
 	tray.SetTooltip("Yousage")
 	tray.SetMenu(service.trayMenu(TrayLabels{Usage: "Usage", Quota: "Quota", Loss: "Loss", Speed: "Speed", Settings: "Settings", Quit: "Quit"}))
 	tray.OnClick(service.ShowWindow)

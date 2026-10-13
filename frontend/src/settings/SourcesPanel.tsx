@@ -7,12 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import { ScanSearchIcon } from "lucide-react";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
   SavedConfiguration,
   type ProviderDetection,
 } from "../../bindings/yousage/internal/service/models";
-import { SavedSources } from "../../bindings/yousage/models";
+import { SavedSources } from "../../bindings/yousage/internal/desktop/models";
 import { useData } from "../usage/controller";
 import { t } from "../i18n";
 import { Notice, PageBody, PageHeader, SettingsSection } from "../ui";

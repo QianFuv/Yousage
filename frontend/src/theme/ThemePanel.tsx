@@ -29,8 +29,8 @@ import {
   ToggleGroup,
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { parse as parseJsonc } from "jsonc-parser";
-import * as nativeApi from "../../bindings/yousage/app";
-import type { ThemeFileInput } from "../../bindings/yousage/models";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
+import type { ThemeFileInput } from "../../bindings/yousage/internal/desktop/models";
 import * as models from "../../bindings/yousage/internal/theme/models";
 import { ThemeEditorPanel } from "../../vendor/ThemeEditorPanel";
 import {

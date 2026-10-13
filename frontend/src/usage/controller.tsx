@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Events } from "@wailsio/runtime";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { SavedDisplay } from "../../bindings/yousage/internal/preferences/models";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
 import type { UsageSnapshot } from "./data";

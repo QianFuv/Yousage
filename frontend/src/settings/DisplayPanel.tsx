@@ -1,7 +1,7 @@
 /** Immediate display preferences acknowledge durable native state before updating controls. */
 import { useState } from "react";
 import { useData } from "../usage/controller";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
   Notice,
   OptionSelect,

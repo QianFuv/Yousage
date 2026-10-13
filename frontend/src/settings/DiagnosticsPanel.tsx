@@ -1,7 +1,7 @@
 /** Diagnostics export is an explicit native action over a backend-owned whitelist. */
 import { useEffect, useState } from "react";
 import { CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { t } from "../i18n";
 import {
   Notice,

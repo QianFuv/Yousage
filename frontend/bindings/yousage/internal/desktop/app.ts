@@ -12,22 +12,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as preferences$0 from "./internal/preferences/models.js";
+import * as preferences$0 from "../preferences/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as quota$0 from "./internal/quota/models.js";
+import * as quota$0 from "../quota/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as refresh$0 from "./internal/refresh/models.js";
+import * as refresh$0 from "../refresh/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as remote$0 from "./internal/remote/models.js";
+import * as remote$0 from "../remote/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as service$0 from "./internal/service/models.js";
+import * as service$0 from "../service/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as theme$0 from "./internal/theme/models.js";
+import * as theme$0 from "../theme/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -37,7 +37,7 @@ import * as $models from "./models.js";
  * ApplyPricing saves each destination independently and reports ambiguous remote writes.
  */
 export function ApplyPricing(identities: string[], patch: preferences$0.PricingPatch): $CancellablePromise<remote$0.SaveOutcome[]> {
-    return $Call.ByID(3520645103, identities, patch).then(($result: any) => {
+    return $Call.ByID(2285016850, identities, patch).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -46,14 +46,14 @@ export function ApplyPricing(identities: string[], patch: preferences$0.PricingP
  * ConfirmClose refuses exit while external writes are pending, then allows the native close hook once.
  */
 export function ConfirmClose(): $CancellablePromise<void> {
-    return $Call.ByID(4181451325);
+    return $Call.ByID(4286855540);
 }
 
 /**
  * ConsumeResetCredit uses an explicit caller operation identity and durable recovery before sending.
  */
 export function ConsumeResetCredit(route: quota$0.RedeemRoute, operationId: string, isExplicitRetry: boolean): $CancellablePromise<quota$0.ResetResult> {
-    return $Call.ByID(529082913, route, operationId, isExplicitRetry).then(($result: any) => {
+    return $Call.ByID(4269291632, route, operationId, isExplicitRetry).then(($result: any) => {
         return $$createType2($result);
     });
 }
@@ -62,14 +62,14 @@ export function ConsumeResetCredit(route: quota$0.RedeemRoute, operationId: stri
  * CopyText checks native clipboard success and bounds the explicit user-selected content.
  */
 export function CopyText(value: string): $CancellablePromise<void> {
-    return $Call.ByID(2798394763, value);
+    return $Call.ByID(4291212070, value);
 }
 
 /**
  * DetectProviders checks registered installation locations without executing account probes.
  */
 export function DetectProviders(): $CancellablePromise<service$0.ProviderDetection[]> {
-    return $Call.ByID(2564077708).then(($result: any) => {
+    return $Call.ByID(3021794615).then(($result: any) => {
         return $$createType4($result);
     });
 }
@@ -78,14 +78,14 @@ export function DetectProviders(): $CancellablePromise<service$0.ProviderDetecti
  * DiscardDraftCredentials can delete only unsaved references created by this session.
  */
 export function DiscardDraftCredentials(identities: string[]): $CancellablePromise<void> {
-    return $Call.ByID(3076200806, identities);
+    return $Call.ByID(1294731373, identities);
 }
 
 /**
  * EnableCursorKeychain forwards a deliberate account access opt-in to its owning environments.
  */
 export function EnableCursorKeychain(identities: string[]): $CancellablePromise<remote$0.SaveOutcome[]> {
-    return $Call.ByID(3128816296, identities).then(($result: any) => {
+    return $Call.ByID(2151426045, identities).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -94,28 +94,28 @@ export function EnableCursorKeychain(identities: string[]): $CancellablePromise<
  * ExportDiagnostics writes only the same whitelisted report after an explicit native Save dialog.
  */
 export function ExportDiagnostics(): $CancellablePromise<boolean> {
-    return $Call.ByID(4266831633);
+    return $Call.ByID(329665966);
 }
 
 /**
  * ExportTheme uses the native save dialog for a portable validated version-one theme.
  */
 export function ExportTheme(definition: theme$0.Definition): $CancellablePromise<boolean> {
-    return $Call.ByID(3294236452, definition);
+    return $Call.ByID(1074974175, definition);
 }
 
 /**
  * FrontendReady reveals the window after the frontend applies its theme.
  */
 export function FrontendReady(): $CancellablePromise<void> {
-    return $Call.ByID(645226692);
+    return $Call.ByID(1956405923);
 }
 
 /**
  * GetAppearance returns saved authoritative state and current published palettes before first paint.
  */
 export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
-    return $Call.ByID(3469612837).then(($result: any) => {
+    return $Call.ByID(1580242582).then(($result: any) => {
         return $$createType5($result);
     });
 }
@@ -124,7 +124,7 @@ export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
  * GetBootstrap returns native preferences after application initialization.
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
-    return $Call.ByID(2483192963).then(($result: any) => {
+    return $Call.ByID(234512250).then(($result: any) => {
         return $$createType6($result);
     });
 }
@@ -133,7 +133,7 @@ export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
  * GetConfiguration returns connection metadata and native target references without credentials.
  */
 export function GetConfiguration(): $CancellablePromise<service$0.SavedConfiguration> {
-    return $Call.ByID(1089004527).then(($result: any) => {
+    return $Call.ByID(138867414).then(($result: any) => {
         return $$createType7($result);
     });
 }
@@ -142,14 +142,14 @@ export function GetConfiguration(): $CancellablePromise<service$0.SavedConfigura
  * GetDiagnostics emits an explicit whitelist without credentials, URLs, account identities, paths or raw errors.
  */
 export function GetDiagnostics(): $CancellablePromise<string> {
-    return $Call.ByID(2811458213);
+    return $Call.ByID(2475500144);
 }
 
 /**
  * GetDisplay returns ordinary saved display preferences independently of theme drafts.
  */
 export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
-    return $Call.ByID(2885542999).then(($result: any) => {
+    return $Call.ByID(2217068354).then(($result: any) => {
         return $$createType8($result);
     });
 }
@@ -158,14 +158,14 @@ export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
  * GetLocalEnvironmentId supplies stable local selection independently of summary availability.
  */
 export function GetLocalEnvironmentId(): $CancellablePromise<string> {
-    return $Call.ByID(2299238358);
+    return $Call.ByID(3972259389);
 }
 
 /**
  * GetLossReport returns local cache-expiry observations.
  */
 export function GetLossReport(days: number, timeZone: string): $CancellablePromise<service$0.LossReport> {
-    return $Call.ByID(4060904650, days, timeZone).then(($result: any) => {
+    return $Call.ByID(3548485653, days, timeZone).then(($result: any) => {
         return $$createType9($result);
     });
 }
@@ -174,7 +174,7 @@ export function GetLossReport(days: number, timeZone: string): $CancellablePromi
  * GetReceipt returns a local trailing-window receipt using the Usage pricing pipeline.
  */
 export function GetReceipt(days: number, timeZone: string): $CancellablePromise<service$0.Receipt> {
-    return $Call.ByID(2732409345, days, timeZone).then(($result: any) => {
+    return $Call.ByID(887616352, days, timeZone).then(($result: any) => {
         return $$createType10($result);
     });
 }
@@ -183,7 +183,7 @@ export function GetReceipt(days: number, timeZone: string): $CancellablePromise<
  * GetSources returns saved source choices independently of quota enablement.
  */
 export function GetSources(): $CancellablePromise<$models.SavedSources> {
-    return $Call.ByID(3791071355).then(($result: any) => {
+    return $Call.ByID(3891224558).then(($result: any) => {
         return $$createType11($result);
     });
 }
@@ -192,7 +192,7 @@ export function GetSources(): $CancellablePromise<$models.SavedSources> {
  * GetSpeedReport returns local generation throughput separated by billing speed tier.
  */
 export function GetSpeedReport(days: number, timeZone: string): $CancellablePromise<service$0.SpeedReport> {
-    return $Call.ByID(636242544, days, timeZone).then(($result: any) => {
+    return $Call.ByID(1696078537, days, timeZone).then(($result: any) => {
         return $$createType12($result);
     });
 }
@@ -201,7 +201,7 @@ export function GetSpeedReport(days: number, timeZone: string): $CancellableProm
  * GetUsage returns the requested live/cached environment aggregates.
  */
 export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
-    return $Call.ByID(2234764926, days, timeZone).then(($result: any) => {
+    return $Call.ByID(2994566643, days, timeZone).then(($result: any) => {
         return $$createType13($result);
     });
 }
@@ -210,21 +210,21 @@ export function GetUsage(days: number, timeZone: string): $CancellablePromise<se
  * OpenDocumentation opens only the fixed official documentation destination.
  */
 export function OpenDocumentation(): $CancellablePromise<void> {
-    return $Call.ByID(3754150517);
+    return $Call.ByID(3478086122);
 }
 
 /**
  * OpenExternal permits a user-selected public HTTP(S) account or documentation destination.
  */
 export function OpenExternal(destination: string): $CancellablePromise<void> {
-    return $Call.ByID(4238767710, destination);
+    return $Call.ByID(4265254175, destination);
 }
 
 /**
  * PairEnvironment stores only a native secret reference; the bootstrap is transient.
  */
 export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
-    return $Call.ByID(1066918238, origin, label, bootstrap, isReadOnly).then(($result: any) => {
+    return $Call.ByID(3805514037, origin, label, bootstrap, isReadOnly).then(($result: any) => {
         return $$createType14($result);
     });
 }
@@ -233,7 +233,7 @@ export function PairEnvironment(origin: string, label: string, bootstrap: string
  * PickThemeFiles opens the native picker; cancellation leaves the import draft untouched.
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
-    return $Call.ByID(1388571440).then(($result: any) => {
+    return $Call.ByID(4260808657).then(($result: any) => {
         return $$createType16($result);
     });
 }
@@ -242,7 +242,7 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  * ReadThemeFiles reads only explicitly picked/dropped paths after checking size and type.
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
-    return $Call.ByID(3002950989, paths).then(($result: any) => {
+    return $Call.ByID(3937500892, paths).then(($result: any) => {
         return $$createType16($result);
     });
 }
@@ -251,28 +251,28 @@ export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.The
  * RecenterWindow recovers an offscreen window without changing saved scale or display preferences.
  */
 export function RecenterWindow(): $CancellablePromise<void> {
-    return $Call.ByID(3259341121);
+    return $Call.ByID(4244914996);
 }
 
 /**
  * RefreshLimits refreshes quota observations without issuing model turns.
  */
 export function RefreshLimits(selected: string[], request: refresh$0.Request): $CancellablePromise<void> {
-    return $Call.ByID(59860548, selected, request);
+    return $Call.ByID(1283336639, selected, request);
 }
 
 /**
  * RefreshUsage coalesces selected scans with foreground-only automatic refresh policy.
  */
 export function RefreshUsage(days: number, timeZone: string, selected: string[], request: refresh$0.Request): $CancellablePromise<void> {
-    return $Call.ByID(2450955827, days, timeZone, selected, request);
+    return $Call.ByID(349957434, days, timeZone, selected, request);
 }
 
 /**
  * SaveAppearance commits the complete intended library and selection atomically.
  */
 export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $CancellablePromise<theme$0.LibrarySnapshot> {
-    return $Call.ByID(2592400194, revision, value).then(($result: any) => {
+    return $Call.ByID(1406368615, revision, value).then(($result: any) => {
         return $$createType5($result);
     });
 }
@@ -281,7 +281,7 @@ export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $
  * SaveConfiguration applies an explicit connection/provider draft.
  */
 export function SaveConfiguration(saved: service$0.SavedConfiguration): $CancellablePromise<service$0.SavedConfiguration> {
-    return $Call.ByID(2212158658, saved).then(($result: any) => {
+    return $Call.ByID(1220111841, saved).then(($result: any) => {
         return $$createType7($result);
     });
 }
@@ -290,7 +290,7 @@ export function SaveConfiguration(saved: service$0.SavedConfiguration): $Cancell
  * SaveDisplay atomically persists a validated ordinary preference update.
  */
 export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellablePromise<preferences$0.SavedDisplay> {
-    return $Call.ByID(920552350, saved).then(($result: any) => {
+    return $Call.ByID(2913585293, saved).then(($result: any) => {
         return $$createType8($result);
     });
 }
@@ -299,7 +299,7 @@ export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellableProm
  * SaveSources persists a complete explicitly applied roots draft.
  */
 export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
-    return $Call.ByID(23962130, saved).then(($result: any) => {
+    return $Call.ByID(430430537, saved).then(($result: any) => {
         return $$createType11($result);
     });
 }
@@ -308,35 +308,35 @@ export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$m
  * SetCloseBridge activates only after a mounted frontend subscribes to closing requests.
  */
 export function SetCloseBridge(isActive: boolean): $CancellablePromise<void> {
-    return $Call.ByID(909584628, isActive);
+    return $Call.ByID(666619873, isActive);
 }
 
 /**
  * SetTrayLabels replaces the tray menu after the frontend resolves its language.
  */
 export function SetTrayLabels(labels: $models.TrayLabels): $CancellablePromise<void> {
-    return $Call.ByID(2665324948, labels);
+    return $Call.ByID(4070883519, labels);
 }
 
 /**
  * ShowWindow reveals a hidden or minimized window without changing its retained page.
  */
 export function ShowWindow(): $CancellablePromise<void> {
-    return $Call.ByID(31117496);
+    return $Call.ByID(3769548585);
 }
 
 /**
  * StageHubCredential stores a fresh native reference; the frontend never reads a saved key.
  */
 export function StageHubCredential(origin: string, value: string): $CancellablePromise<string> {
-    return $Call.ByID(584700173, origin, value);
+    return $Call.ByID(2209570472, origin, value);
 }
 
 /**
  * SyncAppearance updates an opaque background and the native frame caption, which matches the sidebar.
  */
 export function SyncAppearance(isDark: boolean, red: number, green: number, blue: number, captionRed: number, captionGreen: number, captionBlue: number): $CancellablePromise<void> {
-    return $Call.ByID(757831160, isDark, red, green, blue, captionRed, captionGreen, captionBlue);
+    return $Call.ByID(3959541721, isDark, red, green, blue, captionRed, captionGreen, captionBlue);
 }
 
 // Private type creation functions

@@ -33,7 +33,7 @@ import { t } from "../i18n";
 import { useData } from "./controller";
 import { PeriodToggle } from "./PeriodToggle";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 
 /** Preserve null All and explicit empty selection while exposing coverage inside the environment filter. */
 export function UsagePage({

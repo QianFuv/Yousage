@@ -7,7 +7,7 @@ import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as preferences$0 from "./internal/preferences/models.js";
+import * as preferences$0 from "../preferences/models.js";
 
 /**
  * Bootstrap supplies native appearance and regional preferences before rendering.

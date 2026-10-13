@@ -2,7 +2,8 @@ import "culori/css";
 import { converter, parse } from "culori/fn";
 
 /** Native fixture DTO comes directly from Wails generated Go bindings. */
-export type Bootstrap = import("../bindings/yousage/models").Bootstrap;
+export type Bootstrap =
+  import("../bindings/yousage/internal/desktop/models").Bootstrap;
 
 /** Keep absolute dropped paths out of status text and diagnostics. */
 export function droppedNames(paths: string[]): string[] {

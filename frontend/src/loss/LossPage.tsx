@@ -23,7 +23,7 @@ import {
   ProviderSummaryRow,
 } from "../usage/ProviderSummaryRow";
 import type { UsageProviderKind } from "../usage/contracts";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import type {
   LossDay,
   LossEvent,

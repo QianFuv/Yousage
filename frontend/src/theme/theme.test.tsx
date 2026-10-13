@@ -10,7 +10,7 @@ vi.mock("@wailsio/runtime", async () => ({
   )),
   Events: { On: () => () => {} },
 }));
-vi.mock("../../bindings/yousage/app", () => ({}));
+vi.mock("../../bindings/yousage/internal/desktop/app", () => ({}));
 import {
   collectionOwners,
   survivingCollectionVariant,

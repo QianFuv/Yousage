@@ -23,7 +23,7 @@ import {
   orderProviders,
   ProviderSummaryRow,
 } from "../usage/ProviderSummaryRow";
-import * as nativeApi from "../../bindings/yousage/app";
+import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import type {
   SpeedBucket,
   SpeedModel,
