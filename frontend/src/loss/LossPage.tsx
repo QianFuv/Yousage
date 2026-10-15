@@ -321,7 +321,9 @@ function LossEvents({
               <th className="hidden py-2 pl-6 font-normal md:table-cell">
                 {t("Gap")}
               </th>
-              <th className="py-2 pl-6 font-normal">{t("Tokens")}</th>
+              <th className="hidden py-2 pl-6 font-normal md:table-cell">
+                {t("Tokens")}
+              </th>
               <th className="py-2 pl-6 font-normal">{t("Extra spend")}</th>
             </tr>
           </thead>
@@ -366,7 +368,7 @@ function LossEvents({
                     <td className="hidden py-2.5 pl-6 md:table-cell">
                       {gap > 0 ? formatDuration(gap) : "—"}
                     </td>
-                    <td className="py-2.5 pl-6">
+                    <td className="hidden py-2.5 pl-6 md:table-cell">
                       {event.tokens > 0 ? formatTokens(event.tokens) : "—"}
                     </td>
                     <td className="py-2.5 pl-6 text-foreground">

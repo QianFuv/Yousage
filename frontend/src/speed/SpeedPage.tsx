@@ -452,8 +452,12 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
             <th className="hidden py-2 pl-4 font-normal md:table-cell">
               {t("Cache hit")}
             </th>
-            <th className="py-2 pl-4 font-normal">{t("Requests")}</th>
-            <th className="py-2 pl-4 font-normal">{t("Tokens")}</th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Requests")}
+            </th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Tokens")}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -523,7 +527,7 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                       ? formatPercent(model.cacheHitRate)
                       : "—"}
                   </td>
-                  <td className="py-2.5 pl-4">
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
                     {formatCount(model.requests)}
                     {model.unmeasuredRequests > 0 && (
                       <span
@@ -536,7 +540,7 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="py-2.5 pl-4">
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
                     {formatTokens(model.totalTokens)}
                   </td>
                 </tr>
