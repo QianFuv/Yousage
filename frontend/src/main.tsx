@@ -41,6 +41,7 @@ import {
   PlugIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
+  SmartphoneIcon,
   TagsIcon,
   TimerIcon,
   type LucideIcon,
@@ -79,6 +80,11 @@ const LossPage = lazy(() =>
 const SpeedPage = lazy(() =>
   import("./speed/SpeedPage").then((module) => ({
     default: module.SpeedPage,
+  })),
+);
+const SyncPanel = lazy(() =>
+  import("./settings/SyncPanel").then((module) => ({
+    default: module.SyncPanel,
   })),
 );
 const PricingPanel = lazy(() =>
@@ -192,6 +198,16 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       ),
     [navigate],
   );
+  useEffect(() => {
+    /** Open a destination requested by a component outside the navigation, such as the share dialog. */
+    const requested = (event: Event) => {
+      const detail = (event as CustomEvent<{ section?: SettingsSection }>)
+        .detail;
+      if (detail?.section) navigate("settings", detail.section);
+    };
+    window.addEventListener("yousage-navigate", requested);
+    return () => window.removeEventListener("yousage-navigate", requested);
+  }, [navigate]);
   const [status, setStatus] = useState("");
   const closeState = useRef({ isDirty: false, isPending: false });
   closeState.current = {
@@ -468,6 +484,11 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
               <SourcesPanel onDraftChange={changeSourcesState} />
             </div>
           )}
+          {visitedSections.has("sync") && (
+            <div hidden={route !== "settings" || section !== "sync"}>
+              <SyncPanel />
+            </div>
+          )}
           {visitedSections.has("diagnostics") && (
             <div hidden={route !== "settings" || section !== "diagnostics"}>
               <DiagnosticsPanel nativeStatus={status} />
@@ -533,7 +554,8 @@ type SettingsSection =
   | "display"
   | "diagnostics"
   | "pricing"
-  | "sources";
+  | "sources"
+  | "sync";
 
 const SETTINGS_SECTIONS: readonly {
   id: SettingsSection;
@@ -559,6 +581,12 @@ const SETTINGS_SECTIONS: readonly {
     label: msg("Prices & mappings"),
     shortLabel: msg("Prices"),
     icon: TagsIcon,
+  },
+  {
+    id: "sync",
+    label: msg("Sync & sharing"),
+    shortLabel: msg("Sync"),
+    icon: SmartphoneIcon,
   },
   {
     id: "diagnostics",

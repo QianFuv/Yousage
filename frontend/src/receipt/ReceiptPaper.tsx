@@ -47,18 +47,25 @@ function receiptRange(receipt: Receipt): string {
 /**
  * The receipt itself: items, payment lines, a few totals and a scannable summary code.
  *
- * @param props - Receipt data, a ref for exports, and whether amounts are withheld.
+ * @param props - Receipt data, a ref for exports, whether amounts are withheld, and an
+ * optional code that replaces the summary code, such as a share link.
  * @returns The receipt paper element.
  */
 export function ReceiptPaper({
   receipt,
   paperRef,
   hideAmounts = false,
+  code,
 }: {
   receipt: Receipt;
   paperRef?: RefObject<HTMLDivElement | null>;
   hideAmounts?: boolean;
+  code?: { modules: readonly string[]; label: string };
 }) {
+  const shownCode = code ?? {
+    modules: receipt.qrModules,
+    label: t("Scan for the summary"),
+  };
   const isHourly = receipt.days === 1;
   const stats = [
     ...(isHourly
@@ -150,13 +157,13 @@ export function ReceiptPaper({
           </div>
         ))}
       </div>
-      {receipt.qrModules.length > 0 && (
+      {shownCode.modules.length > 0 && (
         <>
           <div className="receipt-code">
-            <SummaryCode modules={receipt.qrModules} />
+            <SummaryCode modules={shownCode.modules} />
           </div>
           <div className="receipt-center receipt-faint receipt-small">
-            {t("Scan for the summary")}
+            {shownCode.label}
           </div>
         </>
       )}
@@ -176,7 +183,7 @@ const QUIET_ZONE = 2;
  * @param props - Matrix rows of `1` (dark) and `0` (light).
  * @returns The code as an SVG element.
  */
-function SummaryCode({ modules }: { modules: readonly string[] }) {
+export function SummaryCode({ modules }: { modules: readonly string[] }) {
   const size = modules.length + QUIET_ZONE * 2;
   let path = "";
   modules.forEach((row, rowIndex) => {

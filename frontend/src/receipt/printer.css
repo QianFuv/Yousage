@@ -190,3 +190,10 @@
     transition: none !important;
   }
 }
+
+/* The share dialog opens from the overlay and must not sit beneath it. */
+.receipt-overlay[data-sharing="true"],
+.receipt-overlay[data-sharing="true"] .receipt-actions,
+.receipt-confetti[data-sharing="true"] {
+  visibility: hidden;
+}

@@ -3,15 +3,22 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   '"{role}" is not a supported theme color role.':
     "“{role}”不是受支持的主题颜色角色。",
   "+{percent}% of pool": "+{percent}% 的总额度",
+  "1 day": "1 天",
   "12-hour": "12 小时制",
+  "14 days": "14 天",
   "24-hour": "24 小时制",
   "24h": "24 小时",
+  "30 days": "30 天",
   "30d": "30 天",
+  "7 days": "7 天",
   "7d": "7 天",
   "90d": "90 天",
+  "A new phone link is ready.": "新的手机链接已生成。",
   "A theme collection cannot be empty.": "主题合集不能为空。",
   'A theme named "{label}" is already installed.':
     "已安装名为“{label}”的主题。",
+  "A token is saved. Type a new one to replace it.":
+    "已保存令牌。输入新令牌即可替换。",
   "API estimate": "API 估算",
   "API estimate excludes {share} unpriced records.":
     "API 估算未包含 {share} 未定价的记录。",
@@ -31,11 +38,16 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Add light palette": "添加亮色配色",
   "Add model price": "添加模型价格",
   Advanced: "高级",
+  "After each refresh, an encrypted snapshot is uploaded to your relay. The relay cannot read it.":
+    "每次刷新后，会把加密快照上传到你的 relay，relay 无法读取其中内容。",
   "Ahead of pace: spending faster than the window elapses":
     "超出节奏：消耗速度快于时间窗口流逝",
   "All environments": "所有环境",
+  "Amounts hidden": "已隐藏金额",
   "An account or settings change is running. Wait for the result before closing.":
     "账户或设置正在更改，请等待完成后再关闭。",
+  "Anyone with this link can open the page until it expires.":
+    "在过期之前，任何拿到链接的人都能打开此页面。",
   Appearance: "外观",
   "Appearance is already saving. Try again after it finishes.":
     "外观正在保存，请稍后再试。",
@@ -46,6 +58,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Apply to": "应用于",
   "Automatic pricing after saving": "保存后使用自动定价",
   "Automatic refresh": "自动刷新",
+  "Available for": "有效期",
+  "Available until {date}": "有效期至 {date}",
   Back: "返回",
   "Back to usage": "返回用量",
   Background: "背景",
@@ -106,6 +120,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Context: "上下文区域",
   Contrast: "对比度",
   "Copy JSON": "复制 JSON",
+  "Copy link": "复制链接",
   "Copy report": "复制报告",
   Cost: "费用",
   "Cost by speed": "按速度划分的费用",
@@ -115,7 +130,11 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Could not save.": "保存失败。",
   "Could not save. Try again.": "保存失败，请重试。",
   "Could not use the reset credit.": "无法使用重置券。",
+  "Create a link from a printed receipt. Active links are listed here.":
+    "在打印出的小票上创建链接，生效中的链接会列在这里。",
+  "Create link": "创建链接",
   "Create theme": "创建主题",
+  "Creating link…": "正在创建链接…",
   "Current match": "当前匹配",
   "Custom configuration": "自定义配置",
   "Custom history location": "自定义历史位置",
@@ -145,6 +164,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Display & behavior": "显示与行为",
   Documentation: "文档",
   "Documentation opened.": "已打开文档。",
+  Done: "完成",
   "Downloading…": "正在下载…",
   Duplicate: "复制为新主题",
   Edit: "编辑",
@@ -168,8 +188,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Find installed fonts": "查找已安装字体",
   Focus: "焦点",
   "Follow system": "跟随系统",
+  "For example https://relay.example.com": "例如 https://relay.example.com",
   Foundation: "基础",
   "Glass opacity": "毛玻璃不透明度",
+  "Hide amounts": "隐藏金额",
   "Hide where {label} is used": "隐藏{label}的使用位置",
   "Hide {label} usage": "隐藏{label}的使用位置",
   "High confidence": "可信度高",
@@ -206,9 +228,11 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
   "Last 24 hours": "最近 24 小时",
+  "Last upload": "上次上传",
   "Last {days} days": "最近 {days} 天",
   Left: "剩余",
   Light: "亮色",
+  "Link copied.": "链接已复制。",
   "Loading configuration…": "正在加载配置…",
   "Loading report…": "正在加载报告…",
   "Loading settings…": "正在加载设置…",
@@ -270,6 +294,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Not detected. Install the provider or configure its standard location, then detect again.":
     "未识别到。请安装该 Provider 或配置其标准位置，然后重新识别。",
   "Not saved": "未保存",
+  "Not uploaded yet": "尚未上传",
   "Nothing to reset right now.": "当前没有需要重置的额度。",
   "Observations disagree: quota use was not proportional to API prices, or some usage happened elsewhere.":
     "观测结果互相矛盾：额度消耗与 API 价格不成比例，或有部分用量发生在其他设备上。",
@@ -300,6 +325,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Open VSX theme details are unavailable.": "Open VSX 主题详情不可用。",
   "Open VSX took too long to respond.": "Open VSX 响应超时。",
   "Open settings": "打开设置",
+  "Open sync settings": "打开同步设置",
   Optional: "可选",
   Other: "其他",
   "Outcome unknown. Reload this environment and review its saved settings before retrying.":
@@ -311,10 +337,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Paste JSON": "粘贴 JSON",
   "Paste theme JSON": "粘贴主题 JSON",
   "Per 1M tokens": "每百万 Token",
+  Phone: "手机",
   "Pick a color from the app": "从应用中取色",
   Placeholder: "占位文字",
   Plan: "套餐",
   Premium: "加价",
+  "Preparing preview…": "正在生成预览…",
   Preview: "预览",
   "Preview import": "预览导入",
   "Preview pasted theme": "预览粘贴的主题",
@@ -347,6 +375,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Refresh while Usage is active and visible. History refreshes when stale; limits wait five minutes after completion. Settings and minimized windows never start automatic queries.":
     "在用量页面打开且可见时自动刷新。历史记录过期时刷新；额度在上次完成五分钟后刷新。设置页面和最小化窗口不会自动查询。",
   "Refreshing…": "正在刷新…",
+  Relay: "Relay",
+  "Relay address": "Relay 地址",
+  "Relay token": "Relay 令牌",
   Remaining: "剩余",
   Remove: "删除",
   "Remove custom themes": "删除自定义主题",
@@ -359,9 +390,11 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Reset applied. Your windows have cleared.": "重置成功，额度窗口已清空。",
   "Reset interface font": "重置界面字体",
   "Reset interface size": "重置界面字号",
+  "Reset link": "重置链接",
   "Reset monospace font": "重置等宽字体",
   "Reset monospace size": "重置等宽字号",
   "Reset price for {model} to automatic": "将 {model} 的价格重置为自动",
+  "Reset the phone link?": "重置手机链接？",
   "Reset time format": "重置时间格式",
   "Reset to automatic": "重置为自动",
   "Reset {label}": "重置{label}",
@@ -371,9 +404,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Restores: "恢复",
   "Retry failed saves": "重试保存失败的项",
   "Review data sources": "检查数据来源",
+  Revoke: "撤回",
+  "Revoke this share link?": "撤回这个分享链接？",
+  Save: "保存",
   "Save changes": "保存更改",
   Saved: "已保存",
   "Saving…": "正在保存…",
+  "Scan to open the shared page": "扫码打开分享页",
+  "Scan with your phone to open the dashboard.": "用手机扫码打开用量面板。",
   "Scanning…": "正在扫描…",
   Search: "搜索",
   "Search matches": "搜索匹配",
@@ -391,8 +429,15 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Selected themes removed.": "已删除所选主题。",
   Session: "会话",
   "Set price": "设置价格",
+  "Set up a relay in Sync & sharing to create share links.":
+    "请先在“同步与分享”中设置 relay，才能创建分享链接。",
   Settings: "设置",
   Share: "占比",
+  "Share link": "分享链接",
+  "Share link revoked.": "分享链接已撤回。",
+  "Share links": "分享链接",
+  "Share preview": "分享预览",
+  "Share this receipt": "分享这张小票",
   "Shared from Yousage": "来自 Yousage 的分享",
   "Shared from Yousage · available until {date}":
     "来自 Yousage 的分享 · 有效期至 {date}",
@@ -413,6 +458,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Smooth fonts": "字体平滑",
   "Snapshot from the desktop app · updated {time}":
     "来自桌面端的快照 · 更新于 {time}",
+  "Snapshot uploaded.": "快照已上传。",
   "Some environment prices are unavailable.": "部分环境的价格不可用。",
   "Some environments are still reporting. Totals include {count} available environments.":
     "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
@@ -427,6 +473,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Surface: "表面",
   "Surface Overlay": "浮层表面",
   "Surface Raised": "凸起表面",
+  Sync: "同步",
+  "Sync & sharing": "同步与分享",
+  "Sync is on.": "同步已开启。",
+  "Sync now": "立即同步",
+  "Sync settings saved.": "同步设置已保存。",
+  "Sync to phone": "同步到手机",
   System: "跟随系统",
   "System default": "系统默认",
   "T3 Code and VS Code JSON. Files and pasted data are limited to 256 KiB. You can also drop files into the window.":
@@ -438,6 +490,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Terminal Scrollbar Hover": "终端滚动条悬停",
   "Terminal Selection": "终端选区",
   "Terminal background": "终端背景",
+  "Test connection": "测试连接",
   Text: "文字",
   "Text Muted": "次要文字",
   "That Open VSX checksum response is invalid.": "Open VSX 返回的校验和无效。",
@@ -481,12 +534,23 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "该主题扩展过大，无法安全导入。",
   'The color for "{role}" must be a literal CSS color such as oklch(0.62 0.2 280).':
     "“{role}”的颜色必须是 CSS 颜色字面量，例如 oklch(0.62 0.2 280)。",
+  "The YOUSAGE_RELAY_TOKEN set on the relay.":
+    "即 relay 上设置的 YOUSAGE_RELAY_TOKEN。",
+  "The current link stops working and its snapshot is deleted from the relay. Scan the new code on your phone.":
+    "当前链接会立即失效，relay 上的快照也会被删除。请在手机上扫描新的二维码。",
   "The key does not match the stored data. Copy the whole link or scan the code again.":
     "密钥与存储的数据不匹配。请复制完整链接或重新扫码。",
   "The line is where even spending would be.": "竖线表示均匀消耗时应处的位置。",
+  "The page below is encrypted on this device and uploaded to your relay. The key stays in the link.":
+    "下面的页面会在本机加密后上传到你的 relay，解密密钥只保存在链接里。",
+  "The page is deleted from the relay and the link stops working immediately.":
+    "页面会从 relay 上删除，链接立即失效。",
   "The part after # holds the key that opens this page. Copy the whole link or scan the code again.":
     "链接中 # 后面的部分是打开此页面的密钥。请复制完整链接或重新扫码。",
+  "The part after # is the key. Anyone with the full link can read your snapshot, so keep it private.":
+    "# 后面的部分是密钥。拿到完整链接的人都能读取你的快照，请勿外传。",
   "The relay cannot be reached": "无法连接 relay",
+  "The relay is reachable and accepts the token.": "relay 可以连接，令牌有效。",
   "The reset outcome is unknown. Refresh limits before deciding to retry explicitly.":
     "重置结果未知。请先刷新额度，再决定是否重试。",
   'The theme "{label}" is not installed.': "未安装主题“{label}”。",
@@ -523,6 +587,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Themes imported.": "主题已导入。",
   "This action is only available in the desktop app.":
     "此操作只能在桌面端进行。",
+  "This address uses plain HTTP, so the relay token travels unencrypted. Use HTTPS, for example through a cloudflared tunnel.":
+    "此地址使用明文 HTTP，relay 令牌会以未加密的方式传输。请改用 HTTPS，例如通过 cloudflared 隧道。",
   "This collection conflicts with a theme outside the collection. No themes were changed.":
     "该合集与合集外的主题冲突，未做任何更改。",
   "This device": "本机",
@@ -578,6 +644,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Update server to edit prices": "请更新服务端后再编辑价格",
   "Update server to map models": "请更新服务端后再映射模型",
   "Update text": "更新提示文字",
+  "Uploading…": "正在上传…",
   Usage: "用量统计",
   "Usage breakdown": "用量明细",
   "Usage breakdown table": "用量明细表",
