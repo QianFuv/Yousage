@@ -1,0 +1,6 @@
+{
+  "keyBase64Url": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "aad": "space:AAAAAAAAAAAAAAAAAAAAAA",
+  "plaintextJson": "{\"formatVersion\":1,\"note\":\"Yousage 测试向量\",\"values\":[1,2,3]}",
+  "envelopeBase64": "AaChoqOkpaanqKmqq/mTdC1FywK/Ym8shU2x7xQ9gFBbv52MoFNdlLSr+r/K/T8STf2onxJy0kiHXAI1TLzevOEt91YCmICk+gckEyjnJt/DVLCJSJdGnATUxcxtfy7p5sXBmQuKe+S1PYDQvWb9vjt7P8Q="
+}

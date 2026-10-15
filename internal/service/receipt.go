@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"rsc.io/qr"
 	"sort"
 	"strings"
 	"time"
@@ -111,22 +110,8 @@ func (service *Service) Receipt(ctx context.Context, days int, timeZone string) 
 	}
 	result.Sessions, result.ActiveDays = len(sessions), len(active)
 	result.QrText = fmt.Sprintf("YOUSAGE %s %s..%s\nAPI $%.2f PAID $%.2f\n%s TOKENS %d SESSIONS", period, window.SinceDay, window.UntilDay, result.TotalUsd, result.PaidUsd, receiptTokenLabel(result.Tokens), result.Sessions)
-	code, err := qr.Encode(result.QrText, qr.L)
-	if err != nil {
-		return result, err
-	}
-	result.QrModules = make([]string, code.Size)
-	for row := range code.Size {
-		pixels := make([]byte, code.Size)
-		for column := range code.Size {
-			pixels[column] = '0'
-			if code.Black(column, row) {
-				pixels[column] = '1'
-			}
-		}
-		result.QrModules[row] = string(pixels)
-	}
-	return result, nil
+	result.QrModules, err = QrModules(result.QrText)
+	return result, err
 }
 
 // subscriptionProviders uses enabled local native quota accounts with authenticated subscription identities.

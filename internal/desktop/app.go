@@ -18,6 +18,7 @@ import (
 	"yousage/internal/remote"
 	dataservice "yousage/internal/service"
 	"yousage/internal/storage"
+	datasync "yousage/internal/sync"
 	"yousage/internal/theme"
 )
 
@@ -42,6 +43,7 @@ type App struct {
 	themeCancel         context.CancelFunc
 	themeDone           chan struct{}
 	usage               *dataservice.Service
+	syncEngine          *datasync.Engine
 	backgroundRefresh   *backgroundRefreshController
 	backgroundOptions   backgroundRefreshOptions
 	windowMutex         sync.Mutex
@@ -104,6 +106,10 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	}
 	usage.Scope = []domain.Provider{domain.Codex, domain.Claude}
 	service.usage = usage
+	if err = service.initializeSync(ctx); err != nil {
+		usage.Close()
+		return err
+	}
 	service.backgroundRefresh = newBackgroundRefreshController(ctx, service.backgroundOptions, func() bool {
 		display, err := usage.Preferences.Display(ctx)
 		return err == nil && display.Value.ShouldAutoRefresh
@@ -139,6 +145,9 @@ func (service *App) ServiceShutdown() error {
 	if service.backgroundRefresh != nil {
 		service.backgroundRefresh.close()
 	}
+	if service.syncEngine != nil {
+		service.syncEngine.Close()
+	}
 	service.persistBounds()
 	if service.usage != nil {
 		service.usage.Close()
@@ -158,6 +167,15 @@ func (service *App) ServiceShutdown() error {
 
 // GetUsage returns the requested live/cached environment aggregates.
 func (service *App) GetUsage(days int, timeZone string) (dataservice.Snapshot, error) {
+	if service.syncEngine != nil {
+		if timeZone == "" {
+			timeZone = "UTC"
+		}
+		if _, err := time.LoadLocation(timeZone); err != nil {
+			timeZone = "UTC"
+		}
+		_ = service.syncEngine.RecordTimeZone(service.context, timeZone)
+	}
 	return service.usage.Usage(service.context, days, timeZone)
 }
 
@@ -176,14 +194,22 @@ func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossRe
 	return service.usage.LossReport(service.context, days, timeZone)
 }
 
-// RefreshUsage coalesces selected scans with foreground-only automatic refresh policy.
+// RefreshUsage coalesces selected scans and queues sync after successful completion.
 func (service *App) RefreshUsage(days int, timeZone string, selected []string, request refresh.Request) error {
-	return service.usage.RefreshUsage(service.context, days, timeZone, selected, request)
+	err := service.usage.RefreshUsage(service.context, days, timeZone, selected, request)
+	if err == nil {
+		service.triggerSync()
+	}
+	return err
 }
 
-// RefreshLimits refreshes quota observations without issuing model turns.
+// RefreshLimits refreshes quota observations and queues sync after successful completion.
 func (service *App) RefreshLimits(selected []string, request refresh.Request) error {
-	return service.usage.RefreshLimits(service.context, selected, request)
+	err := service.usage.RefreshLimits(service.context, selected, request)
+	if err == nil {
+		service.triggerSync()
+	}
+	return err
 }
 
 // ApplyPricing saves each destination independently and reports ambiguous remote writes.

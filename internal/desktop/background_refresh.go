@@ -9,7 +9,7 @@ import (
 
 const backgroundRefreshInterval = 15 * time.Minute
 
-// backgroundRefreshOptions supplies the T3 sync seam. Configure callbacks before
+// backgroundRefreshOptions supplies sync eligibility. Configure callbacks before
 // ServiceStartup; callbacks must support concurrent reads. After changing sync
 // settings, call backgroundRefresh.reconcile to apply eligibility immediately.
 // The hook runs after both refresh attempts, including partial failures, so sync
@@ -48,8 +48,8 @@ type backgroundRefreshController struct {
 	ticker        backgroundRefreshTicker
 }
 
-// newBackgroundRefreshController defaults to disabled sync and UTC until T3 wires
-// its settings. No work starts until visibility and eligibility are reconciled.
+// newBackgroundRefreshController defaults to disabled sync and UTC without saved
+// settings. No work starts until visibility and eligibility are reconciled.
 func newBackgroundRefreshController(ctx context.Context, options backgroundRefreshOptions, isAutoEnabled func() bool,
 	refreshUsage func(context.Context, int, string, []string, refresh.Request) error,
 	refreshLimits func(context.Context, []string, refresh.Request) error) *backgroundRefreshController {
