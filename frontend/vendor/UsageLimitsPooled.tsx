@@ -421,12 +421,14 @@ function PoolSegment({
             }}
           />
         ) : null}
-        <span
-          aria-hidden
-          className="absolute inset-0 flex items-center justify-center text-3xs leading-none font-semibold text-foreground/80 tabular-nums @2xl/pool:hidden"
-        >
-          {index}
-        </span>
+        {showAccountName ? (
+          <span
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center text-3xs leading-none font-semibold text-foreground/80 tabular-nums @2xl/pool:hidden"
+          >
+            {index}
+          </span>
+        ) : null}
         <div className="relative hidden h-full min-w-0 items-center gap-1.5 px-2 text-xs @2xl/pool:flex">
           {showAccountName ? (
             <AccountName
@@ -466,6 +468,7 @@ function PoolSegment({
         color={color}
         now={now}
         index={index}
+        showAccountName={showAccountName}
         cycleValue={cycleValue}
       />
       {account.redeem ? (
@@ -498,7 +501,8 @@ function PoolSegment({
 /**
  * Below the strip at narrow widths: one row per account in bar order, carrying
  * the text the segment has no room for. Tapping a row opens the same popover
- * as its segment, so the two are one control with two handles.
+ * as its segment, so the two are one control with two handles. Like the wide
+ * segment label, a single-account pool shows neither the index nor the name.
  */
 function LegendRow({
   account,
@@ -506,6 +510,7 @@ function LegendRow({
   color,
   now,
   index,
+  showAccountName,
   cycleValue,
 }: {
   readonly account: LimitAccount;
@@ -513,6 +518,7 @@ function LegendRow({
   readonly color: string;
   readonly now: number;
   readonly index: number;
+  readonly showAccountName: boolean;
   readonly cycleValue: CycleValue | undefined;
 }) {
   const remaining = remainingPercent(window);
@@ -523,21 +529,25 @@ function LegendRow({
     <PopoverTrigger
       style={{ gridColumn: "1 / -1", gridRow: index + 1 }}
       render={<Button variant="ghost" size="compact" />}
-      className="min-w-0 @2xl/pool:hidden"
+      className="min-w-0 sm:text-xs @2xl/pool:hidden"
     >
-      <span className="relative inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-3xs leading-none font-semibold text-foreground/80 tabular-nums">
-        <span
-          aria-hidden
-          className="absolute inset-0 rounded-sm opacity-35"
-          style={{ backgroundColor: color }}
-        />
-        <span className="sr-only">{t("Segment")} </span>
-        <span className="relative">{index}</span>
-      </span>
-      <AccountName
-        account={account}
-        className="min-w-0 truncate font-medium text-foreground"
-      />
+      {showAccountName ? (
+        <>
+          <span className="relative inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-3xs leading-none font-semibold text-foreground/80 tabular-nums">
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-sm opacity-35"
+              style={{ backgroundColor: color }}
+            />
+            <span className="sr-only">{t("Segment")} </span>
+            <span className="relative">{index}</span>
+          </span>
+          <AccountName
+            account={account}
+            className="min-w-0 truncate font-medium text-foreground"
+          />
+        </>
+      ) : null}
       <span className="shrink-0 font-semibold text-foreground tabular-nums">
         {remaining}%
       </span>
