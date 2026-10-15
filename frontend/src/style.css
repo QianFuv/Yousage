@@ -176,6 +176,9 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar-item-short {
+  display: none;
+}
 .sidebar-dirty {
   width: 0.375rem;
   height: 0.375rem;
@@ -231,6 +234,12 @@ body {
     position: absolute;
     top: 0.375rem;
     right: calc(50% - 0.875rem);
+  }
+  .sidebar-item-long {
+    display: none;
+  }
+  .sidebar-item-short {
+    display: block;
   }
 }
 

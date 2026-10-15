@@ -309,6 +309,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Preview import": "预览导入",
   "Preview pasted theme": "预览粘贴的主题",
   "Preview update": "预览更新",
+  Prices: "价格",
   "Prices & mappings": "价格与映射",
   "Prices not loaded": "价格未加载",
   "Processed tokens": "处理 Token",
@@ -400,6 +401,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Some environment prices are unavailable.": "部分环境的价格不可用。",
   "Some environments are still reporting. Totals include {count} available environments.":
     "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
+  Sources: "来源",
   "Sources & connections": "数据来源",
   Spent: "已花费",
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",

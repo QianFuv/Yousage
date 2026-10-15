@@ -353,6 +353,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
                   key={item.id}
                   icon={item.icon}
                   label={t(item.label)}
+                  shortLabel={item.shortLabel && t(item.shortLabel)}
                   isCurrent={section === item.id}
                   isDirty={sectionState[item.id]}
                   onClick={() => navigate("settings", item.id)}
@@ -536,28 +537,47 @@ type SettingsSection =
 const SETTINGS_SECTIONS: readonly {
   id: SettingsSection;
   label: string;
+  shortLabel?: string;
   icon: LucideIcon;
 }[] = [
   { id: "appearance", label: msg("Appearance"), icon: PaletteIcon },
   {
     id: "display",
     label: msg("Display & behavior"),
+    shortLabel: msg("Display"),
     icon: SlidersHorizontalIcon,
   },
-  { id: "sources", label: msg("Sources & connections"), icon: PlugIcon },
-  { id: "pricing", label: msg("Prices & mappings"), icon: TagsIcon },
-  { id: "diagnostics", label: msg("About & diagnostics"), icon: InfoIcon },
+  {
+    id: "sources",
+    label: msg("Sources & connections"),
+    shortLabel: msg("Sources"),
+    icon: PlugIcon,
+  },
+  {
+    id: "pricing",
+    label: msg("Prices & mappings"),
+    shortLabel: msg("Prices"),
+    icon: TagsIcon,
+  },
+  {
+    id: "diagnostics",
+    label: msg("About & diagnostics"),
+    shortLabel: msg("About"),
+    icon: InfoIcon,
+  },
 ];
 
 /**
  * Sidebar navigation row that collapses to its icon in narrow windows.
  *
- * @param props - Icon, label, current/dirty state and click handler.
+ * @param props - Icon, label, optional bottom-tab label, current/dirty state
+ * and click handler.
  * @returns The navigation button.
  */
 function NavItem({
   icon: Icon,
   label,
+  shortLabel,
   title,
   isCurrent,
   isDirty,
@@ -565,6 +585,7 @@ function NavItem({
 }: {
   icon: LucideIcon;
   label: string;
+  shortLabel?: string;
   title?: string;
   isCurrent?: boolean;
   isDirty?: boolean;
@@ -580,7 +601,20 @@ function NavItem({
       onClick={onClick}
     >
       <Icon aria-hidden />
-      <span className="sidebar-item-label">{label}</span>
+      <span
+        className={
+          shortLabel
+            ? "sidebar-item-label sidebar-item-long"
+            : "sidebar-item-label"
+        }
+      >
+        {label}
+      </span>
+      {shortLabel && (
+        <span className="sidebar-item-label sidebar-item-short">
+          {shortLabel}
+        </span>
+      )}
       {isDirty && <span className="sidebar-dirty" aria-hidden />}
     </button>
   );
