@@ -18,3 +18,7 @@ tasks:
   dev:
     cmds:
       - wails3 dev -config build/config.yml -port 4175
+  relay:docker:
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - docker build -f build/relay/Dockerfile -t yousage-relay:local .

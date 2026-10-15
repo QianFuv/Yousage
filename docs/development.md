@@ -32,6 +32,34 @@ powershell -NoProfile -File build/package-windows.ps1  # 生成便携版 ZIP 和
 便携版 ZIP 包含 `yousage.exe`、`README.md`、`THIRD_PARTY_NOTICES.md`、
 `dependencies.json` 和 `SHA256SUMS.txt`，ZIP 自身的摘要写入 `bin/SHA256SUMS.txt`。
 
+### 中继与网页
+
+中继独立于桌面程序，网页资源由 `build:web` 输出到 `internal/relay/web/dist`，再由 Go 内嵌。
+在仓库根目录执行（令牌占位值需替换为自己的强随机令牌，不要提交到仓库）：
+
+```powershell
+pnpm --dir tools/parity install --frozen-lockfile
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend build:web
+$env:YOUSAGE_RELAY_TOKEN = '<替换为至少 24 字符的强随机令牌>'
+$env:YOUSAGE_RELAY_ADDR = '127.0.0.1:8080'
+$env:YOUSAGE_RELAY_DATA = './data'
+go run ./cmd/yousage-relay
+```
+
+另开终端可运行 `curl.exe -fsS http://127.0.0.1:8080/healthz`。
+没有先构建网页时，Go 仍可编译，但查看地址仅返回占位页；网页变化后需要重新构建中继。
+
+```powershell
+go test ./internal/relay/... ./cmd/yousage-relay/...
+go vet ./internal/relay/... ./cmd/yousage-relay/...
+task relay:docker
+```
+
+`relay:docker` 在仓库根目录构建 `yousage-relay:local`，不需要本机 Wails 或原生 GUI 开发库。
+若通过 Wails 提供的 Task 运行器执行，使用 `wails3 task relay:docker`。
+Docker / Compose 部署、HTTPS 入口与桌面配对见 [中继指南](relay.md)。
+
 ### 其他平台
 
 - macOS（需要 Xcode 命令行工具，macOS 12 及以上）：

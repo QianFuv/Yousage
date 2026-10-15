@@ -1,0 +1,16 @@
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: build/relay/Dockerfile
+    image: yousage-relay:local
+    environment:
+      YOUSAGE_RELAY_TOKEN: ${YOUSAGE_RELAY_TOKEN:?Set YOUSAGE_RELAY_TOKEN to a strong random token}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - relay-data:/data
+    restart: unless-stopped
+
+volumes:
+  relay-data:
