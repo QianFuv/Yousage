@@ -244,6 +244,30 @@ html [data-slot="input-control"].font-mono input {
   font-size: var(--font-size-code, 0.875rem);
 }
 
+/* Control text ----------------------------------------------------------- */
+/* Shared controls switch text size at the sm breakpoint: buttons, inputs and
+   labels grow below it while segmented toggles shrink. Keep the sm size at
+   every width so controls on narrow screens match the desktop and the rows
+   around them. Unlayered rules take precedence over the utility layer. */
+@media (width < 40rem) {
+  [class~="sm:text-xs"] {
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  [class~="sm:text-sm"] {
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  [class~="sm:text-sm/4"] {
+    font-size: var(--text-sm);
+    line-height: 1rem;
+  }
+  [class~="sm:text-base"] {
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+}
+
 /* Page layout ------------------------------------------------------------ */
 .page-body {
   gap: var(--page-gap);
