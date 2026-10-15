@@ -15,6 +15,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "API estimate": "API 估算",
   "API estimate excludes {share} unpriced records.":
     "API 估算未包含 {share} 未定价的记录。",
+  "API-equivalent spend": "API 等值花费",
   About: "关于",
   "About & diagnostics": "关于与诊断",
   Accent: "强调色",
@@ -70,6 +71,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Canceled.": "已取消。",
   "Changes apply to {destination}": "更改将应用于 {destination}",
   "ChatGPT shared usage": "ChatGPT 共享用量",
+  "Check your connection and try again.": "请检查网络连接后重试。",
   "Choose files": "选择文件",
   "Choose the variants to remove. Selected owners will fall back to the standard palette.":
     "选择要删除的变体。正在使用这些变体的模式将恢复为默认配色。",
@@ -125,6 +127,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Daily cost by provider": "各 Provider 每日费用",
   "Daily processed tokens": "每日处理 Token",
   "Daily processed tokens by provider": "各 Provider 每日处理 Token",
+  "Daily spend": "每日花费",
+  "Daily tokens": "每日 Token",
   Dark: "暗色",
   Day: "日",
   "Detect providers again": "重新识别 Provider",
@@ -179,6 +183,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Hourly cost by provider": "各 Provider 每小时费用",
   "Hourly processed tokens": "每小时处理 Token",
   "Hourly processed tokens by provider": "各 Provider 每小时处理 Token",
+  "Hourly spend": "每小时花费",
+  "Hourly tokens": "每小时 Token",
   "How quota reset times are shown.": "额度重置时间的显示方式。",
   "Icon Muted": "次要图标",
   "Import themes": "导入主题",
@@ -194,9 +200,13 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "界面语言。“跟随系统”将使用 Windows 显示语言。",
   "Interface scale": "界面缩放",
   "Interface size": "界面字号",
+  "It has expired, was revoked, or the link was replaced.":
+    "它已过期、已被撤回，或链接已被重置。",
   "Keep editing": "继续编辑",
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
+  "Last 24 hours": "最近 24 小时",
+  "Last {days} days": "最近 {days} 天",
   Left: "剩余",
   Light: "亮色",
   "Loading configuration…": "正在加载配置…",
@@ -383,6 +393,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Set price": "设置价格",
   Settings: "设置",
   Share: "占比",
+  "Shared from Yousage": "来自 Yousage 的分享",
+  "Shared from Yousage · available until {date}":
+    "来自 Yousage 的分享 · 有效期至 {date}",
   "Show where {label} is used": "显示{label}的使用位置",
   "Show {label} usage": "显示{label}的使用位置",
   Sidebar: "侧边栏",
@@ -398,11 +411,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Sidebar selection": "侧边栏选中项",
   "Signed in": "登录位置",
   "Smooth fonts": "字体平滑",
+  "Snapshot from the desktop app · updated {time}":
+    "来自桌面端的快照 · 更新于 {time}",
   "Some environment prices are unavailable.": "部分环境的价格不可用。",
   "Some environments are still reporting. Totals include {count} available environments.":
     "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
   Sources: "来源",
   "Sources & connections": "数据来源",
+  "Spend over time": "花费趋势",
   Spent: "已花费",
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
   Standard: "标准",
@@ -465,7 +481,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "该主题扩展过大，无法安全导入。",
   'The color for "{role}" must be a literal CSS color such as oklch(0.62 0.2 280).':
     "“{role}”的颜色必须是 CSS 颜色字面量，例如 oklch(0.62 0.2 280)。",
+  "The key does not match the stored data. Copy the whole link or scan the code again.":
+    "密钥与存储的数据不匹配。请复制完整链接或重新扫码。",
   "The line is where even spending would be.": "竖线表示均匀消耗时应处的位置。",
+  "The part after # holds the key that opens this page. Copy the whole link or scan the code again.":
+    "链接中 # 后面的部分是打开此页面的密钥。请复制完整链接或重新扫码。",
+  "The relay cannot be reached": "无法连接 relay",
   "The reset outcome is unknown. Refresh limits before deciding to retry explicitly.":
     "重置结果未知。请先刷新额度，再决定是否重试。",
   'The theme "{label}" is not installed.': "未安装主题“{label}”。",
@@ -500,11 +521,18 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "主题变体不能重复基础外观“{appearance}”。",
   Themes: "主题",
   "Themes imported.": "主题已导入。",
+  "This action is only available in the desktop app.":
+    "此操作只能在桌面端进行。",
   "This collection conflicts with a theme outside the collection. No themes were changed.":
     "该合集与合集外的主题冲突，未做任何更改。",
   "This device": "本机",
+  "This link is incomplete": "链接不完整",
   "This model already has a row. Edit its prices there.":
     "该模型已有一行，请在那一行编辑价格。",
+  "This page cannot be opened": "无法打开此页面",
+  "This page is no longer available": "此页面已不可用",
+  "This page was created by a different Yousage version. Update the relay or the desktop app so both match.":
+    "此页面由不同版本的 Yousage 生成。请更新 relay 或桌面端，使两者版本一致。",
   "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.":
     "这将使用账户中的一张重置券并清空当前额度窗口，操作无法撤销。",
   "This theme changed while the editor was open. Reopen the saved theme before replacing it.":
@@ -514,6 +542,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Toggle account email visibility": "切换账户邮箱显示",
   Tokens: "Token",
   "Tokens by type": "按类型划分的 Token",
+  "Tokens over time": "Token 趋势",
+  "Tokens processed": "处理的 Token",
   "Toolbar background": "工具栏背景",
   "Toolbar border": "工具栏边框",
   "Toolbar control": "工具栏控件",
@@ -566,6 +596,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Use {name} for dark mode": "暗色模式使用 {name}",
   "Use {name} for light mode": "亮色模式使用 {name}",
   "Using…": "正在使用…",
+  "Versions do not match": "版本不匹配",
   Via: "来源",
   "View usage in ChatGPT with your connected account.":
     "使用已连接的账户在 ChatGPT 中查看用量。",
@@ -577,6 +608,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Weekly: "每周",
   "Your installed themes changed while this package was downloading. Try again.":
     "下载期间已安装的主题发生了变化，请重试。",
+  "Yousage usage share": "Yousage 用量分享",
   "e.g. Aurora": "例如：极光",
   "expires in {duration}": "{duration}后过期",
   "in {duration}": "{duration}后",

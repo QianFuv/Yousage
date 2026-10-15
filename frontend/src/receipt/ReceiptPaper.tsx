@@ -47,15 +47,17 @@ function receiptRange(receipt: Receipt): string {
 /**
  * The receipt itself: items, payment lines, a few totals and a scannable summary code.
  *
- * @param props - Receipt data and a ref for exports.
+ * @param props - Receipt data, a ref for exports, and whether amounts are withheld.
  * @returns The receipt paper element.
  */
 export function ReceiptPaper({
   receipt,
   paperRef,
+  hideAmounts = false,
 }: {
   receipt: Receipt;
   paperRef?: RefObject<HTMLDivElement | null>;
+  hideAmounts?: boolean;
 }) {
   const isHourly = receipt.days === 1;
   const stats = [
@@ -64,7 +66,14 @@ export function ReceiptPaper({
       : [{ label: t("Active days"), value: formatCount(receipt.activeDays) }]),
     { label: t("Sessions"), value: formatCount(receipt.sessions) },
     { label: "TOKENS", value: formatTokens(receipt.tokens) },
-    { label: t("Cache saved"), value: formatUsd(receipt.cacheSavingsUsd) },
+    ...(hideAmounts
+      ? []
+      : [
+          {
+            label: t("Cache saved"),
+            value: formatUsd(receipt.cacheSavingsUsd),
+          },
+        ]),
   ];
   return (
     <div
@@ -94,23 +103,31 @@ export function ReceiptPaper({
                 {item.model}
               </span>
               <span className="receipt-number">
-                {item.costUsd === 0 && item.unpricedRecords > 0
-                  ? t("Unpriced")
-                  : formatUsd(item.costUsd)}
+                {hideAmounts
+                  ? formatTokens(item.tokens)
+                  : item.costUsd === 0 && item.unpricedRecords > 0
+                    ? t("Unpriced")
+                    : formatUsd(item.costUsd)}
               </span>
             </div>
-            <div className="receipt-faint receipt-small">
-              {formatTokens(item.tokens)} tokens
-            </div>
+            {!hideAmounts && (
+              <div className="receipt-faint receipt-small">
+                {formatTokens(item.tokens)} tokens
+              </div>
+            )}
           </div>
         ))
       )}
       <hr className="receipt-rule-double" />
       <div className="receipt-row receipt-total">
         <span>{t("Total")}</span>
-        <span className="receipt-number">{formatUsd(receipt.totalUsd)}</span>
+        <span className="receipt-number">
+          {hideAmounts
+            ? `${formatTokens(receipt.tokens)} tokens`
+            : formatUsd(receipt.totalUsd)}
+        </span>
       </div>
-      {receipt.subscriptionUsd > 0 && (
+      {!hideAmounts && receipt.subscriptionUsd > 0 && (
         <div className="receipt-row receipt-faint">
           <span>{t("Paid by subscription")}</span>
           <span className="receipt-number">
@@ -118,10 +135,12 @@ export function ReceiptPaper({
           </span>
         </div>
       )}
-      <div className="receipt-row receipt-strong">
-        <span>{t("Amount paid")}</span>
-        <span className="receipt-number">{formatUsd(receipt.paidUsd)}</span>
-      </div>
+      {!hideAmounts && (
+        <div className="receipt-row receipt-strong">
+          <span>{t("Amount paid")}</span>
+          <span className="receipt-number">{formatUsd(receipt.paidUsd)}</span>
+        </div>
+      )}
       <hr className="receipt-rule" />
       <div className="receipt-stats">
         {stats.map((stat) => (

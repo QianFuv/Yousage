@@ -14,6 +14,7 @@ import {
 import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
 import { formatUsd } from "@t3tools/shared/usageFormat";
 import { type ReactNode, useState } from "react";
+import { useIsReadOnly } from "../src/web/readOnly";
 
 import {
   basisText,
@@ -386,6 +387,7 @@ function PoolSegment({
   readonly showAccountName: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const isReadOnly = useIsReadOnly();
   const remaining = remainingPercent(window);
   const resetsIn = formatResetsIn(window, now);
   const resetDuration = formatResetDuration(window, now);
@@ -471,7 +473,7 @@ function PoolSegment({
         showAccountName={showAccountName}
         cycleValue={cycleValue}
       />
-      {account.redeem ? (
+      {account.redeem && !isReadOnly ? (
         <RedeemableSegmentPopup
           account={account}
           window={window}

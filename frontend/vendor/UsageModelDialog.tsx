@@ -9,6 +9,7 @@ import {
 } from "@t3tools/shared/usageMerge";
 import { useMemo } from "react";
 import { t } from "../src/i18n";
+import { useIsReadOnly } from "../src/web/readOnly";
 
 import {
   mergeAnsweredUsage,
@@ -67,6 +68,7 @@ export function UsageModelDialog({
   readonly onSetPrice: () => void;
   readonly onClose: () => void;
 }) {
+  const isReadOnly = useIsReadOnly();
   const usage = useMemo(
     () =>
       mergeAnsweredUsage(
@@ -242,7 +244,9 @@ export function UsageModelDialog({
                 tokens: formatTokens(model.unpricedTokens),
               })}
             </span>
-            <Button onClick={onSetPrice}>{t("Set price")}</Button>
+            {!isReadOnly && (
+              <Button onClick={onSetPrice}>{t("Set price")}</Button>
+            )}
           </DialogFooter>
         ) : null}
       </DialogPopup>

@@ -32,6 +32,7 @@ import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
 import { PeriodToggle } from "./PeriodToggle";
+import { useIsReadOnly } from "../web/readOnly";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 
 /** Preserve null All and explicit empty selection while exposing coverage inside the environment filter. */
@@ -45,6 +46,7 @@ export function UsagePage({
   onSettings: (section: "pricing" | "sources", model?: string) => void;
 }) {
   const data = useData();
+  const isReadOnly = useIsReadOnly();
   const metric =
     view === "limits"
       ? "limits"
@@ -241,13 +243,15 @@ export function UsagePage({
                   {hasNoHistory && (
                     <Notice
                       action={
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => onSettings("sources")}
-                        >
-                          {t("Review data sources")}
-                        </Button>
+                        !isReadOnly && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => onSettings("sources")}
+                          >
+                            {t("Review data sources")}
+                          </Button>
+                        )
                       }
                     >
                       {t("No saved history has been scanned yet.")}

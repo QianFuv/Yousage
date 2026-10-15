@@ -46,6 +46,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
+import { NavItem } from "./NavItem";
 import {
   AlertDialog,
   AlertDialogDescription,
@@ -566,59 +567,6 @@ const SETTINGS_SECTIONS: readonly {
     icon: InfoIcon,
   },
 ];
-
-/**
- * Sidebar navigation row that collapses to its icon in narrow windows.
- *
- * @param props - Icon, label, optional bottom-tab label, current/dirty state
- * and click handler.
- * @returns The navigation button.
- */
-function NavItem({
-  icon: Icon,
-  label,
-  shortLabel,
-  title,
-  isCurrent,
-  isDirty,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  shortLabel?: string;
-  title?: string;
-  isCurrent?: boolean;
-  isDirty?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="sidebar-item"
-      aria-current={isCurrent ? "page" : undefined}
-      aria-label={isDirty ? t("{label} (unsaved)", { label }) : label}
-      title={title ?? label}
-      onClick={onClick}
-    >
-      <Icon aria-hidden />
-      <span
-        className={
-          shortLabel
-            ? "sidebar-item-label sidebar-item-long"
-            : "sidebar-item-label"
-        }
-      >
-        {label}
-      </span>
-      {shortLabel && (
-        <span className="sidebar-item-label sidebar-item-short">
-          {shortLabel}
-        </span>
-      )}
-      {isDirty && <span className="sidebar-dirty" aria-hidden />}
-    </button>
-  );
-}
 
 /**
  * Apply the saved language and match reset timestamps to it.

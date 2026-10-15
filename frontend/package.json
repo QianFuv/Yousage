@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js --host 127.0.0.1 --port 4175 --strictPort",
     "build": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js build",
+    "build:web": "node ../tools/parity/node_modules/vite/dist/vite/node/cli.js build --config vite.web.config.ts",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
-    "lint": "node node_modules/eslint/bin/eslint.js src reference-adapter.tsx vite.config.ts",
-    "format:check": "prettier --check src reference-adapter.tsx vite.config.ts eslint.config.mjs",
+    "lint": "node node_modules/eslint/bin/eslint.js src reference-adapter.tsx vite.config.ts vite.web.config.ts",
+    "format:check": "prettier --check src reference-adapter.tsx vite.config.ts vite.web.config.ts eslint.config.mjs",
     "test": "vitest run"
   },
   "dependencies": {
