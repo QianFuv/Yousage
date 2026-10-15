@@ -12,6 +12,11 @@ export class Request {
     "IsAutoEnabled": boolean;
     "AfterPending": boolean;
 
+    /**
+     * IsBackground permits automatic refresh while hidden or outside Usage.
+     */
+    "IsBackground": boolean;
+
     /** Creates a new Request instance. */
     constructor($$source: Partial<Request> = {}) {
         if (!("IsManual" in $$source)) {
@@ -28,6 +33,9 @@ export class Request {
         }
         if (!("AfterPending" in $$source)) {
             this["AfterPending"] = false;
+        }
+        if (!("IsBackground" in $$source)) {
+            this["IsBackground"] = false;
         }
 
         Object.assign(this, $$source);

@@ -42,6 +42,8 @@ type App struct {
 	themeCancel         context.CancelFunc
 	themeDone           chan struct{}
 	usage               *dataservice.Service
+	backgroundRefresh   *backgroundRefreshController
+	backgroundOptions   backgroundRefreshOptions
 	windowMutex         sync.Mutex
 	normalBounds        preferences.WindowBounds
 	hasNormalBounds     bool
@@ -102,6 +104,13 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	}
 	usage.Scope = []domain.Provider{domain.Codex, domain.Claude}
 	service.usage = usage
+	service.backgroundRefresh = newBackgroundRefreshController(ctx, service.backgroundOptions, func() bool {
+		display, err := usage.Preferences.Display(ctx)
+		return err == nil && display.Value.ShouldAutoRefresh
+	}, usage.RefreshUsage, usage.RefreshLimits)
+	if service.window != nil {
+		service.backgroundRefresh.setVisibility(service.window.IsVisible() && !service.window.IsMinimised())
+	}
 	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
 	usage.ReconcileConnections()
 	if display, err := usage.Preferences.Display(ctx); err == nil {
@@ -127,6 +136,9 @@ func (service *App) ServiceShutdown() error {
 	service.windowMutex.Lock()
 	service.isShuttingDown = true
 	service.windowMutex.Unlock()
+	if service.backgroundRefresh != nil {
+		service.backgroundRefresh.close()
+	}
 	service.persistBounds()
 	if service.usage != nil {
 		service.usage.Close()
@@ -204,6 +216,9 @@ func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.Sav
 	if err == nil {
 		service.applyZoom(value.Value.Zoom)
 		service.setCloseToTray(value.Value.ShouldCloseToTray)
+		if service.backgroundRefresh != nil {
+			service.backgroundRefresh.reconcile()
+		}
 	}
 	return value, err
 }

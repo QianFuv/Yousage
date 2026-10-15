@@ -16,7 +16,11 @@ var HistoryPolicy = Policy{StaleAfter: time.Minute}
 var LimitsPolicy = Policy{CompletionCooldown: 5 * time.Minute}
 var RatesPolicy = Policy{StaleAfter: 24 * time.Hour, ManualFloor: time.Minute}
 
-type Request struct{ IsManual, IsVisible, IsUsagePage, IsAutoEnabled, AfterPending bool }
+type Request struct {
+	IsManual, IsVisible, IsUsagePage, IsAutoEnabled, AfterPending bool
+	// IsBackground permits automatic refresh while hidden or outside Usage.
+	IsBackground bool
+}
 type Snapshot[T any] struct {
 	Value                                 T
 	HasValue                              bool
@@ -47,7 +51,7 @@ func New[T any](policy Policy) *Coordinator[T] {
 	return &Coordinator[T]{entries: map[string]*entry[T]{}, policy: policy, clock: time.Now, context: ctx, cancel: cancel}
 }
 
-// Run never starts background work while hidden or in Settings; explicit requests bypass cooldown.
+// Run gates automatic work by visibility or background intent, preferences, and freshness; manual requests bypass cooldown.
 func (coordinator *Coordinator[T]) Run(ctx context.Context, key string, request Request, operation func(context.Context) (T, error)) (Snapshot[T], error) {
 	if err := ctx.Err(); err != nil {
 		return Snapshot[T]{}, err
@@ -84,7 +88,7 @@ func (coordinator *Coordinator[T]) Run(ctx context.Context, key string, request 
 		coordinator.mutex.Unlock()
 		return snapshot, nil
 	}
-	if !request.IsManual && (!request.IsVisible || !request.IsUsagePage || !request.IsAutoEnabled || (coordinator.policy.CompletionCooldown > 0 && !held.snapshot.CompletedAt.IsZero() && now.Sub(held.snapshot.CompletedAt) < coordinator.policy.CompletionCooldown) || (coordinator.policy.StaleAfter > 0 && held.snapshot.HasValue && now.Sub(held.snapshot.SucceededAt) < coordinator.policy.StaleAfter)) {
+	if !request.IsManual && ((!request.IsBackground && (!request.IsVisible || !request.IsUsagePage)) || !request.IsAutoEnabled || (coordinator.policy.CompletionCooldown > 0 && !held.snapshot.CompletedAt.IsZero() && now.Sub(held.snapshot.CompletedAt) < coordinator.policy.CompletionCooldown) || (coordinator.policy.StaleAfter > 0 && held.snapshot.HasValue && now.Sub(held.snapshot.SucceededAt) < coordinator.policy.StaleAfter)) {
 		snapshot := held.snapshot
 		coordinator.mutex.Unlock()
 		return snapshot, ErrSkipped

@@ -28,6 +28,77 @@ func (ctx *interleavingContext) Done() <-chan struct{} {
 
 func automatic() Request { return Request{IsVisible: true, IsUsagePage: true, IsAutoEnabled: true} }
 
+func TestBackgroundOnlyBypassesVisibilityAndPageGates(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		request Request
+		canRun  bool
+	}{
+		{"background while hidden outside Usage", Request{IsBackground: true, IsAutoEnabled: true}, true},
+		{"background with auto refresh disabled", Request{IsBackground: true}, false},
+		{"ordinary hidden request", Request{IsUsagePage: true, IsAutoEnabled: true}, false},
+		{"ordinary request outside Usage", Request{IsVisible: true, IsAutoEnabled: true}, false},
+		{"ordinary request with auto refresh disabled", Request{IsVisible: true, IsUsagePage: true}, false},
+		{"ordinary visible Usage request", automatic(), true},
+		{"manual request remains unconditional", Request{IsManual: true}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			coordinator := New[int](HistoryPolicy)
+			defer coordinator.Close()
+			calls := 0
+			_, err := coordinator.Run(context.Background(), "local", test.request, func(context.Context) (int, error) {
+				calls++
+				return 7, nil
+			})
+			if test.canRun {
+				if err != nil || calls != 1 {
+					t.Fatalf("eligible request: calls=%d, error=%v", calls, err)
+				}
+			} else if !errors.Is(err, ErrSkipped) || calls != 0 {
+				t.Fatalf("ineligible request started work: calls=%d, error=%v", calls, err)
+			}
+		})
+	}
+}
+
+func TestBackgroundRespectsFreshnessAndCompletionCooldown(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		policy         Policy
+		operationError error
+	}{
+		{"fresh success", HistoryPolicy, nil},
+		{"success cooldown", LimitsPolicy, nil},
+		{"failure cooldown", LimitsPolicy, errors.New("offline")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			coordinator := New[int](test.policy)
+			defer coordinator.Close()
+			now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+			coordinator.clock = func() time.Time { return now }
+			calls := 0
+			operation := func(context.Context) (int, error) {
+				calls++
+				now = now.Add(time.Minute)
+				return calls, test.operationError
+			}
+			request := Request{IsBackground: true, IsAutoEnabled: true}
+			if _, err := coordinator.Run(context.Background(), "local", request, operation); !errors.Is(err, test.operationError) {
+				t.Fatal(err)
+			}
+			interval := max(test.policy.StaleAfter, test.policy.CompletionCooldown)
+			now = now.Add(interval - time.Second)
+			if _, err := coordinator.Run(context.Background(), "local", request, operation); !errors.Is(err, ErrSkipped) || calls != 1 {
+				t.Fatalf("completion gate ignored: calls=%d, error=%v", calls, err)
+			}
+			now = now.Add(time.Second)
+			if _, err := coordinator.Run(context.Background(), "local", request, operation); !errors.Is(err, test.operationError) || calls != 2 {
+				t.Fatalf("expired gate still blocked: calls=%d, error=%v", calls, err)
+			}
+		})
+	}
+}
+
 func TestCooldownAtCompletionFailureRetentionAndManualBypass(t *testing.T) {
 	coordinator := New[int](LimitsPolicy)
 	defer coordinator.Close()

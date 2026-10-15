@@ -39,7 +39,11 @@ func (service *App) installDesktopHooks() {
 	service.window.OnWindowEvent(events.Common.WindowDPIChanged, func(*application.WindowEvent) { service.applyWindowLimits() })
 	for _, event := range []events.WindowEventType{events.Common.WindowShow, events.Common.WindowHide, events.Common.WindowMinimise, events.Common.WindowUnMinimise, events.Common.WindowRestore} {
 		service.window.OnWindowEvent(event, func(*application.WindowEvent) {
-			service.nativeApp.Event.Emit("window-visibility", windowVisibility(event, service.window.IsVisible(), service.window.IsMinimised()))
+			isVisible := windowVisibility(event, service.window.IsVisible(), service.window.IsMinimised())
+			if service.backgroundRefresh != nil {
+				service.backgroundRefresh.setVisibility(isVisible)
+			}
+			service.nativeApp.Event.Emit("window-visibility", isVisible)
 		})
 	}
 }
