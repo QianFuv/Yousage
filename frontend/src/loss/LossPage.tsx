@@ -75,19 +75,24 @@ export function LossPage({ isActive }: { isActive: boolean }) {
       <PageHeader
         title={t("Loss")}
         status={data.isBusy ? t("Refreshing…") : !report ? t("Loading…") : null}
+        actions={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={isBusy ? t("Refreshing…") : t("Refresh usage")}
+            title={`${t("Refresh")} (Ctrl+R)`}
+            aria-busy={isBusy}
+            disabled={isBusy}
+            onClick={() => void data.refresh(true, true)}
+          >
+            <RefreshCwIcon
+              aria-hidden
+              className={cn(isBusy && "animate-spin")}
+            />
+          </Button>
+        }
       >
         <PeriodToggle label={t("Loss period")} />
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={isBusy ? t("Refreshing…") : t("Refresh usage")}
-          title={`${t("Refresh")} (Ctrl+R)`}
-          aria-busy={isBusy}
-          disabled={isBusy}
-          onClick={() => void data.refresh(true, true)}
-        >
-          <RefreshCwIcon aria-hidden className={cn(isBusy && "animate-spin")} />
-        </Button>
       </PageHeader>
       <PageBody>
         {error && <Notice tone="error">{error}</Notice>}

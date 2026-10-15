@@ -154,46 +154,50 @@ export function UsagePage({
       <PageHeader
         title={view === "limits" ? t("Quota") : t("Usage")}
         status={statusLabel}
-      >
-        {view === "statistics" && (
-          <ToggleGroup
-            aria-label={t("Usage metric")}
-            variant="segmented"
-            value={[metric]}
-            onValueChange={(next) => {
-              const value = next[0];
-              if (value === "cost" || value === "tokens")
-                void data.patchDisplay({ metric: value }).catch(() => {});
+        actions={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={
+              data.isBusy
+                ? t("Refreshing…")
+                : metric === "limits"
+                  ? t("Refresh limits")
+                  : t("Refresh usage")
+            }
+            title={`${t("Refresh")} (Ctrl+R)`}
+            aria-busy={data.isBusy}
+            disabled={data.isBusy}
+            onClick={() => {
+              setLimitsNow(Date.now());
+              void data.refresh(true, true);
             }}
           >
-            <Toggle value="cost">{t("Cost")}</Toggle>
-            <Toggle value="tokens">{t("Tokens")}</Toggle>
-          </ToggleGroup>
+            <RefreshCwIcon
+              aria-hidden
+              className={cn(data.isBusy && "animate-spin")}
+            />
+          </Button>
+        }
+      >
+        {view === "statistics" && (
+          <>
+            <ToggleGroup
+              aria-label={t("Usage metric")}
+              variant="segmented"
+              value={[metric]}
+              onValueChange={(next) => {
+                const value = next[0];
+                if (value === "cost" || value === "tokens")
+                  void data.patchDisplay({ metric: value }).catch(() => {});
+              }}
+            >
+              <Toggle value="cost">{t("Cost")}</Toggle>
+              <Toggle value="tokens">{t("Tokens")}</Toggle>
+            </ToggleGroup>
+            <PeriodToggle label={t("Usage period")} />
+          </>
         )}
-        {view === "statistics" && <PeriodToggle label={t("Usage period")} />}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={
-            data.isBusy
-              ? t("Refreshing…")
-              : metric === "limits"
-                ? t("Refresh limits")
-                : t("Refresh usage")
-          }
-          title={`${t("Refresh")} (Ctrl+R)`}
-          aria-busy={data.isBusy}
-          disabled={data.isBusy}
-          onClick={() => {
-            setLimitsNow(Date.now());
-            void data.refresh(true, true);
-          }}
-        >
-          <RefreshCwIcon
-            aria-hidden
-            className={cn(data.isBusy && "animate-spin")}
-          />
-        </Button>
       </PageHeader>
       <PageBody>
         {(data.error || selected.some((environment) => environment.error)) && (

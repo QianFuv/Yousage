@@ -13,23 +13,28 @@ import {
 /**
  * Sticky page header with an optional breadcrumb parent and trailing controls.
  *
- * @param props - Title, optional parent label and trailing controls.
+ * On narrow screens the icon actions stay beside the title and the other
+ * controls move to their own full-width row, so every page wraps the same way.
+ *
+ * @param props - Title, optional parent label, controls and icon actions.
  * @returns The page header element.
  */
 export function PageHeader({
   title,
   parent,
   status,
+  actions,
   children,
 }: {
   title: ReactNode;
   parent?: string;
   status?: ReactNode;
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <header className="page-header sticky top-0 z-20 flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/85 px-6 py-2 backdrop-blur-md max-md:px-4">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm max-md:basis-full">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
         {parent && (
           <>
             <span className="shrink-0 text-muted-foreground">{parent}</span>
@@ -47,8 +52,13 @@ export function PageHeader({
         )}
       </div>
       {children && (
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-md:order-last max-md:basis-full max-md:justify-start">
           {children}
+        </div>
+      )}
+      {actions && (
+        <div className="flex shrink-0 items-center gap-2 md:-ms-2">
+          {actions}
         </div>
       )}
     </header>
