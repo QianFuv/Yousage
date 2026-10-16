@@ -1,0 +1,201 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify desktop and frontend
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Preserve LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - name: Install dependencies
+        run: |
+          npm install --global pnpm@10.32.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir tools/parity install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Verify reference sources and tests
+        run: pnpm --dir tools/parity test
+      - name: Check frontend types
+        run: pnpm --dir frontend typecheck
+      - name: Lint frontend
+        run: pnpm --dir frontend lint
+      - name: Check frontend formatting
+        run: pnpm --dir frontend format:check
+      - name: Test frontend
+        run: pnpm --dir frontend test
+      - name: Build desktop frontend
+        run: pnpm --dir frontend build
+      - name: Build relay frontend
+        run: pnpm --dir frontend build:web
+      - name: Check Go formatting
+        run: |
+          $unformatted = gofmt -l .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($unformatted) {
+            $unformatted
+            exit 1
+          }
+      - name: Test Go packages
+        run: go test -count=1 -p 1 -timeout=10m ./...
+      - name: Vet Go packages
+        run: go vet ./...
+
+  relay:
+    name: Build, test and publish relay
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - name: Test Linux relay packages
+        run: go test -count=1 -timeout=5m ./internal/relay ./cmd/yousage-relay ./internal/sync
+      - name: Build relay image
+        run: |
+          docker build --file build/relay/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag yousage-relay:ci .
+      - name: Smoke test relay image
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(openssl rand -hex 32)"
+          echo "::add-mask::$token"
+          export YOUSAGE_RELAY_TOKEN="$token"
+          trap 'docker logs yousage-relay-ci; docker rm --force --volumes yousage-relay-ci' EXIT
+          docker run --detach --name yousage-relay-ci \
+            --env YOUSAGE_RELAY_TOKEN \
+            --publish 127.0.0.1:18080:8080 yousage-relay:ci
+          curl --fail --silent --show-error --retry 20 --retry-connrefused \
+            --retry-delay 1 --max-time 5 http://127.0.0.1:18080/healthz
+          python3 - <<'PY'
+          """Verify the built relay HTTP surface with disposable synthetic data."""
+          import json
+          import os
+          import re
+          import secrets
+          import urllib.error
+          import urllib.request
+
+          BASE_URL = "http://127.0.0.1:18080"
+          TOKEN = os.environ["YOUSAGE_RELAY_TOKEN"]
+
+          def request(path, method="GET", body=None, bearer=None):
+              """Return a relay response, including expected HTTP errors.
+
+              Args:
+                  path: The relay endpoint path.
+                  method: The HTTP method.
+                  body: Optional request bytes.
+                  bearer: Optional write token.
+
+              Returns:
+                  The HTTP status, headers and response bytes.
+              """
+              headers = {"Content-Type": "application/octet-stream"}
+              if bearer is not None:
+                  headers["Authorization"] = f"Bearer {bearer}"
+              message = urllib.request.Request(
+                  BASE_URL + path, data=body, headers=headers, method=method
+              )
+              try:
+                  response = urllib.request.urlopen(message, timeout=10)
+              except urllib.error.HTTPError as error:
+                  response = error
+              with response:
+                  return response.status, response.headers, response.read()
+
+          status, _, body = request("/healthz")
+          assert status == 200 and json.loads(body) == {"status": "ok"}
+          for bearer in (None, "incorrect-token"):
+              status, headers, _ = request("/api/auth", bearer=bearer)
+              assert status == 401
+              assert headers["WWW-Authenticate"] == "Bearer"
+              assert headers["Cache-Control"] == "no-store"
+          assert request("/api/auth", bearer=TOKEN)[0] == 204
+          for prefix in ("v", "s"):
+              status, headers, body = request(f"/{prefix}/{'A' * 22}")
+              assert status == 200
+              assert "script-src 'self'" in headers["Content-Security-Policy"]
+              assert headers["Referrer-Policy"] == "no-referrer"
+              assert headers["X-Content-Type-Options"] == "nosniff"
+              assets = re.findall(rb'(?:src|href)="(/assets/[^" ]+)"', body)
+              assert assets, "Built frontend assets are missing"
+              for asset in assets:
+                  assert request(asset.decode())[0] == 200
+          space_id = secrets.token_urlsafe(16)
+          path = f"/api/spaces/{space_id}"
+          envelope = b"\x01" + secrets.token_bytes(64)
+          try:
+              assert request(path, "PUT", envelope)[0] == 401
+              assert request(path, "PUT", envelope, TOKEN)[0] == 204
+              status, headers, body = request(path)
+              assert status == 200 and body == envelope
+              assert headers["Cache-Control"] == "no-store"
+              assert headers["ETag"] and headers["Last-Modified"]
+          finally:
+              assert request(path, "DELETE", bearer=TOKEN)[0] == 204
+          assert request(path)[0] == 404
+          status, _, body = request(
+              "/api/shares/reserve?ttlDays=1", "POST", bearer=TOKEN
+          )
+          assert status == 201
+          path = f"/api/shares/{json.loads(body)['id']}"
+          try:
+              assert request(path)[0] == 404
+              assert request(path, "PUT", envelope, TOKEN)[0] == 204
+              assert request(path, "PUT", envelope, TOKEN)[0] == 409
+              status, headers, body = request(path)
+              assert status == 200 and body == envelope
+              assert headers["Cache-Control"] == "no-store"
+          finally:
+              assert request(path, "DELETE", bearer=TOKEN)[0] == 204
+          assert request(path)[0] == 404
+          print("Relay image smoke checks passed")
+          PY
+      - name: Publish latest and commit image tags
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker tag yousage-relay:ci "$image:sha-$GITHUB_SHA"
+          docker tag yousage-relay:ci "$image:latest"
+          docker push "$image:sha-$GITHUB_SHA"
+          docker push "$image:latest"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$image:latest")"
+          printf 'Image: `%s:latest`\n\nCommit: `%s`\n\nDigest: `%s`\n' \
+            "$image" "$GITHUB_SHA" "$digest" >> "$GITHUB_STEP_SUMMARY"
