@@ -119,7 +119,11 @@ func TestGenerationCheckpointReplayAndAppend(test *testing.T) {
 		test.Fatal(err)
 	}
 	id := sources[0].Fingerprint.Id()
-	checkpoint, _ := store.Checkpoint(ctx, id, path)
+	path = filepath.Join(sources[0].Fingerprint.ResolvedHomePath, filepath.Base(path))
+	checkpoint, err := store.Checkpoint(ctx, id, path)
+	if err != nil || checkpoint.Revision == 0 {
+		test.Fatal("initial canonical checkpoint missing", checkpoint, err)
+	}
 	records, _ := store.Records(ctx, id)
 	if len(records) != 1 || records[0].GenerationMs != 2000 {
 		test.Fatal(records)

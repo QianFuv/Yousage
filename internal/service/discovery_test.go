@@ -91,9 +91,7 @@ func TestWindowsDiscoveryUsesNativePayloadWithoutExecutingShims(test *testing.T)
 	current := filepath.Join(root, "node_modules", "@openai", "codex", "node_modules", "@openai", "codex-win32-"+architecture, "vendor", triple, "bin", "codex.exe")
 	write(older)
 	write(current)
-	if resolved := service.resolveExecutable("codex", ""); resolved != current {
-		test.Fatal("new native payload was not preferred", resolved)
-	}
+	assertSameExecutable(test, service.resolveExecutable("codex", ""), current)
 	if service.resolveExecutable("codex", filepath.Join(root, "missing.exe")) != "" {
 		test.Fatal("missing explicit installation silently switched account context")
 	}
@@ -107,9 +105,7 @@ func TestWindowsDiscoveryUsesNativePayloadWithoutExecutingShims(test *testing.T)
 	write(nestedLegacy)
 	newSibling := filepath.Join(filepath.Dir(filepath.Dir(older)), "bin", "codex.exe")
 	write(newSibling)
-	if resolved := service.resolveExecutable("codex", ""); resolved != nestedLegacy {
-		test.Fatal("another installation displaced the active package dependency", resolved)
-	}
+	assertSameExecutable(test, service.resolveExecutable("codex", ""), nestedLegacy)
 	detected, err := service.DetectProviders(context.Background())
 	if err != nil || !detected[0].IsInstalled || detected[0].HasHistory {
 		test.Fatal("installation and history availability were conflated", detected, err)
@@ -166,7 +162,21 @@ func TestWindowsDiscoveryRecognizesDesktopFallbackAndCanonicalPnpmDependency(tes
 		test.Fatal(err)
 	}
 	service.Environment["PATH"] = shim
-	if resolved := service.resolveExecutable("codex", ""); resolved != payload {
-		test.Fatal("canonical pnpm sibling dependency was missed", resolved)
+	assertSameExecutable(test, service.resolveExecutable("codex", ""), payload)
+}
+
+// assertSameExecutable compares installation identity across canonical path aliases.
+func assertSameExecutable(test *testing.T, actual, expected string) {
+	test.Helper()
+	actualFile, err := os.Stat(actual)
+	if err != nil {
+		test.Fatal("resolved executable missing", actual, err)
+	}
+	expectedFile, err := os.Stat(expected)
+	if err != nil {
+		test.Fatal("expected executable missing", expected, err)
+	}
+	if !os.SameFile(actualFile, expectedFile) {
+		test.Fatalf("resolved executable %q does not identify expected installation %q", actual, expected)
 	}
 }

@@ -127,7 +127,11 @@ func TestErrorParserUpgradeDropsRetainedErrors(t *testing.T) {
 					t.Fatal(err)
 				}
 				id := results[0].Fingerprint.Id()
-				checkpoint, _ := store.Checkpoint(ctx, id, path)
+				path = filepath.Join(results[0].Fingerprint.ResolvedHomePath, filepath.Base(path))
+				checkpoint, err := store.Checkpoint(ctx, id, path)
+				if err != nil || checkpoint.Revision == 0 {
+					t.Fatal("initial canonical checkpoint missing", checkpoint, err)
+				}
 				records, _ := store.Records(ctx, id)
 				checkpoint.ParserVersion = version
 				if len(records) != 1 {

@@ -39,7 +39,11 @@ func TestContextCheckpointReplayAndAppend(test *testing.T) {
 				test.Fatal(err)
 			}
 			id := sources[0].Fingerprint.Id()
-			checkpoint, _ := store.Checkpoint(ctx, id, path)
+			path = filepath.Join(sources[0].Fingerprint.ResolvedHomePath, filepath.Base(path))
+			checkpoint, err := store.Checkpoint(ctx, id, path)
+			if err != nil || checkpoint.Revision == 0 {
+				test.Fatal("initial canonical checkpoint missing", checkpoint, err)
+			}
 			records, _ := store.Records(ctx, id)
 			checkpoint.ParserVersion = ParserVersion - 1
 			records[0].ContextId = ""

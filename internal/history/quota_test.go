@@ -38,7 +38,11 @@ func TestQuotaReparseHorizon(test *testing.T) {
 			test.Fatal(err)
 		}
 		id := results[0].Fingerprint.Id()
-		checkpoint, _ := store.Checkpoint(ctx, id, path)
+		path = filepath.Join(results[0].Fingerprint.ResolvedHomePath, filepath.Base(path))
+		checkpoint, err := store.Checkpoint(ctx, id, path)
+		if err != nil || checkpoint.Revision == 0 {
+			test.Fatal("initial canonical checkpoint missing", checkpoint, err)
+		}
 		checkpoint.ParserVersion = 1
 		checkpoint, err = store.CommitFile(ctx, checkpoint, nil, true)
 		if err != nil {
@@ -121,7 +125,11 @@ func TestQuotaParserVersionReplacesOnceAndResumes(test *testing.T) {
 		test.Fatal(err)
 	}
 	id := sources[0].Fingerprint.Id()
-	checkpoint, _ := store.Checkpoint(ctx, id, path)
+	path = filepath.Join(sources[0].Fingerprint.ResolvedHomePath, filepath.Base(path))
+	checkpoint, err := store.Checkpoint(ctx, id, path)
+	if err != nil || checkpoint.Revision == 0 {
+		test.Fatal("initial canonical checkpoint missing", checkpoint, err)
+	}
 	checkpoint.ParserVersion = ParserVersion - 1
 	checkpoint, err = store.CommitFile(ctx, checkpoint, nil, true)
 	if err != nil {
