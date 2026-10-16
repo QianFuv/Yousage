@@ -11,6 +11,9 @@ import (
 	"io"
 )
 
+// ErrEnvelopeVersion identifies an unsupported encrypted envelope version.
+var ErrEnvelopeVersion = errors.New("unsupported encrypted envelope version")
+
 // NewKey creates a 256-bit key encoded as unpadded base64url.
 func NewKey() (string, error) {
 	data := make([]byte, 32)
@@ -64,7 +67,10 @@ func Seal(plaintext []byte, key, aad string) ([]byte, error) {
 
 // Open authenticates and decompresses a version-one envelope with a bounded output.
 func Open(envelope []byte, key, aad string) ([]byte, error) {
-	if len(envelope) < 29 || envelope[0] != 1 {
+	if len(envelope) > 0 && envelope[0] != 1 {
+		return nil, ErrEnvelopeVersion
+	}
+	if len(envelope) < 29 {
 		return nil, errors.New("invalid encrypted envelope")
 	}
 	encryption, err := encryptionCipher(key)

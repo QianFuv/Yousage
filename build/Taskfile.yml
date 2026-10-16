@@ -7,8 +7,19 @@ tasks:
       - pnpm --dir frontend install --frozen-lockfile
       - go mod download
       - task: notices
-      - wails3 generate bindings -ts -clean=true
+      - task: bindings
       - pnpm --dir frontend build
+  bindings:
+    cmds:
+      - wails3 generate bindings -ts -clean=true
+      - task: bindings:android
+  bindings:android:
+    cmds:
+      - wails3 generate bindings -ts -clean=false ./internal/mobile
+    env:
+      GOOS: android
+      GOARCH: arm64
+      CGO_ENABLED: '0'
   notices:
     cmds:
       - node -e "require('fs').mkdirSync('bin', {recursive:true})"

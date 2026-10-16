@@ -45,6 +45,8 @@ export type SnapshotSource = {
   device: { isDark: () => boolean; locale: string };
   /** Open a destination chosen by the user. */
   open: (url: string) => void;
+  /** Host transport for calls the snapshot does not answer; without one they are rejected. */
+  fallback?: RuntimeTransport | null;
 };
 
 /** Thrown by a capturing transport to stop a probe before it reaches the network. */
@@ -54,10 +56,12 @@ class ProbeStop extends Error {}
  * Record the generated method ID of every binding the viewer answers.
  *
  * @param setTransport - The runtime's transport setter.
+ * @param previous - Transport to restore afterwards, such as a native bridge.
  * @returns Binding names keyed by method ID.
  */
 export async function captureMethodIds(
   setTransport: (transport: RuntimeTransport | null) => void,
+  previous: RuntimeTransport | null = null,
 ): Promise<Map<number, ViewerMethod>> {
   const names = new Map<number, ViewerMethod>();
   let current: ViewerMethod = "GetUsage";
@@ -75,14 +79,15 @@ export async function captureMethodIds(
     current = name;
     await probe().catch(() => {});
   }
-  setTransport(null);
+  setTransport(previous);
   return names;
 }
 
 /**
  * Build a transport that serves reads from the snapshot and keeps display changes in memory.
  *
- * Every other binding is rejected, so desktop-only actions cannot run from a viewer.
+ * Every other call goes to the fallback transport when there is one and is rejected
+ * otherwise, so desktop-only actions cannot run from a viewer.
  *
  * @param names - Binding names keyed by method ID.
  * @param source - The snapshot and the viewing device.
@@ -139,11 +144,15 @@ export function createSnapshotTransport(
     }
   };
   return {
-    async call(objectID, _method, _windowName, args) {
+    async call(objectID, method, windowName, args) {
+      const request = args as { methodID: number; args: unknown[] };
+      if (
+        source.fallback &&
+        (objectID !== objectNames.Call || !names.has(request.methodID))
+      )
+        return source.fallback.call(objectID, method, windowName, args);
       if (objectID !== objectNames.Call) return null;
-      return structuredClone(
-        await answer(args as { methodID: number; args: unknown[] }),
-      );
+      return structuredClone(await answer(request));
     },
   };
 }

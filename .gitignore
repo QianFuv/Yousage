@@ -1,5 +1,6 @@
 /frontend/node_modules/
 /frontend/dist/
+/frontend/dist-android/
 /internal/relay/web/dist/
 /frontend/.vite/
 /frontend/*.tsbuildinfo
@@ -9,3 +10,10 @@
 /.task/
 /build/*.log
 /*.syso
+/build/android/.gradle/
+/build/android/build/
+/build/android/app/build/
+/build/android/local.properties
+/build/android/app/src/main/jniLibs/
+/build/android/overlay.json
+/build/android/gen/

@@ -1,0 +1,34 @@
+version: '3'
+
+tasks:
+  build:frontend:
+    cmds:
+      - task: :common:bindings:android
+      - pnpm --dir frontend build:android
+
+  build:
+    desc: Build an emulator APK (amd64 by default; set ANDROID_ARCH=arm64 for a device)
+    cmds:
+      - task: build:frontend
+      - go run ./build/android/scripts -mode debug -arch {{.ANDROID_ARCH | default "amd64"}}
+
+  debug:
+    desc: Build a debug APK for the x86_64 emulator
+    cmds:
+      - task: build
+
+  package:
+    desc: Build an arm64 release APK (debug-keystore signed unless configured otherwise)
+    cmds:
+      - task: build:frontend
+      - go run ./build/android/scripts -mode release -arch {{.ANDROID_ARCH | default "arm64"}}
+
+  compile:go:shared:
+    desc: Compile only the Android shared library
+    cmds:
+      - go run ./build/android/scripts -mode {{.MODE | default "debug"}} -arch {{.ANDROID_ARCH | default "arm64"}} -compile-only
+
+  assemble:apk:
+    desc: Assemble an existing Android shared library into an APK
+    cmds:
+      - go run ./build/android/scripts -mode {{.MODE | default "debug"}} -arch {{.ANDROID_ARCH | default "amd64"}} -assemble-only

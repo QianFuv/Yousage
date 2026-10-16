@@ -83,6 +83,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Cancel download": "取消下载",
   "Cancel inspecting app colors": "取消检查应用颜色",
   "Canceled.": "已取消。",
+  "Change link": "更换链接",
   "Changes apply to {destination}": "更改将应用于 {destination}",
   "ChatGPT shared usage": "ChatGPT 共享用量",
   "Check your connection and try again.": "请检查网络连接后重试。",
@@ -116,7 +117,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Compact: "紧凑",
   Confidence: "可信度",
   "Conflicting observations": "观测相互矛盾",
+  Connect: "连接",
   "Connect an environment to set model prices.": "连接环境后才能设置模型价格。",
+  "Connect to your desktop": "连接桌面端",
   Context: "上下文区域",
   Contrast: "对比度",
   "Copy JSON": "复制 JSON",
@@ -300,6 +303,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "观测结果互相矛盾：额度消耗与 API 价格不成比例，或有部分用量发生在其他设备上。",
   Offline: "离线",
   "On pace with the window": "与时间窗口节奏一致",
+  "On your computer, open Settings → Sync & sharing, turn on Sync to phone and copy the phone link. Paste it here.":
+    "在电脑上打开 设置 → 同步与分享，开启“同步到手机”并复制手机链接，然后粘贴到这里。",
   "One or more color themes in that extension could not be imported safely.":
     "该扩展中有主题无法安全导入。",
   "Only usage recorded on this device is counted.": "仅统计本设备记录的用量。",
@@ -334,10 +339,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Overlay: "浮层",
   "Page content": "页面内容",
   "Panel animation duration": "面板动画时长",
+  Paste: "粘贴",
   "Paste JSON": "粘贴 JSON",
   "Paste theme JSON": "粘贴主题 JSON",
   "Per 1M tokens": "每百万 Token",
   Phone: "手机",
+  "Phone link": "手机链接",
   "Pick a color from the app": "从应用中取色",
   Placeholder: "占位文字",
   Plan: "套餐",
@@ -549,6 +556,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "链接中 # 后面的部分是打开此页面的密钥。请复制完整链接或重新扫码。",
   "The part after # is the key. Anyone with the full link can read your snapshot, so keep it private.":
     "# 后面的部分是密钥。拿到完整链接的人都能读取你的快照，请勿外传。",
+  "The part after # is the key. It stays on this phone and is never sent to the relay.":
+    "# 后面的部分是密钥，只保存在这台手机上，不会发送给 relay。",
   "The relay cannot be reached": "无法连接 relay",
   "The relay is reachable and accepts the token.": "relay 可以连接，令牌有效。",
   "The reset outcome is unknown. Refresh limits before deciding to retry explicitly.":
@@ -592,6 +601,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "This collection conflicts with a theme outside the collection. No themes were changed.":
     "该合集与合集外的主题冲突，未做任何更改。",
   "This device": "本机",
+  "This is not a complete Yousage phone link. Copy it again from the desktop app.":
+    "这不是完整的 Yousage 手机链接，请从桌面端重新复制。",
   "This link is incomplete": "链接不完整",
   "This model already has a row. Edit its prices there.":
     "该模型已有一行，请在那一行编辑价格。",
@@ -618,6 +629,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Toolbar text": "工具栏文字",
   Total: "合计",
   Totals: "合计",
+  "Try again": "重试",
   "Turn off to keep both when IDs collide.":
     "关闭后，ID 冲突时将同时保留两者。",
   "Two colors, rest derived": "只需两种颜色，其余自动生成",
@@ -653,6 +665,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Usage statistics": "用量统计",
   "Use a reset credit?": "使用重置券？",
   "Use advanced theme colors": "使用高级主题颜色",
+  "Use another link": "换一个链接",
   "Use automatic detection": "改为自动识别",
   "Use credit": "使用重置券",
   "Use for dark mode only": "仅用于暗色模式",

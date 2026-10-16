@@ -1,6 +1,10 @@
 /** The viewer answers reads from the snapshot and refuses every desktop-only action. */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setTransport } from "@wailsio/runtime";
+import {
+  getTransport,
+  setTransport,
+  type RuntimeTransport,
+} from "@wailsio/runtime";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
   captureMethodIds,
@@ -127,5 +131,32 @@ describe("snapshot transport", () => {
     ).rejects.toThrow();
     await expect(nativeApi.GetConfiguration()).rejects.toThrow();
     await expect(nativeApi.SaveAppearance(1, {} as never)).rejects.toThrow();
+  });
+
+  it("restores the host transport after recording method IDs", async () => {
+    const host: RuntimeTransport = { call: async () => null };
+    setTransport(host);
+    await captureMethodIds(setTransport, host);
+    expect(getTransport()).toBe(host);
+  });
+
+  it("passes other calls to the host transport and keeps reads local", async () => {
+    const forwarded = vi.fn(async () => ({}));
+    const names = await captureMethodIds(setTransport);
+    setTransport(
+      createSnapshotTransport(names, {
+        current: snapshotFixture,
+        refetch: async () => {},
+        device: { isDark: () => false, locale: "en" },
+        open: () => {},
+        fallback: { call: forwarded },
+      }),
+    );
+    expect(await nativeApi.GetUsage(7, "UTC")).toMatchObject({
+      name: "usage-7",
+    });
+    expect(forwarded).not.toHaveBeenCalled();
+    await expect(nativeApi.GetConfiguration()).resolves.toBeDefined();
+    expect(forwarded).toHaveBeenCalledTimes(1);
   });
 });

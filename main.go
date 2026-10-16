@@ -1,3 +1,5 @@
+//go:build !android
+
 // Yousage embeds desktop resources and starts the native application.
 package main
 

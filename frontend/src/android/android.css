@@ -1,0 +1,82 @@
+/* Android app --------------------------------------------------------------- */
+/* The WebView draws edge to edge, so the top inset keeps content clear of the
+   status bar; the bottom tab bar already pads for the navigation bar. */
+.desktop-layout,
+.relay-problem,
+.android-pair {
+  padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
+}
+
+/* Before a snapshot theme applies, older WebViews mis-resolve the default dark
+   muted color (a color-mix over an oklch `none` hue), so use its plain value. */
+.dark :is(.android-pair, .relay-problem) {
+  --muted-foreground: #a3a3a3;
+}
+
+.viewer-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 0.75rem;
+}
+.android-banner-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.android-problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.android-pair {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.875rem;
+  max-width: 28rem;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding-right: 1.5rem;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  padding-left: 1.5rem;
+  color: var(--foreground);
+}
+.android-pair-wordmark {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.android-pair h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.android-pair p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.android-pair-field {
+  display: flex;
+  gap: 0.5rem;
+}
+.android-pair-field > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.android-pair .android-pair-error {
+  color: var(--destructive);
+}
+.android-pair .android-pair-note {
+  font-size: 0.75rem;
+}

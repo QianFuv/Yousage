@@ -4,9 +4,28 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
 	"testing"
 )
+
+// TestEnvelopeVersion distinguishes unsupported formats from authentication failures.
+func TestEnvelopeVersion(test *testing.T) {
+	key, _ := NewKey()
+	envelope, err := Seal([]byte(`{}`), key, "space:version")
+	if err != nil {
+		test.Fatal(err)
+	}
+	envelope[0] = 2
+	if _, err = Open(envelope, key, "space:version"); !errors.Is(err, ErrEnvelopeVersion) {
+		test.Fatalf("unsupported version error = %v", err)
+	}
+	for _, invalid := range [][]byte{nil, {1}, {1, 2, 3}} {
+		if _, err = Open(invalid, key, "space:version"); err == nil || errors.Is(err, ErrEnvelopeVersion) {
+			test.Fatalf("invalid envelope error = %v", err)
+		}
+	}
+}
 
 func TestEnvelopeContractVector(test *testing.T) {
 	data, err := os.ReadFile("testdata/envelope_vector.json")

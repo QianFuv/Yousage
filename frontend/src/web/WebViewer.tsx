@@ -1,5 +1,11 @@
 /** Relay viewer shell: the four usage pages from a snapshot, without settings or native actions. */
-import { lazy, Suspense, useLayoutEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useLayoutEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ChartNoAxesCombinedIcon,
   FlameIcon,
@@ -44,15 +50,17 @@ export function formatSnapshotTime(instant: string, locale: string): string {
 /**
  * Read-only pages rendered from the latest relay snapshot.
  *
- * @param props - Snapshot time and the viewing device locale.
+ * @param props - Snapshot time, the viewing device locale and an optional banner control.
  * @returns The viewer layout.
  */
 export function WebViewer({
   generatedAt,
   locale,
+  bannerAction,
 }: {
   generatedAt: string;
   locale: string;
+  bannerAction?: ReactNode;
 }) {
   useI18n();
   const data = useData();
@@ -112,6 +120,7 @@ export function WebViewer({
           {t("Snapshot from the desktop app · updated {time}", {
             time: formatSnapshotTime(generatedAt, locale),
           })}
+          {bannerAction}
         </p>
         <div hidden={route !== "statistics" && route !== "quota"}>
           <UsagePage
@@ -140,15 +149,17 @@ export function WebViewer({
 /**
  * A full-page message shown instead of the viewer or share page.
  *
- * @param props - Title and explanation.
+ * @param props - Title, explanation and optional actions.
  * @returns The message page.
  */
 export function RelayProblem({
   title,
   detail,
+  children,
 }: {
   title: string;
   detail: string;
+  children?: ReactNode;
 }) {
   return (
     <div className="relay-problem" role="alert">
@@ -163,6 +174,7 @@ export function RelayProblem({
       </strong>
       <h1>{title}</h1>
       <p>{detail}</p>
+      {children}
     </div>
   );
 }

@@ -84,6 +84,22 @@ export async function loadRelayPayload<T>(
             : "decrypt",
     };
   }
+  return checkPayload(value, isValid, read.etag);
+}
+
+/**
+ * Accept a decrypted payload of the expected kind and format version.
+ *
+ * @param value - Parsed payload JSON.
+ * @param isValid - Shape check for the expected payload kind.
+ * @param etag - Entity tag the payload was served with.
+ * @returns The payload, or a version or decrypt problem.
+ */
+export function checkPayload<T>(
+  value: unknown,
+  isValid: (value: unknown) => value is T,
+  etag: string,
+): LoadResult<T> {
   if (!isValid(value))
     return {
       status: "problem",
@@ -92,5 +108,5 @@ export async function loadRelayPayload<T>(
           ? "version"
           : "decrypt",
     };
-  return { status: "ok", payload: value, etag: read.etag };
+  return { status: "ok", payload: value, etag };
 }

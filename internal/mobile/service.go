@@ -1,0 +1,229 @@
+// Package mobile provides the native Android read-only snapshot viewer.
+package mobile
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	datasync "yousage/internal/sync"
+)
+
+const maxEnvelopeBytes = 4 << 20
+
+var validSpaceID = regexp.MustCompile(`^[A-Za-z0-9_-]{22}$`)
+
+// Pairing exposes pairing state without disclosing the space ID or secret key.
+type Pairing struct {
+	IsPaired    bool   `json:"isPaired"`
+	RelayOrigin string `json:"relayOrigin"`
+}
+
+// SnapshotResult carries decrypted JSON or a recoverable relay outcome.
+type SnapshotResult struct {
+	Status  string `json:"status"`
+	Problem string `json:"problem"`
+	Payload string `json:"payload"`
+	ETag    string `json:"etag"`
+}
+
+// storedPairing holds credentials exclusively in private native storage.
+type storedPairing struct {
+	Origin string `json:"origin"`
+	ID     string `json:"id"`
+	Key    string `json:"key"`
+}
+
+// Service binds pairing, relay reads, and external navigation to the frontend.
+type Service struct {
+	mutex     sync.Mutex
+	directory string
+	client    *http.Client
+	openURL   func(string) error
+}
+
+// newService configures private persistence and bounded relay requests.
+func newService(directory string, openURL func(string) error) *Service {
+	return &Service{directory: directory, openURL: openURL, client: &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(request *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}}
+}
+
+// parseLink validates a complete viewer link and isolates its native credentials.
+func parseLink(link string) (storedPairing, error) {
+	parsed, err := url.Parse(strings.TrimSpace(link))
+	if err != nil || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Opaque != "" {
+		return storedPairing{}, errors.New("invalid pairing link")
+	}
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLocalHost(parsed.Hostname())) {
+		return storedPairing{}, errors.New("pairing links require HTTPS outside local networks")
+	}
+	identifier := strings.TrimPrefix(parsed.Path, "/v/")
+	if parsed.Path != "/v/"+identifier || parsed.RawPath != "" || !validSpaceID.MatchString(identifier) {
+		return storedPairing{}, errors.New("invalid pairing space")
+	}
+	key, err := base64.RawURLEncoding.Strict().DecodeString(parsed.Fragment)
+	if err != nil || len(key) != 32 || strings.ContainsAny(parsed.Fragment, "\r\n") {
+		return storedPairing{}, errors.New("invalid pairing key")
+	}
+	return storedPairing{Origin: parsed.Scheme + "://" + parsed.Host, ID: identifier, Key: parsed.Fragment}, nil
+}
+
+// isLocalHost permits cleartext only for loopback and literal private addresses.
+func isLocalHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	address := net.ParseIP(host)
+	return address != nil && (address.IsLoopback() || address.IsPrivate())
+}
+
+// readPairing reads and validates native credentials while the mutex is held.
+func (service *Service) readPairing() (storedPairing, error) {
+	data, err := os.ReadFile(filepath.Join(service.directory, "pairing.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return storedPairing{}, nil
+	}
+	if err != nil {
+		return storedPairing{}, err
+	}
+	var pairing storedPairing
+	if err = json.Unmarshal(data, &pairing); err != nil {
+		return storedPairing{}, errors.New("invalid saved pairing")
+	}
+	validated, err := parseLink(pairing.Origin + "/v/" + pairing.ID + "#" + pairing.Key)
+	if err != nil || validated != pairing {
+		return storedPairing{}, errors.New("invalid saved pairing")
+	}
+	return pairing, nil
+}
+
+// GetPairing returns saved pairing metadata without exposing credentials.
+func (service *Service) GetPairing() (Pairing, error) {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	pairing, err := service.readPairing()
+	return Pairing{IsPaired: pairing.ID != "", RelayOrigin: pairing.Origin}, err
+}
+
+// Pair atomically saves a validated link without contacting the relay.
+func (service *Service) Pair(link string) (Pairing, error) {
+	pairing, err := parseLink(link)
+	if err != nil {
+		return Pairing{}, err
+	}
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if err = os.MkdirAll(service.directory, 0700); err != nil {
+		return Pairing{}, err
+	}
+	data, err := json.Marshal(pairing)
+	if err != nil {
+		return Pairing{}, err
+	}
+	file, err := os.CreateTemp(service.directory, ".pairing-*")
+	if err != nil {
+		return Pairing{}, err
+	}
+	defer os.Remove(file.Name())
+	if _, err = file.Write(data); err == nil {
+		err = file.Sync()
+	}
+	closeError := file.Close()
+	if err != nil {
+		return Pairing{}, err
+	}
+	if closeError != nil {
+		return Pairing{}, closeError
+	}
+	if err = os.Rename(file.Name(), filepath.Join(service.directory, "pairing.json")); err != nil {
+		return Pairing{}, err
+	}
+	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
+}
+
+// Unpair deletes saved credentials; an already unpaired app succeeds.
+func (service *Service) Unpair() error {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	err := os.Remove(filepath.Join(service.directory, "pairing.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+// LoadSnapshot conditionally fetches, authenticates, and decompresses the snapshot.
+func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
+	service.mutex.Lock()
+	pairing, err := service.readPairing()
+	service.mutex.Unlock()
+	if err != nil {
+		return SnapshotResult{}, err
+	}
+	if pairing.ID == "" {
+		return SnapshotResult{Status: "unpaired"}, nil
+	}
+	request, err := http.NewRequest(http.MethodGet, pairing.Origin+"/api/spaces/"+pairing.ID, nil)
+	if err != nil {
+		return SnapshotResult{}, err
+	}
+	request.Header.Set("Cache-Control", "no-store")
+	if etag != "" {
+		request.Header.Set("If-None-Match", etag)
+	}
+	response, err := service.client.Do(request)
+	if err != nil {
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+	}
+	defer response.Body.Close()
+	switch response.StatusCode {
+	case http.StatusNotModified:
+		return SnapshotResult{Status: "unchanged", ETag: response.Header.Get("ETag")}, nil
+	case http.StatusNotFound:
+		return SnapshotResult{Status: "problem", Problem: "missing"}, nil
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+	}
+	envelope, err := io.ReadAll(io.LimitReader(response.Body, maxEnvelopeBytes+1))
+	if err != nil {
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+	}
+	if len(envelope) > maxEnvelopeBytes {
+		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil
+	}
+	payload, err := datasync.Open(envelope, pairing.Key, "space:"+pairing.ID)
+	if errors.Is(err, datasync.ErrEnvelopeVersion) {
+		return SnapshotResult{Status: "problem", Problem: "version"}, nil
+	}
+	if err != nil || !json.Valid(payload) {
+		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil
+	}
+	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: response.Header.Get("ETag")}, nil
+}
+
+// OpenURL opens an HTTPS destination through the native Android browser bridge.
+func (service *Service) OpenURL(destination string) error {
+	parsed, err := url.Parse(destination)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.Opaque != "" {
+		return errors.New("only HTTPS links can be opened")
+	}
+	if service.openURL == nil {
+		return errors.New("native browser is unavailable")
+	}
+	return service.openURL(destination)
+}
