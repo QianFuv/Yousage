@@ -189,26 +189,24 @@ func (service *Service) startLimitsFollowup(request refresh.Request) {
 		}()
 		ctx := context.WithValue(service.owner, deferredUsageInvalidationKey{}, true)
 		historyError := service.RefreshHistory(ctx, request)
-		rateError := service.RefreshRates(ctx, request)
+		service.RefreshRates(ctx, request)
 		if ctx.Err() == nil {
-			service.recordFollowupFailure(ctx, historyError, rateError)
+			service.recordFollowupFailure(ctx, historyError)
 			service.emit("usage-invalidated", nil)
 		}
 	}()
 }
 
 // recordFollowupFailure retains history failures alongside coordinator notices.
-func (service *Service) recordFollowupFailure(ctx context.Context, historyError, rateError error) {
-	if historyError == nil && rateError == nil {
+func (service *Service) recordFollowupFailure(ctx context.Context, historyError error) {
+	if historyError == nil {
 		return
 	}
-	if historyError != nil {
-		entries, _, err := service.sourceIndex(ctx)
-		if err == nil {
-			for _, entry := range entries {
-				if !entry.IsHidden && service.isProviderInScope(entry.Source.Fingerprint.Provider) {
-					_ = service.Store.Observe(ctx, domain.Observation{SourceId: entry.Source.Fingerprint.Id(), Status: "failed", AttemptedAt: service.Now().UnixMilli(), Notice: "Local history could not be refreshed. Cached history is retained."})
-				}
+	entries, _, err := service.sourceIndex(ctx)
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsHidden && service.isProviderInScope(entry.Source.Fingerprint.Provider) {
+				_ = service.Store.Observe(ctx, domain.Observation{SourceId: entry.Source.Fingerprint.Id(), Status: "failed", AttemptedAt: service.Now().UnixMilli(), Notice: "Local history could not be refreshed. Cached history is retained."})
 			}
 		}
 	}
