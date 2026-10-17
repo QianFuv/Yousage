@@ -2,6 +2,7 @@ import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { observeResize } from "~/lib/observeResize";
+import { useReadoutDismissal } from "../src/usage/readoutDismissal";
 
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
 import { formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
@@ -201,6 +202,12 @@ export function UsageProviderChart({
   const plotRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverPositionRef = useRef<{ x: number; y: number } | null>(null);
+  /** Hide the readout; touch scrolling and presses elsewhere end it too. */
+  const dismiss = useCallback(() => {
+    hoverPositionRef.current = null;
+    setHoverIndex(null);
+  }, []);
+  useReadoutDismissal(plotRef, hoverIndex !== null, dismiss);
 
   const { paths, ticks, stepX, toY, series } = useMemo(() => {
     if (periods.length === 0) {
@@ -364,10 +371,8 @@ export function UsageProviderChart({
           style={{ touchAction: "pan-y" }}
           onPointerDown={handleMove}
           onPointerMove={handleMove}
-          onMouseLeave={() => {
-            hoverPositionRef.current = null;
-            setHoverIndex(null);
-          }}
+          onPointerCancel={dismiss}
+          onMouseLeave={dismiss}
         >
           <svg
             className="h-full w-full"

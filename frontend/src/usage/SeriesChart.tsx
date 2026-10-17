@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { observeResize } from "~/lib/observeResize";
+import { useReadoutDismissal } from "./readoutDismissal";
 import {
   curvePath,
   niceScale,
@@ -58,6 +59,12 @@ export function SeriesChart({
   const plotRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverPositionRef = useRef<{ x: number; y: number } | null>(null);
+  /** Hide the readout; touch scrolling and presses elsewhere end it too. */
+  const dismiss = useCallback(() => {
+    hoverPositionRef.current = null;
+    setHoverIndex(null);
+  }, []);
+  useReadoutDismissal(plotRef, hoverIndex !== null, dismiss);
 
   const { paths, ticks, stepX, toY } = useMemo(() => {
     const peak = Math.max(0, ...series.flatMap((line) => line.values));
@@ -175,10 +182,8 @@ export function SeriesChart({
           style={{ touchAction: "pan-y" }}
           onPointerDown={handleMove}
           onPointerMove={handleMove}
-          onMouseLeave={() => {
-            hoverPositionRef.current = null;
-            setHoverIndex(null);
-          }}
+          onPointerCancel={dismiss}
+          onMouseLeave={dismiss}
         >
           <svg
             className="h-full w-full"
