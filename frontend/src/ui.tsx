@@ -33,7 +33,7 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="page-header sticky top-0 z-20 flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/85 px-6 py-2 backdrop-blur-md max-md:px-4">
+    <header className="page-header sticky top-0 z-40 flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/85 px-6 py-2 backdrop-blur-md max-md:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
         {parent && (
           <>
