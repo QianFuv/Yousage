@@ -186,6 +186,79 @@ func TestLoadSnapshot(test *testing.T) {
 	}
 }
 
+// TestCachedSnapshot checks that a cold start can reopen the last relay read for the same pairing only.
+func TestCachedSnapshot(test *testing.T) {
+	key, _ := datasync.NewKey()
+	identifier := strings.Repeat("A", 22)
+	payload := `{"schemaVersion":1,"usage":[]}`
+	envelope, err := datasync.Seal([]byte(payload), key, "space:"+identifier)
+	if err != nil {
+		test.Fatal(err)
+	}
+	isChanged := true
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("ETag", `"current"`)
+		if !isChanged {
+			writer.WriteHeader(http.StatusNotModified)
+			return
+		}
+		writer.Write(envelope)
+	}))
+	defer server.Close()
+	directory := test.TempDir()
+	service := newService(directory, nil)
+	if result, err := service.CachedSnapshot(); err != nil || result.Status != "unpaired" {
+		test.Fatalf("unpaired cache = %+v, error = %v", result, err)
+	}
+	link := server.URL + "/v/" + identifier + "#" + key
+	if _, err = service.Pair(link); err != nil {
+		test.Fatal(err)
+	}
+	if result, err := service.CachedSnapshot(); err != nil || result.Status != "empty" {
+		test.Fatalf("empty cache = %+v, error = %v", result, err)
+	}
+	if result, err := service.LoadSnapshot(""); err != nil || result.Status != "ok" {
+		test.Fatalf("load = %+v, error = %v", result, err)
+	}
+	isChanged = false
+	if result, err := service.LoadSnapshot(`"current"`); err != nil || result.Status != "unchanged" {
+		test.Fatalf("conditional load = %+v, error = %v", result, err)
+	}
+	cached, err := newService(directory, nil).CachedSnapshot()
+	if err != nil || cached.Status != "ok" || cached.Payload != payload || cached.ETag != `"current"` {
+		test.Fatalf("reopened cache = %+v, error = %v", cached, err)
+	}
+	stored, err := os.ReadFile(filepath.Join(directory, snapshotFile))
+	if err != nil || strings.Contains(string(stored), "schemaVersion") {
+		test.Fatal("cached snapshot is not kept encrypted")
+	}
+	if err = os.WriteFile(filepath.Join(directory, snapshotFile), []byte("{"), 0600); err != nil {
+		test.Fatal(err)
+	}
+	if result, err := service.CachedSnapshot(); err != nil || result.Status != "empty" || result.Payload != "" {
+		test.Fatalf("corrupt cache = %+v, error = %v", result, err)
+	}
+	isChanged = true
+	service.LoadSnapshot("")
+	otherKey, _ := datasync.NewKey()
+	if _, err = service.Pair(server.URL + "/v/" + strings.Repeat("B", 22) + "#" + otherKey); err != nil {
+		test.Fatal(err)
+	}
+	if result, err := service.CachedSnapshot(); err != nil || result.Status != "empty" {
+		test.Fatalf("replaced pairing reused the old cache: %+v, error = %v", result, err)
+	}
+	if _, err = service.Pair(link); err != nil {
+		test.Fatal(err)
+	}
+	service.LoadSnapshot("")
+	if err = service.Unpair(); err != nil {
+		test.Fatal(err)
+	}
+	if entries, _ := os.ReadDir(directory); len(entries) != 0 {
+		test.Fatalf("unpair left private files: %v", entries)
+	}
+}
+
 // TestSnapshotTimeout checks that a stalled relay produces a recoverable network problem.
 func TestSnapshotTimeout(test *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -1,4 +1,4 @@
-/** Android entry: pair with the desktop's relay once, then show its latest snapshot read-only. */
+/** Android entry: pair with the desktop's relay once, then show its saved and latest snapshots read-only. */
 import { createRoot, type Root } from "react-dom/client";
 import { getTransport } from "@wailsio/runtime";
 import { RefreshCwIcon, Unlink2Icon } from "lucide-react";
@@ -77,10 +77,38 @@ function showProblem(problem: keyof typeof PROBLEMS) {
   );
 }
 
-/** Read the saved relay's snapshot and mount the viewer over it. */
+/** Show the wordmark while the first snapshot downloads. */
+function showLoading() {
+  leaveViewer();
+  applyDeviceLook();
+  root.render(
+    <div className="android-loading" role="status">
+      <strong className="sidebar-wordmark android-pair-wordmark">
+        <span aria-hidden>Y</span>
+        <span className="sidebar-wordmark-tail" aria-hidden>
+          ou
+        </span>
+        <span className="sidebar-wordmark-tail" aria-hidden>
+          sage
+        </span>
+      </strong>
+      <span>
+        <RefreshCwIcon aria-hidden className="animate-spin" />
+        {t("Loading…")}
+      </span>
+    </div>,
+  );
+}
+
+/** Show the snapshot saved on this device at once, or download the first one, and mount the viewer. */
 async function openSnapshot() {
   leaveViewer();
-  const first = interpretSnapshot(await mobileApi.LoadSnapshot(""));
+  let first = interpretSnapshot(await mobileApi.CachedSnapshot());
+  const isSaved = first.status === "ok";
+  if (first.status === "empty") {
+    showLoading();
+    first = interpretSnapshot(await mobileApi.LoadSnapshot(""));
+  }
   if (first.status === "unpaired") return showPairing();
   if (first.status !== "ok")
     return showProblem(first.status === "problem" ? first.problem : "network");
@@ -89,6 +117,7 @@ async function openSnapshot() {
   unmountViewer = await mountViewer({
     root,
     initial: first.payload,
+    isSaved,
     locale,
     fallback: nativeTransport,
     async fetchNewer() {

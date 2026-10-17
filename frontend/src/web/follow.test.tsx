@@ -87,6 +87,58 @@ describe("followSnapshots", () => {
     follower.stop();
   });
 
+  it("shows a refresh on opening, then clears it once the snapshot is current", async () => {
+    const statuses: string[] = [];
+    const follower = followSnapshots(
+      async () => "newer",
+      () => {},
+      (status) => statuses.push(status.state),
+    );
+    await follower.refetch(true);
+    expect(statuses).toEqual(["refreshing", "current"]);
+    follower.stop();
+  });
+
+  it("shows a refresh when the app returns, but not for periodic polls", async () => {
+    const statuses: string[] = [];
+    const follower = followSnapshots(
+      async () => null,
+      () => {},
+      (status) => statuses.push(status.state),
+    );
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS * 2);
+    expect(statuses).toEqual([]);
+    page.show("hidden");
+    page.show("visible");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses).toEqual(["refreshing", "current"]);
+    follower.stop();
+  });
+
+  it("keeps a shown failure until a later poll succeeds", async () => {
+    const statuses: { state: string; problem?: string }[] = [];
+    const fetchNewer = vi
+      .fn<() => Promise<string | null>>()
+      .mockRejectedValueOnce(new Error("The relay cannot be reached"))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(null);
+    const follower = followSnapshots(
+      fetchNewer,
+      () => {},
+      (status) => statuses.push(status),
+    );
+    await expect(follower.refetch(true)).rejects.toThrow();
+    expect(statuses.at(-1)).toEqual({
+      state: "failed",
+      problem: "The relay cannot be reached",
+    });
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
+    expect(statuses.at(-1)?.state).toBe("failed");
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
+    expect(statuses.at(-1)).toEqual({ state: "current" });
+    follower.stop();
+  });
+
   it("ignores everything after it stops", async () => {
     let finish: (value: string) => void = () => {};
     const fetchNewer = vi.fn(

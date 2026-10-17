@@ -20,6 +20,8 @@ import (
 )
 
 const maxEnvelopeBytes = 4 << 20
+const pairingFile = "pairing.json"
+const snapshotFile = "snapshot.json"
 
 var validSpaceID = regexp.MustCompile(`^[A-Za-z0-9_-]{22}$`)
 
@@ -42,6 +44,13 @@ type storedPairing struct {
 	Origin string `json:"origin"`
 	ID     string `json:"id"`
 	Key    string `json:"key"`
+}
+
+// cachedSnapshot keeps the last authenticated envelope, still encrypted, for the next cold start.
+type cachedSnapshot struct {
+	ID       string `json:"id"`
+	ETag     string `json:"etag"`
+	Envelope []byte `json:"envelope"`
 }
 
 // Service binds pairing, relay reads, and external navigation to the frontend.
@@ -93,7 +102,7 @@ func isLocalHost(host string) bool {
 
 // readPairing reads and validates native credentials while the mutex is held.
 func (service *Service) readPairing() (storedPairing, error) {
-	data, err := os.ReadFile(filepath.Join(service.directory, "pairing.json"))
+	data, err := os.ReadFile(filepath.Join(service.directory, pairingFile))
 	if errors.Is(err, os.ErrNotExist) {
 		return storedPairing{}, nil
 	}
@@ -125,18 +134,29 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	if err != nil {
 		return Pairing{}, err
 	}
-	service.mutex.Lock()
-	defer service.mutex.Unlock()
-	if err = os.MkdirAll(service.directory, 0700); err != nil {
-		return Pairing{}, err
-	}
 	data, err := json.Marshal(pairing)
 	if err != nil {
 		return Pairing{}, err
 	}
-	file, err := os.CreateTemp(service.directory, ".pairing-*")
-	if err != nil {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if err = service.writePrivate(pairingFile, data); err != nil {
 		return Pairing{}, err
+	}
+	if err = service.removePrivate(snapshotFile); err != nil {
+		return Pairing{}, err
+	}
+	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
+}
+
+// writePrivate atomically replaces one file in private storage while the mutex is held.
+func (service *Service) writePrivate(name string, data []byte) error {
+	if err := os.MkdirAll(service.directory, 0700); err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(service.directory, ".private-*")
+	if err != nil {
+		return err
 	}
 	defer os.Remove(file.Name())
 	if _, err = file.Write(data); err == nil {
@@ -144,26 +164,69 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	}
 	closeError := file.Close()
 	if err != nil {
-		return Pairing{}, err
+		return err
 	}
 	if closeError != nil {
-		return Pairing{}, closeError
+		return closeError
 	}
-	if err = os.Rename(file.Name(), filepath.Join(service.directory, "pairing.json")); err != nil {
-		return Pairing{}, err
-	}
-	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
+	return os.Rename(file.Name(), filepath.Join(service.directory, name))
 }
 
-// Unpair deletes saved credentials; an already unpaired app succeeds.
-func (service *Service) Unpair() error {
-	service.mutex.Lock()
-	defer service.mutex.Unlock()
-	err := os.Remove(filepath.Join(service.directory, "pairing.json"))
+// removePrivate deletes one private file while the mutex is held; a missing file succeeds.
+func (service *Service) removePrivate(name string) error {
+	err := os.Remove(filepath.Join(service.directory, name))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	return err
+}
+
+// Unpair deletes saved credentials and the cached snapshot; an already unpaired app succeeds.
+func (service *Service) Unpair() error {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if err := service.removePrivate(snapshotFile); err != nil {
+		return err
+	}
+	return service.removePrivate(pairingFile)
+}
+
+// CachedSnapshot opens the last snapshot read from the relay, so a cold start shows it at once.
+//
+// It reports "empty" when nothing usable is cached for the current pairing.
+func (service *Service) CachedSnapshot() (SnapshotResult, error) {
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	pairing, err := service.readPairing()
+	if err != nil {
+		return SnapshotResult{}, err
+	}
+	if pairing.ID == "" {
+		return SnapshotResult{Status: "unpaired"}, nil
+	}
+	data, err := os.ReadFile(filepath.Join(service.directory, snapshotFile))
+	var cached cachedSnapshot
+	if err != nil || json.Unmarshal(data, &cached) != nil || cached.ID != pairing.ID {
+		return SnapshotResult{Status: "empty"}, nil
+	}
+	payload, err := datasync.Open(cached.Envelope, pairing.Key, "space:"+pairing.ID)
+	if err != nil || !json.Valid(payload) {
+		return SnapshotResult{Status: "empty"}, nil
+	}
+	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: cached.ETag}, nil
+}
+
+// cacheSnapshot keeps an authenticated envelope unless the pairing changed during the read.
+func (service *Service) cacheSnapshot(pairing storedPairing, etag string, envelope []byte) {
+	data, err := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: etag, Envelope: envelope})
+	if err != nil {
+		return
+	}
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if current, err := service.readPairing(); err == nil && current == pairing {
+		_ = service.writePrivate(snapshotFile, data)
+	}
 }
 
 // LoadSnapshot conditionally fetches, authenticates, and decompresses the snapshot.
@@ -213,7 +276,9 @@ func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
 	if err != nil || !json.Valid(payload) {
 		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil
 	}
-	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: response.Header.Get("ETag")}, nil
+	etag = response.Header.Get("ETag")
+	service.cacheSnapshot(pairing, etag, envelope)
+	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: etag}, nil
 }
 
 // OpenURL opens an HTTPS destination through the native Android browser bridge.

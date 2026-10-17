@@ -15,11 +15,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * CachedSnapshot opens the last snapshot read from the relay, so a cold start shows it at once.
+ * 
+ * It reports "empty" when nothing usable is cached for the current pairing.
+ */
+export function CachedSnapshot(): $CancellablePromise<$models.SnapshotResult> {
+    return $Call.ByID(3627769306).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * GetPairing returns saved pairing metadata without exposing credentials.
  */
 export function GetPairing(): $CancellablePromise<$models.Pairing> {
     return $Call.ByID(777916204).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
@@ -28,7 +39,7 @@ export function GetPairing(): $CancellablePromise<$models.Pairing> {
  */
 export function LoadSnapshot(etag: string): $CancellablePromise<$models.SnapshotResult> {
     return $Call.ByID(1471563460, etag).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType0($result);
     });
 }
 
@@ -44,17 +55,17 @@ export function OpenURL(destination: string): $CancellablePromise<void> {
  */
 export function Pair(link: string): $CancellablePromise<$models.Pairing> {
     return $Call.ByID(1595144256, link).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
 /**
- * Unpair deletes saved credentials; an already unpaired app succeeds.
+ * Unpair deletes saved credentials and the cached snapshot; an already unpaired app succeeds.
  */
 export function Unpair(): $CancellablePromise<void> {
     return $Call.ByID(1382349247);
 }
 
 // Private type creation functions
-const $$createType0 = $models.Pairing.createFrom;
-const $$createType1 = $models.SnapshotResult.createFrom;
+const $$createType0 = $models.SnapshotResult.createFrom;
+const $$createType1 = $models.Pairing.createFrom;

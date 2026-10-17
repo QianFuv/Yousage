@@ -18,6 +18,8 @@ import { UsagePage } from "../usage/UsagePage";
 import { NavItem } from "../NavItem";
 import { t, useI18n } from "../i18n";
 import { ViewerSettings, type ViewerConnection } from "./ViewerSettings";
+import { RefreshStatus } from "./RefreshStatus";
+import type { FollowStatus } from "./follow";
 
 const LossPage = lazy(() =>
   import("../loss/LossPage").then((module) => ({ default: module.LossPage })),
@@ -34,7 +36,7 @@ type ViewerRoute = "statistics" | "quota" | "loss" | "speed" | "settings";
 /**
  * Read-only pages rendered from the latest relay snapshot.
  *
- * @param props - Snapshot time and version, the viewing device locale and the relay connection.
+ * @param props - Snapshot time and version, the viewing device locale, the relay connection and refresh status.
  * @returns The viewer layout.
  */
 export function WebViewer({
@@ -42,11 +44,13 @@ export function WebViewer({
   appVersion,
   locale,
   connection,
+  refresh,
 }: {
   generatedAt: string;
   appVersion: string;
   locale: string;
   connection?: ViewerConnection;
+  refresh?: { status: FollowStatus; onRetry: () => void };
 }) {
   useI18n();
   const data = useData();
@@ -136,6 +140,14 @@ export function WebViewer({
           />
         )}
       </main>
+      {refresh && (
+        <RefreshStatus
+          status={refresh.status}
+          generatedAt={generatedAt}
+          locale={locale}
+          onRetry={refresh.onRetry}
+        />
+      )}
     </div>
   );
 }

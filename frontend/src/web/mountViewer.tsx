@@ -8,7 +8,7 @@ import { resolveLanguage, setLanguage } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
 import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
-import { followSnapshots } from "./follow";
+import { followSnapshots, type FollowStatus } from "./follow";
 import { ReadOnlyContext } from "./readOnly";
 import { WebViewer } from "./WebViewer";
 import type { ViewerConnection } from "./ViewerSettings";
@@ -38,6 +38,8 @@ export type ViewerHost = {
   root: Root;
   /** The first snapshot to show. */
   initial: PrivateSnapshot;
+  /** The first snapshot was saved on this device earlier, so refresh it at once with visible progress. */
+  isSaved?: boolean;
   /** Download a newer snapshot; `null` when unchanged, an error with a message on failure. */
   fetchNewer: () => Promise<PrivateSnapshot | null>;
   /** Open a destination chosen by the user. */
@@ -61,19 +63,33 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   let snapshot = host.initial;
   const names = await captureMethodIds(setTransport, fallback);
   const darkQuery = matchMedia(DARK_QUERY);
-  /** Render the shell again so the banner shows the latest snapshot time. */
-  let renderTime: (generatedAt: string) => void = () => {};
+  let status: FollowStatus = { state: "current" };
+  /** Render the shell again so it shows the latest snapshot time and refresh status. */
+  let render: () => void = () => {};
   /** Hand each newer snapshot's theme and reports to the mounted pages. */
-  const follower = followSnapshots(host.fetchNewer, (next) => {
-    snapshot = next;
-    renderTime(snapshot.generatedAt);
-    dispatchEvent("appearance-snapshot", snapshot.appearance);
-    dispatchEvent("usage-invalidated", null);
-  });
+  const follower = followSnapshots(
+    host.fetchNewer,
+    (next) => {
+      snapshot = next;
+      render();
+      dispatchEvent("appearance-snapshot", snapshot.appearance);
+      dispatchEvent("usage-invalidated", null);
+    },
+    (next) => {
+      status = next;
+      render();
+    },
+  );
+  /** Refresh with visible progress; failures stay in the status. */
+  const refreshShown = () => void follower.refetch(true).catch(() => {});
   setTransport(
     createSnapshotTransport(names, {
       current: () => snapshot,
-      refetch: follower.refetch,
+      /** A failure the status already shows is not reported again by the pages. */
+      refetch: () =>
+        follower.refetch().catch((cause: unknown) => {
+          if (status.state !== "failed") throw cause;
+        }),
       device: { isDark: () => darkQuery.matches, locale: host.locale },
       open: host.open,
       fallback,
@@ -91,7 +107,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   setLanguage(resolveLanguage(display.value.language, host.locale));
   configureTimestampLocale(host.locale);
   applySavedAppearance(appearance, bootstrap.isSystemDark);
-  renderTime = (generatedAt) =>
+  render = () =>
     host.root.render(
       <ReadOnlyContext.Provider value>
         <AppearanceProvider
@@ -100,17 +116,19 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
         >
           <DataProvider initial={display}>
             <WebViewer
-              generatedAt={generatedAt}
+              generatedAt={snapshot.generatedAt}
               appVersion={snapshot.appVersion}
               locale={host.locale}
               connection={host.connection}
+              refresh={{ status, onRetry: refreshShown }}
             />
           </DataProvider>
           <Toaster />
         </AppearanceProvider>
       </ReadOnlyContext.Provider>,
     );
-  renderTime(snapshot.generatedAt);
+  render();
+  if (host.isSaved) refreshShown();
   return () => {
     follower.stop();
     clearNotifications();

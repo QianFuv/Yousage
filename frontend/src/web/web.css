@@ -182,3 +182,71 @@
   height: 0.5rem;
   border-radius: 999px;
 }
+
+/* Refresh status -------------------------------------------------------- */
+.viewer-refresh-status {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  right: 1rem;
+  left: 1rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: min(28rem, calc(100vw - 2rem));
+  margin: 0 auto;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+  /* Quick checks finish before the note appears, so it does not flicker. */
+  animation: viewer-refresh-status-in 150ms ease-out 400ms both;
+}
+.viewer-refresh-status[data-state="failed"] {
+  border-radius: calc(var(--radius) + 4px);
+  animation: none;
+}
+.viewer-refresh-status > svg {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.viewer-refresh-status[data-state="failed"] > svg {
+  color: var(--destructive);
+}
+.viewer-refresh-status > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.viewer-refresh-status small {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.viewer-refresh-status button {
+  flex: none;
+  margin-left: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font: inherit;
+  font-weight: 500;
+}
+@keyframes viewer-refresh-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewer-refresh-status {
+    animation-duration: 0s;
+  }
+}

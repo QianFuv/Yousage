@@ -3,19 +3,24 @@ import type { SnapshotResult } from "../../bindings/yousage/internal/mobile/mode
 import { checkPayload, PROBLEMS, type LoadResult } from "../web/load";
 import { isPrivateSnapshot, type PrivateSnapshot } from "../web/payloads";
 
-/** A snapshot read on the device, or the marker that no link is saved yet. */
-export type DeviceRead = LoadResult<PrivateSnapshot> | { status: "unpaired" };
+/** A snapshot read on the device, or the marker that no link or no saved snapshot exists yet. */
+export type DeviceRead =
+  | LoadResult<PrivateSnapshot>
+  | { status: "unpaired" }
+  | { status: "empty" };
 
 /**
  * Turn the Go side's snapshot result into a validated payload or a problem.
  *
- * @param result - What `LoadSnapshot` returned.
- * @returns The snapshot, an unchanged or unpaired marker, or a problem key.
+ * @param result - What `LoadSnapshot` or `CachedSnapshot` returned.
+ * @returns The snapshot, an unchanged, unpaired or empty marker, or a problem key.
  */
 export function interpretSnapshot(result: SnapshotResult): DeviceRead {
   switch (result.status) {
     case "unpaired":
       return { status: "unpaired" };
+    case "empty":
+      return { status: "empty" };
     case "unchanged":
       return { status: "unchanged" };
     case "ok": {

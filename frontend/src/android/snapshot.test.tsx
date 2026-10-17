@@ -45,10 +45,13 @@ describe("interpretSnapshot", () => {
     expect(read).toEqual({ status: "problem", problem: "decrypt" });
   });
 
-  it("passes through unpaired, unchanged and known problems", () => {
+  it("passes through unpaired, empty, unchanged and known problems", () => {
     expect(
       interpretSnapshot(new SnapshotResult({ status: "unpaired" })),
     ).toEqual({ status: "unpaired" });
+    expect(interpretSnapshot(new SnapshotResult({ status: "empty" }))).toEqual({
+      status: "empty",
+    });
     expect(
       interpretSnapshot(new SnapshotResult({ status: "unchanged" })),
     ).toEqual({ status: "unchanged" });

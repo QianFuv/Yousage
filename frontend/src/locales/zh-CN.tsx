@@ -805,6 +805,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "占额外花费 {share} · {tokens} Token",
   "Show all {count} events": "显示全部 {count} 条",
   "Show fewer": "收起",
+  "Showing data from {time}": "正在显示 {time} 的数据",
   "Daily extra spend": "每日额外花费",
   "Hourly extra spend": "每小时额外花费",
   Events: "事件",
