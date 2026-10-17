@@ -1,6 +1,7 @@
 /** The relay warning appears only when the token would cross the network unencrypted. */
 import { describe, expect, it } from "vitest";
-import { isInsecureRelay } from "./SyncPanel";
+import { State } from "../../bindings/yousage/internal/sync/models";
+import { isInsecureRelay, nextSyncState } from "./SyncPanel";
 
 describe("relay address warning", () => {
   it("warns for plain HTTP to another machine", () => {
@@ -15,5 +16,18 @@ describe("relay address warning", () => {
     expect(isInsecureRelay("http://[::1]:8080")).toBe(false);
     expect(isInsecureRelay("https://")).toBe(false);
     expect(isInsecureRelay("")).toBe(false);
+  });
+});
+
+describe("sync state after an action", () => {
+  it("keeps the shown state when an action has no result", () => {
+    const current = State.createFrom({ isEnabled: true, pairingUrl: "u" });
+    expect(nextSyncState(current, {})).toBe(current);
+    expect(nextSyncState(current, undefined)).toBe(current);
+  });
+
+  it("shows the state an action returns", () => {
+    const next = State.createFrom({ isEnabled: false });
+    expect(nextSyncState(null, next)).toBe(next);
   });
 });

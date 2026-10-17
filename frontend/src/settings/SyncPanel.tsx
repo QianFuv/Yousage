@@ -17,7 +17,7 @@ import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
   SaveInput,
   type ShareView,
-  type State as SyncState,
+  State as SyncState,
 } from "../../bindings/yousage/internal/sync/models";
 import { t } from "../i18n";
 import {
@@ -72,6 +72,22 @@ function periodTitle(days: number): string {
     : t("Last {days} days", { days: String(days) });
 }
 
+/**
+ * The sync state after an action, keeping the current one when the action returns none.
+ *
+ * Bindings without a result still resolve to an empty object, which must not replace the state.
+ *
+ * @param current - State shown before the action.
+ * @param result - What the action resolved to.
+ * @returns The state to show next.
+ */
+export function nextSyncState(
+  current: SyncState | null,
+  result: unknown,
+): SyncState | null {
+  return result instanceof SyncState ? result : current;
+}
+
 /** A destructive action waiting for confirmation. */
 type PendingConfirm =
   | { kind: "rotate" }
@@ -116,8 +132,8 @@ export function SyncPanel() {
     setError("");
     setMessage("");
     try {
-      const next = await action();
-      if (next) setState(next);
+      const result = await action();
+      setState((current) => nextSyncState(current, result));
       setMessage(success);
     } catch (cause) {
       setError(String(cause));
