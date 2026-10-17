@@ -91,16 +91,16 @@ export function useResetCredit(
 ) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const attempted = useRef(false);
   const isWorking = useRef(false);
   const identity = JSON.stringify([environmentId, input]);
-  /** Redeem only after confirmation; a subsequent confirmation is an explicit retry of the same operation. */
+  /** Retry unresolved operations explicitly; completed outcomes allow a new confirmed redemption. */
   async function redeem() {
     if (isWorking.current) return;
     isWorking.current = true;
     setConfirming(false);
     setBusy(true);
     let operationId = RESET_OPERATIONS.get(identity);
+    const isExplicitRetry = operationId !== undefined;
     if (!operationId) {
       operationId = crypto.randomUUID();
       RESET_OPERATIONS.set(identity, operationId);
@@ -109,9 +109,16 @@ export function useResetCredit(
       const result = await nativeApi.ConsumeResetCredit(
         RedeemRoute.createFrom(JSON.stringify({ environmentId, ...input })),
         operationId,
-        attempted.current,
+        isExplicitRetry,
       );
-      attempted.current = true;
+      if (
+        ["reset", "nothingToReset", "noCredit", "alreadyRedeemed"].includes(
+          result.outcome,
+        ) &&
+        RESET_OPERATIONS.get(identity) === operationId
+      ) {
+        RESET_OPERATIONS.delete(identity);
+      }
       await nativeApi
         .RefreshLimits(
           [environmentId],
@@ -133,7 +140,6 @@ export function useResetCredit(
         result.outcome === "reset" && !result.warning ? "success" : "info",
       );
     } catch (cause) {
-      attempted.current = true;
       notifyError(cause);
     } finally {
       isWorking.current = false;
