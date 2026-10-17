@@ -11,12 +11,54 @@ import (
 	"testing"
 	"time"
 	"yousage/internal/refresh"
+	datasync "yousage/internal/sync"
 )
 
 type fakeBackgroundTicker struct {
 	channel chan time.Time
 	stopped chan struct{}
 	once    sync.Once
+}
+
+// TestBackgroundRefreshAdvancesEveryPublishedWindow checks a real snapshot after a hidden-day rollover.
+func TestBackgroundRefreshAdvancesEveryPublishedWindow(t *testing.T) {
+	app := syncTestApp(t)
+	now := app.usage.Now()
+	app.usage.Now = func() time.Time { return now }
+	for _, days := range []int{1, 7, 30, 90} {
+		if _, err := app.usage.Usage(app.context, days, "UTC"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now = now.Add(25 * time.Hour)
+	created := make(chan *fakeBackgroundTicker, 1)
+	completed := make(chan datasync.Snapshot, 1)
+	builder := datasync.SnapshotBuilder{Source: app.usage, Display: app.usage.Preferences.Display, Appearance: app.themes.Read, Bootstrap: func() any { return Bootstrap{} }, Now: app.usage.Now}
+	controller := newBackgroundRefreshController(app.context, backgroundRefreshOptions{
+		isSyncEnabled: func() bool { return true },
+		newTicker:     backgroundTickerFactory(t, created),
+		onRefreshed: func() {
+			snapshot, err := builder.Build(app.context, "UTC")
+			if err != nil {
+				t.Error(err)
+			}
+			completed <- snapshot
+		},
+	}, func() bool { return true }, func(ctx context.Context, days int, zone string, _ []string, request refresh.Request) error {
+		return app.usage.RefreshUsage(ctx, days, zone, []string{}, request)
+	}, func(context.Context, []string, refresh.Request) error { return nil })
+	defer controller.close()
+	controller.setVisibility(false)
+	awaitBackgroundValue(t, created).channel <- time.Time{}
+	snapshot := awaitBackgroundValue(t, completed)
+	if len(snapshot.Periods) != 4 {
+		t.Fatalf("published %d periods, want 4", len(snapshot.Periods))
+	}
+	for name, period := range snapshot.Periods {
+		if period.Usage.Window != period.Speed.Window || period.Usage.Window != period.Loss.Window {
+			t.Errorf("period %s has inconsistent usage/report windows: %+v / %+v", name, period.Usage.Window, period.Speed.Window)
+		}
+	}
 }
 
 func (ticker *fakeBackgroundTicker) ticks() <-chan time.Time { return ticker.channel }
@@ -55,7 +97,7 @@ func TestBackgroundRefreshRequiresSyncAutoRefreshAndHiddenWindow(t *testing.T) {
 				t.Run(fmt.Sprintf("sync=%v/auto=%v/visible=%v", isSyncEnabled, isAutoEnabled, isVisible), func(t *testing.T) {
 					created := make(chan *fakeBackgroundTicker, 2)
 					completed := make(chan struct{}, 1)
-					calls := make(chan string, 2)
+					calls := make(chan string, 5)
 					controller := newBackgroundRefreshController(context.Background(), backgroundRefreshOptions{
 						isSyncEnabled: func() bool { return isSyncEnabled },
 						timeZone:      func() string { return "Asia/Shanghai" },
@@ -63,10 +105,10 @@ func TestBackgroundRefreshRequiresSyncAutoRefreshAndHiddenWindow(t *testing.T) {
 						onRefreshed:   func() { completed <- struct{}{} },
 					}, func() bool { return isAutoEnabled },
 						func(ctx context.Context, days int, zone string, selected []string, request refresh.Request) error {
-							if ctx.Err() != nil || days != 90 || zone != "Asia/Shanghai" || selected != nil || request != (refresh.Request{IsBackground: true, IsAutoEnabled: true}) {
+							if ctx.Err() != nil || zone != "Asia/Shanghai" || selected != nil || request != (refresh.Request{IsBackground: true, IsAutoEnabled: true}) {
 								t.Errorf("wrong usage request: days=%d zone=%s selected=%v request=%+v", days, zone, selected, request)
 							}
-							calls <- "usage"
+							calls <- fmt.Sprintf("usage:%d", days)
 							return errors.New("partial failure")
 						}, func(ctx context.Context, selected []string, request refresh.Request) error {
 							if ctx.Err() != nil || selected != nil || request != (refresh.Request{IsBackground: true, IsAutoEnabled: true}) {
@@ -89,8 +131,10 @@ func TestBackgroundRefreshRequiresSyncAutoRefreshAndHiddenWindow(t *testing.T) {
 					}
 					ticker.channel <- time.Time{}
 					awaitBackgroundValue(t, completed)
-					if first, second := <-calls, <-calls; first != "usage" || second != "limits" {
-						t.Fatal("refresh cycle did not finish usage and limits before the hook", first, second)
+					for _, expected := range []string{"usage:1", "usage:7", "usage:30", "usage:90", "limits"} {
+						if actual := <-calls; actual != expected {
+							t.Fatalf("refresh order = %s, want %s", actual, expected)
+						}
 					}
 				})
 			}
@@ -167,7 +211,7 @@ func TestBackgroundRefreshReconcilesPreferenceChangesAndRechecksFlags(t *testing
 
 func TestBackgroundRefreshShowHideDoesNotOverlapCancelledRun(t *testing.T) {
 	created := make(chan *fakeBackgroundTicker, 2)
-	started, release, completed := make(chan struct{}, 2), make(chan struct{}), make(chan struct{}, 2)
+	started, release, completed := make(chan struct{}, 5), make(chan struct{}), make(chan struct{}, 2)
 	var calls atomic.Int32
 	controller := newBackgroundRefreshController(context.Background(), backgroundRefreshOptions{
 		isSyncEnabled: func() bool { return true },
@@ -203,7 +247,7 @@ func TestBackgroundRefreshShowHideDoesNotOverlapCancelledRun(t *testing.T) {
 	awaitBackgroundValue(t, completed)
 	controller.setVisibility(true)
 	controller.close()
-	if calls.Load() != 2 {
+	if calls.Load() != 5 {
 		t.Fatalf("queued ticks escaped stopped worker: calls=%d", calls.Load())
 	}
 }

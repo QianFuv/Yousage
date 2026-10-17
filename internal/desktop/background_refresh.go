@@ -12,7 +12,7 @@ const backgroundRefreshInterval = 15 * time.Minute
 // backgroundRefreshOptions supplies sync eligibility. Configure callbacks before
 // ServiceStartup; callbacks must support concurrent reads. After changing sync
 // settings, call backgroundRefresh.reconcile to apply eligibility immediately.
-// The hook runs after both refresh attempts, including partial failures, so sync
+// The hook runs after all period and limits refresh attempts, including partial failures, so sync
 // can publish retained last-good values. It must return promptly.
 type backgroundRefreshOptions struct {
 	isSyncEnabled func() bool
@@ -110,7 +110,7 @@ func (controller *backgroundRefreshController) reconcileLocked() {
 }
 
 // run waits a full interval before querying, rechecks flags on every tick, and
-// never starts another cycle until both refresh calls and the hook have returned.
+// never starts another cycle until every published window, limits, and the hook have returned.
 func (controller *backgroundRefreshController) run(ctx context.Context, ticker backgroundRefreshTicker) {
 	defer func() {
 		controller.mutex.Lock()
@@ -133,9 +133,12 @@ func (controller *backgroundRefreshController) run(ctx context.Context, ticker b
 				return
 			}
 			request := refresh.Request{IsBackground: true, IsAutoEnabled: true}
-			_ = controller.refreshUsage(ctx, 90, controller.options.timeZone(), nil, request)
-			if ctx.Err() != nil {
-				return
+			zone := controller.options.timeZone()
+			for _, days := range []int{1, 7, 30, 90} {
+				_ = controller.refreshUsage(ctx, days, zone, nil, request)
+				if ctx.Err() != nil {
+					return
+				}
 			}
 			_ = controller.refreshLimits(ctx, nil, request)
 			if ctx.Err() != nil {
