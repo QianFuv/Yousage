@@ -217,12 +217,6 @@ func decodeConfig(raw json.RawMessage, expectedId string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if config.Settings.Prices == nil {
-		config.Settings.Prices = map[string]domain.PriceOverride{}
-	}
-	if config.Settings.Aliases == nil {
-		config.Settings.Aliases = map[string]string{}
-	}
 	config.Themes, config.Sources = []theme.Definition{}, []quota.HubSnapshot{}
 	return config, nil
 }
@@ -278,12 +272,6 @@ func (projection *Projection) Apply(raw json.RawMessage, expectedId string) erro
 				return err
 			}
 			next.Config.Settings = settings
-			if next.Config.Settings.Prices == nil {
-				next.Config.Settings.Prices = map[string]domain.PriceOverride{}
-			}
-			if next.Config.Settings.Aliases == nil {
-				next.Config.Settings.Aliases = map[string]string{}
-			}
 		case "environmentThemesUpdated":
 			var payload struct {
 				Themes []json.RawMessage `json:"themes"`
