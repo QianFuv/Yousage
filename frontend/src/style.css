@@ -191,7 +191,8 @@ body {
 /* Phone browsers get one column with the navigation as a bottom tab bar. The
    desktop window's minimum size keeps the desktop app above this breakpoint.
    The bar is translucent over the page, and the current tab is marked by a
-   pill behind its icon rather than a bordered card. */
+   pill behind its icon rather than a bordered card. Both tints use opacity
+   instead of color-mix, which older WebViews break for achromatic colors. */
 @media (width < 48rem) {
   .desktop-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -208,11 +209,20 @@ body {
     overflow-y: hidden;
     padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom));
     border-right: 0;
-    border-top: 1px solid
-      color-mix(in srgb, var(--color-sidebar-border) 70%, transparent);
-    background: color-mix(in srgb, var(--color-sidebar) 82%, transparent);
+    border-top: 1px solid var(--color-sidebar-border);
+    position: relative;
+    isolation: isolate;
+    background: transparent;
     backdrop-filter: blur(18px) saturate(1.4);
     -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  }
+  .app-sidebar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--color-sidebar);
+    opacity: 0.82;
   }
   .sidebar-brand,
   .sidebar-group-label {
@@ -254,7 +264,7 @@ body {
     width: 3.5rem;
     height: 1.875rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    background: var(--primary);
     opacity: 0;
     transform: translateX(-50%) scaleX(0.5);
     transition:
@@ -276,7 +286,7 @@ body {
     font-weight: 600;
   }
   .sidebar-item[aria-current="page"]::before {
-    opacity: 1;
+    opacity: 0.16;
     transform: translateX(-50%) scaleX(1);
   }
   .sidebar-item[aria-current="page"] svg {
@@ -575,7 +585,7 @@ html [data-slot="input-control"].font-mono input {
   color: var(--primary);
 }
 .app-toast[data-tone="error"] {
-  border-color: color-mix(in srgb, var(--destructive) 35%, var(--border));
+  border-color: var(--destructive);
 }
 .app-toast[data-tone="error"] .app-toast-icon {
   color: var(--destructive);
