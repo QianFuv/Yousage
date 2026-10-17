@@ -198,6 +198,21 @@ export function DisplayPanel() {
             }
           />
           <SettingsRow
+            title={t("Start minimized")}
+            description={t(
+              "Launch into the notification area without opening the window. Click the tray icon to open it.",
+            )}
+            control={
+              <Switch
+                aria-label={t("Start minimized")}
+                checked={value.shouldStartMinimized}
+                onCheckedChange={(isChecked) =>
+                  change({ shouldStartMinimized: isChecked })
+                }
+              />
+            }
+          />
+          <SettingsRow
             title={t("Close to tray")}
             description={t(
               "Closing the window keeps Yousage running in the notification area. Choose Quit from the tray menu to exit.",

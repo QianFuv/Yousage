@@ -17,6 +17,7 @@ export class Display {
     "shouldAutoRefresh": boolean;
     "shouldRestoreWindow": boolean;
     "shouldCloseToTray": boolean;
+    "shouldStartMinimized": boolean;
     "timestampFormat": string;
     "breakdown": string;
     "language": string;
@@ -43,6 +44,9 @@ export class Display {
         }
         if (!("shouldCloseToTray" in $$source)) {
             this["shouldCloseToTray"] = false;
+        }
+        if (!("shouldStartMinimized" in $$source)) {
+            this["shouldStartMinimized"] = false;
         }
         if (!("timestampFormat" in $$source)) {
             this["timestampFormat"] = "";

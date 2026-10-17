@@ -21,16 +21,17 @@ type WindowBounds struct {
 	Maximized bool `json:"maximized"`
 }
 type Display struct {
-	Density             string  `json:"density"`
-	Zoom                float64 `json:"zoom"`
-	Metric              string  `json:"metric"`
-	WindowDays          int     `json:"windowDays"`
-	ShouldAutoRefresh   bool    `json:"shouldAutoRefresh"`
-	ShouldRestoreWindow bool    `json:"shouldRestoreWindow"`
-	ShouldCloseToTray   bool    `json:"shouldCloseToTray"`
-	TimestampFormat     string  `json:"timestampFormat"`
-	Breakdown           string  `json:"breakdown"`
-	Language            string  `json:"language"`
+	Density              string  `json:"density"`
+	Zoom                 float64 `json:"zoom"`
+	Metric               string  `json:"metric"`
+	WindowDays           int     `json:"windowDays"`
+	ShouldAutoRefresh    bool    `json:"shouldAutoRefresh"`
+	ShouldRestoreWindow  bool    `json:"shouldRestoreWindow"`
+	ShouldCloseToTray    bool    `json:"shouldCloseToTray"`
+	ShouldStartMinimized bool    `json:"shouldStartMinimized"`
+	TimestampFormat      string  `json:"timestampFormat"`
+	Breakdown            string  `json:"breakdown"`
+	Language             string  `json:"language"`
 }
 
 type Source struct {

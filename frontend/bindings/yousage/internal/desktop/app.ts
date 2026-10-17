@@ -108,7 +108,7 @@ export function ExportTheme(definition: theme$0.Definition): $CancellablePromise
 }
 
 /**
- * FrontendReady reveals the window after the frontend applies its theme.
+ * FrontendReady reveals the window after the frontend applies its theme, unless the launch starts minimized.
  */
 export function FrontendReady(): $CancellablePromise<void> {
     return $Call.ByID(1956405923);
@@ -382,6 +382,8 @@ export function SetTrayLabels(labels: $models.TrayLabels): $CancellablePromise<v
 
 /**
  * ShowWindow reveals a hidden or minimized window without changing its retained page.
+ * 
+ * A minimized launch restores the saved bounds only now, since maximizing earlier would show the window.
  */
 export function ShowWindow(): $CancellablePromise<void> {
     return $Call.ByID(3769548585);

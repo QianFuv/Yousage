@@ -14,6 +14,7 @@ let display = {
     zoom: 1,
     shouldRestoreWindow: true,
     shouldCloseToTray: true,
+    shouldStartMinimized: false,
     timestampFormat: "locale",
     breakdown: "model",
     metric: "limits",

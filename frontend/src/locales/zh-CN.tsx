@@ -241,6 +241,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Last upload": "上次上传",
   "Last {days} days": "最近 {days} 天",
   "Launch at login": "开机自启",
+  "Launch into the notification area without opening the window. Click the tray icon to open it.":
+    "启动后只在托盘中运行，不打开窗口；点击托盘图标即可打开。",
   Left: "剩余",
   Light: "亮色",
   "Link copied.": "链接已复制。",
@@ -487,6 +489,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
   "Start Yousage when you sign in to this computer.":
     "登录这台电脑时自动启动 Yousage。",
+  "Start minimized": "启动时最小化",
   Standard: "标准",
   Status: "状态",
   "Subtle surface": "浅色背景",

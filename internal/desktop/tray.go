@@ -56,7 +56,16 @@ func (service *App) SetTrayLabels(labels TrayLabels) {
 }
 
 // ShowWindow reveals a hidden or minimized window without changing its retained page.
+//
+// A minimized launch restores the saved bounds only now, since maximizing earlier would show the window.
 func (service *App) ShowWindow() {
+	service.windowMutex.Lock()
+	isWaitingInTray := service.isWaitingInTray
+	service.isWaitingInTray = false
+	service.windowMutex.Unlock()
+	if isWaitingInTray {
+		service.restoreWindow()
+	}
 	service.window.UnMinimise()
 	service.window.Show()
 	service.window.Focus()

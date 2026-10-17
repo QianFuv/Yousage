@@ -54,6 +54,7 @@ type App struct {
 	isCloseBridgeActive bool
 	shouldAllowClose    bool
 	shouldCloseToTray   bool
+	isWaitingInTray     bool
 	zoom                float64
 }
 
@@ -138,6 +139,9 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	usage.ReconcileConnections()
 	if display, err := usage.Preferences.Display(ctx); err == nil {
 		service.setCloseToTray(display.Value.ShouldCloseToTray)
+		service.windowMutex.Lock()
+		service.isWaitingInTray = display.Value.ShouldStartMinimized && !hasNativeSmokeArgument()
+		service.windowMutex.Unlock()
 	}
 	watcher, cancel := context.WithCancel(ctx)
 	service.themeCancel = cancel
@@ -421,9 +425,15 @@ func (service *App) GetBootstrap() Bootstrap {
 	return Bootstrap{IsSystemDark: service.nativeApp.Env.IsDarkMode(), SystemLocale: systemLocale()}
 }
 
-// FrontendReady reveals the window after the frontend applies its theme.
+// FrontendReady reveals the window after the frontend applies its theme, unless the launch starts minimized.
 func (service *App) FrontendReady() {
 	service.record("frontend-ready")
+	service.windowMutex.Lock()
+	isWaitingInTray := service.isWaitingInTray
+	service.windowMutex.Unlock()
+	if isWaitingInTray {
+		return
+	}
 	service.restoreWindow()
 	service.window.Show()
 	if hasNativeSmokeArgument() {
