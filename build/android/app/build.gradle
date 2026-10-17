@@ -14,7 +14,7 @@ android {
         applicationId "app.yousage.mobile"
         minSdk 21
         targetSdk 35
-        versionCode 1
+        versionCode providers.gradleProperty("yousageVersionCode").map { it as int }.getOrElse(1)
         versionName providers.gradleProperty("yousageVersion").getOrElse("0.1.0")
 
         // Configure supported ABIs

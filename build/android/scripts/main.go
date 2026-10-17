@@ -237,6 +237,10 @@ func assemble(root, sdk, mode, architecture string) error {
 		return errors.New("app version missing from build/config.yml")
 	}
 	version := strings.Trim(string(match[1]), `"'`)
+	versionCode, err := androidVersionCode(version)
+	if err != nil {
+		return err
+	}
 	variant := "Debug"
 	if mode == "release" {
 		variant = "Release"
@@ -246,7 +250,7 @@ func assemble(root, sdk, mode, architecture string) error {
 		abi = "x86_64"
 	}
 	project := filepath.Join(root, "build", "android")
-	arguments := []string{"--no-daemon", "assemble" + variant, "-PyousageVersion=" + version, "-PyousageAbi=" + abi}
+	arguments := []string{"--no-daemon", "assemble" + variant, "-PyousageVersion=" + version, "-PyousageVersionCode=" + strconv.Itoa(versionCode), "-PyousageAbi=" + abi}
 	var command *exec.Cmd
 	if runtime.GOOS == "windows" {
 		command = exec.Command("cmd.exe", append([]string{"/d", "/c", `.\gradlew.bat`}, arguments...)...)
@@ -272,6 +276,18 @@ func assemble(root, sdk, mode, architecture string) error {
 		fmt.Printf("APK: %s (%d bytes)\n", destination, info.Size())
 	}
 	return nil
+}
+
+// androidVersionCode maps major.minor.patch to the increasing integer Android compares on upgrade.
+func androidVersionCode(version string) (int, error) {
+	match := regexp.MustCompile(`^(0|[1-9]\d{0,3})\.(0|[1-9]\d?)\.(0|[1-9]\d?)$`).FindStringSubmatch(version)
+	if match == nil {
+		return 0, fmt.Errorf("version %q must be major.minor.patch with minor and patch below 100", version)
+	}
+	major, _ := strconv.Atoi(match[1])
+	minor, _ := strconv.Atoi(match[2])
+	patch, _ := strconv.Atoi(match[3])
+	return major*10000 + minor*100 + patch, nil
 }
 
 // environment replaces selected process variables without duplicate entries.

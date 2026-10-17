@@ -91,6 +91,35 @@ go run ./tools/spikes/theme --app bin/yousage.exe  # 用真实可执行文件验
   在隔离目录中运行生产可执行文件的命令行主题流程。
 - 浏览器中的尺寸测试只能验证 CSS 布局，不能代替原生 DPI、文件对话框、标题栏颜色和进程退出等检查。
 
+## 版本与发布
+
+版本号以 `build/config.yml` 的 `info.version` 为准。Windows 版本资源、macOS `Info.plist`、
+`internal/sync/snapshot.go` 和 `build/dependencies.json` 中的副本由脚本统一修改：
+
+```powershell
+node build/version.mjs              # 查看当前版本
+node build/version.mjs set 0.2.0    # 修改所有副本
+node build/version.mjs check        # 检查各副本是否一致（CI 也会检查）
+```
+
+Android 的 versionCode 由版本号换算（主版本 × 10000 + 次版本 × 100 + 修订号），
+因此次版本号和修订号都必须小于 100。
+
+平时推送到 main 只运行 CI 检查，不构建安装包和镜像。CI 通过后，Release 工作流检查
+`v<版本号>` 标签是否已存在；不存在时（即提升版本号后的第一次推送）同时构建并发布：
+
+- `yousage-<版本>-windows-amd64.zip`：Windows 便携版
+- `yousage-<版本>-android-arm64.apk`：Android 安装包
+- `ghcr.io/qianfuv/yousage-relay:<版本>` 与 `:latest`：中继镜像
+
+发布页同时附带 `SHA256SUMS.txt`。某个构建失败时不会发布任何内容；修复后再次推送，
+或在 Actions 中手动运行 Release 工作流即可重试。
+
+Android 安装包必须用固定的发布密钥签名，换了密钥的新版本无法覆盖安装旧版本。在仓库的
+Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`（keystore 文件的 Base64）、
+`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`；
+缺少任一项时发布会失败，不会退回调试密钥。
+
 ## 发布前手动检查
 
 自动化测试无法覆盖原生窗口交互。发布前请用最终的可执行文件检查：

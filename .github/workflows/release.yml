@@ -1,0 +1,344 @@
+name: Release
+
+# Publishes a release only when build/config.yml carries a version that has no tag yet.
+# Ordinary pushes stop after CI; bumping the version builds the Windows portable
+# package, the Android APK and the relay image, then publishes them together.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Check for a new version
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      should-release: ${{ steps.version.outputs.should-release }}
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - id: version
+        name: Read version
+        env:
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          node build/version.mjs check
+          version="$(node build/version.mjs)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            echo "v$version is already released; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "should-release=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing v$version from \`$COMMIT\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  desktop:
+    name: Build Windows portable package
+    needs: prepare
+    if: needs.prepare.outputs.should-release == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "0"
+      GOOS: windows
+      GOARCH: amd64
+    steps:
+      - name: Preserve LF line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - name: Install dependencies
+        run: |
+          npm install --global pnpm@10.32.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir tools/parity install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir frontend install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $wails = go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@$wails"
+      - name: Build desktop frontend
+        run: pnpm --dir frontend build
+      - name: Build executable
+        run: |
+          wails3 generate syso -arch amd64 -icon build/windows/icon.ico -manifest build/windows/wails.exe.manifest -info build/windows/info.json -out wails_windows_amd64.syso
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui" -o bin/yousage.exe .
+      - name: Package portable ZIP
+        run: ./build/package-windows.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: desktop
+          path: bin/yousage-${{ needs.prepare.outputs.version }}-windows-amd64.zip
+          if-no-files-found: error
+
+  android:
+    name: Build Android APK
+    needs: prepare
+    if: needs.prepare.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: |
+          npm install --global pnpm@10.32.0
+          pnpm --dir tools/parity install --frozen-lockfile
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Build Android frontend
+        run: pnpm --dir frontend build:android
+      - name: Restore signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] ||
+            [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::Set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets; releases are never signed with a debug key."
+            exit 1
+          fi
+          keystore="$RUNNER_TEMP/yousage-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          echo "ANDROID_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+      - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: go run ./build/android/scripts -mode release -arch arm64
+      - name: Verify APK signature
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          certificates="$("$apksigner" verify --print-certs bin/yousage-release-arm64.apk)"
+          echo "$certificates"
+          if grep -q "CN=Android Debug" <<< "$certificates"; then
+            echo "::error::The APK is signed with a debug key."
+            exit 1
+          fi
+          mv bin/yousage-release-arm64.apk "bin/yousage-$VERSION-android-arm64.apk"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android
+          path: bin/yousage-${{ needs.prepare.outputs.version }}-android-arm64.apk
+          if-no-files-found: error
+
+  relay:
+    name: Build and test relay image
+    needs: prepare
+    if: needs.prepare.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - name: Build relay image
+        env:
+          COMMIT: ${{ needs.prepare.outputs.commit }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          docker build --file build/relay/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${COMMIT}" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --tag yousage-relay:ci .
+      - name: Smoke test relay image
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(openssl rand -hex 32)"
+          echo "::add-mask::$token"
+          export YOUSAGE_RELAY_TOKEN="$token"
+          trap 'docker logs yousage-relay-ci; docker rm --force --volumes yousage-relay-ci' EXIT
+          docker run --detach --name yousage-relay-ci \
+            --env YOUSAGE_RELAY_TOKEN \
+            --publish 127.0.0.1:18080:8080 yousage-relay:ci
+          curl --fail --silent --show-error --retry 20 --retry-connrefused \
+            --retry-delay 1 --max-time 5 http://127.0.0.1:18080/healthz
+          python3 - <<'PY'
+          """Verify the built relay HTTP surface with disposable synthetic data."""
+          import json
+          import os
+          import re
+          import secrets
+          import urllib.error
+          import urllib.request
+
+          BASE_URL = "http://127.0.0.1:18080"
+          TOKEN = os.environ["YOUSAGE_RELAY_TOKEN"]
+
+          def request(path, method="GET", body=None, bearer=None):
+              """Return a relay response, including expected HTTP errors.
+
+              Args:
+                  path: The relay endpoint path.
+                  method: The HTTP method.
+                  body: Optional request bytes.
+                  bearer: Optional write token.
+
+              Returns:
+                  The HTTP status, headers and response bytes.
+              """
+              headers = {"Content-Type": "application/octet-stream"}
+              if bearer is not None:
+                  headers["Authorization"] = f"Bearer {bearer}"
+              message = urllib.request.Request(
+                  BASE_URL + path, data=body, headers=headers, method=method
+              )
+              try:
+                  response = urllib.request.urlopen(message, timeout=10)
+              except urllib.error.HTTPError as error:
+                  response = error
+              with response:
+                  return response.status, response.headers, response.read()
+
+          status, _, body = request("/healthz")
+          assert status == 200 and json.loads(body) == {"status": "ok"}
+          for bearer in (None, "incorrect-token"):
+              status, headers, _ = request("/api/auth", bearer=bearer)
+              assert status == 401
+              assert headers["WWW-Authenticate"] == "Bearer"
+              assert headers["Cache-Control"] == "no-store"
+          assert request("/api/auth", bearer=TOKEN)[0] == 204
+          for prefix in ("v", "s"):
+              status, headers, body = request(f"/{prefix}/{'A' * 22}")
+              assert status == 200
+              assert "script-src 'self'" in headers["Content-Security-Policy"]
+              assert headers["Referrer-Policy"] == "no-referrer"
+              assert headers["X-Content-Type-Options"] == "nosniff"
+              assets = re.findall(rb'(?:src|href)="(/assets/[^" ]+)"', body)
+              assert assets, "Built frontend assets are missing"
+              for asset in assets:
+                  assert request(asset.decode())[0] == 200
+          space_id = secrets.token_urlsafe(16)
+          path = f"/api/spaces/{space_id}"
+          envelope = b"\x01" + secrets.token_bytes(64)
+          try:
+              assert request(path, "PUT", envelope)[0] == 401
+              assert request(path, "PUT", envelope, TOKEN)[0] == 204
+              status, headers, body = request(path)
+              assert status == 200 and body == envelope
+              assert headers["Cache-Control"] == "no-store"
+              assert headers["ETag"] and headers["Last-Modified"]
+          finally:
+              assert request(path, "DELETE", bearer=TOKEN)[0] == 204
+          assert request(path)[0] == 404
+          status, _, body = request(
+              "/api/shares/reserve?ttlDays=1", "POST", bearer=TOKEN
+          )
+          assert status == 201
+          path = f"/api/shares/{json.loads(body)['id']}"
+          try:
+              assert request(path)[0] == 404
+              assert request(path, "PUT", envelope, TOKEN)[0] == 204
+              assert request(path, "PUT", envelope, TOKEN)[0] == 409
+              status, headers, body = request(path)
+              assert status == 200 and body == envelope
+              assert headers["Cache-Control"] == "no-store"
+          finally:
+              assert request(path, "DELETE", bearer=TOKEN)[0] == 204
+          assert request(path)[0] == 404
+          print("Relay image smoke checks passed")
+          PY
+      - name: Save relay image
+        run: docker save yousage-relay:ci | gzip > "$RUNNER_TEMP/relay-image.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: relay-image
+          path: ${{ runner.temp }}/relay-image.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish release
+    needs: [prepare, desktop, android, relay]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish relay image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
+          gunzip --stdout dist/relay-image.tar.gz | docker load
+          rm dist/relay-image.tar.gz
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker tag yousage-relay:ci "$image:$VERSION"
+          docker tag yousage-relay:ci "$image:latest"
+          docker push "$image:$VERSION"
+          docker push "$image:latest"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$COMMIT" \
+            --title "Yousage $VERSION" \
+            --generate-notes \
+            --notes "Relay image: \`$IMAGE:$VERSION\`" \
+            -- *

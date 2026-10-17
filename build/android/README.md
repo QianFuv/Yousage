@@ -28,7 +28,9 @@ Android Gradle Plugin 8.7.3 and JDK 21.
 
 Release APKs use the debug keystore unless `ANDROID_KEYSTORE_FILE`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` are
-provided. App version comes from `build/config.yml`. The application ID is
+provided; the GitHub release workflow refuses to publish without them. The app
+version comes from `build/config.yml`, and the version code is derived from it as
+`major * 10000 + minor * 100 + patch`. The application ID is
 `app.yousage.mobile`; the JNI namespace remains `com.wails.app`.
 
 For an existing frontend build, the individual phases are:

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { readVersion } from "./version.mjs";
 
 const entries = new Map();
 const licensePattern = /^(licen[cs]e|copying|notice|copyright)([.\-_]|$)/i;
@@ -156,7 +157,7 @@ writeFileSync(
   "build/dependencies.json",
   JSON.stringify(
     {
-      version: "0.1.0",
+      version: readVersion(),
       sourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b",
       dependencies: manifest,
     },
