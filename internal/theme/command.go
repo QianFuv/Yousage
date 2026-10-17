@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
+	"yousage/internal/appstate"
 )
 
 // RunCommand handles theme subcommands before any native application is constructed.
@@ -56,9 +56,7 @@ func RunCommand(ctx context.Context, arguments []string, output, diagnostics io.
 		}
 	}
 	if failure == nil && directory == "" {
-		var config string
-		config, failure = os.UserConfigDir()
-		directory = filepath.Join(config, "Yousage")
+		directory, failure = appstate.Directory()
 	}
 	if failure == nil {
 		directory, failure = filepath.Abs(directory)

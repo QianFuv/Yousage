@@ -36,7 +36,8 @@
 .\bin\yousage.exe theme clear --state-dir "$env:TEMP\yousage-theme-example"
 ```
 
-默认目录是系统用户配置目录下的 `Yousage`。命令行分派在创建 Wails 应用之前执行，
+Windows 默认目录是 exe 所在目录，与桌面程序共用；macOS / Linux 仍使用系统用户配置目录下的
+`Yousage`。`--state-dir` 可覆盖发布目录。命令行分派在创建 Wails 应用之前执行，
 不会启动 GUI 或 Node 进程，也不会写入其他应用的状态。
 
 ```powershell

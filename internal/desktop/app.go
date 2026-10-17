@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"yousage/internal/appstate"
 	"yousage/internal/domain"
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
@@ -56,8 +57,22 @@ type App struct {
 	zoom                float64
 }
 
+// newApp opens the shared desktop state directory without falling back to another location.
 func newApp() (*App, error) {
-	directory, err := os.MkdirTemp("", "yousage-native-lifecycle-")
+	stateDirectory, err := appstate.Directory()
+	if err != nil {
+		return nil, err
+	}
+	return newAppInDirectory(stateDirectory, hasNativeSmokeArgument())
+}
+
+// newAppInDirectory keeps logs and smoke-test state inside the selected application directory.
+func newAppInDirectory(stateDirectory string, isSmoke bool) (*App, error) {
+	logsDirectory := filepath.Join(stateDirectory, "logs")
+	if err := os.MkdirAll(logsDirectory, 0700); err != nil {
+		return nil, err
+	}
+	directory, err := os.MkdirTemp(logsDirectory, "yousage-native-lifecycle-")
 	if err != nil {
 		return nil, err
 	}
@@ -66,13 +81,7 @@ func newApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	config, err := os.UserConfigDir()
-	if err != nil {
-		logFile.Close()
-		return nil, err
-	}
-	stateDirectory := filepath.Join(config, "Yousage")
-	if hasNativeSmokeArgument() {
+	if isSmoke {
 		stateDirectory = filepath.Join(directory, "isolated-state")
 	}
 	database, err := storage.Open(filepath.Join(stateDirectory, "yousage.sqlite"))
@@ -80,7 +89,7 @@ func newApp() (*App, error) {
 		logFile.Close()
 		return nil, err
 	}
-	if hasNativeSmokeArgument() {
+	if isSmoke {
 		preferenceService := preferences.New(database)
 		if _, err = preferenceService.SaveSources(context.Background(), []preferences.Source{}, 0); err == nil {
 			display := preferences.Defaults()

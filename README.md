@@ -95,8 +95,12 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 ## 数据存储与隐私
 
-- 设置、最近 90 天的统计事实、增量检查点和主题保存在系统用户配置目录下的 `Yousage`
-  目录中，Windows 上通常为 `%APPDATA%\Yousage`。WebView 配置位于其中的 `webview/`。
+- Windows 便携版将设置、最近 90 天的统计事实、增量检查点和界面主题保存到 exe 同目录的
+  `yousage.sqlite`；发布的主题位于 `themes/`，主题命令配置为 `settings.json`，WebView 数据和
+  缓存位于 `webview/`，运行日志位于 `logs/`。程序目录必须可写，不会退回 AppData 或系统临时目录。
+- 覆盖升级前先退出程序，再将新版 ZIP 解压覆盖原目录；安装包不包含运行数据，因此会保留并复用
+  原有数据库、主题和缓存。不会自动迁移旧版 `%APPDATA%\Yousage` 中的数据。
+- macOS / Linux 继续使用系统用户配置目录下的 `Yousage` 目录。
 - 数据库只保存归一化的用量数字，不保存提示词、回复内容或任何凭据。
 - 额度中心密钥、远程访问令牌等凭据保存在系统凭据库（Windows 凭据管理器、macOS 钥匙串、
   Linux Secret Service）中，不会写入诊断报告。
