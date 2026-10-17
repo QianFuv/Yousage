@@ -61,10 +61,11 @@ Claude 的 `api_error` 和 `isApiErrorMessage` 标记、Codex 的 `turn_aborted`
 
 Codex 取请求开始后最早的 Reasoning 或 AgentMessage `item_completed` 的 `started_at_ms`；
 只调用工具的响应不计。Claude 取首个思考块（`apiBlockIndex` 为 0）的时间戳减去其
-`thinkingDurationMs`。同一 Claude 消息的后续块在一次读取中替换之前的块，因此请求结束于最后一个块。
+`thinkingDurationMs`。同一 Claude 消息的后续块会替换之前的块，包括跨扫描到达和无换行文件尾的块，
+因此请求结束于最后一个块；文件尾被改写时会重放，以恢复仍然有效的完整行记录。
 只投影条目类型、开始时间、块序号和思考时长。
 
 ## 解析器版本
 
-当前解析器版本为 8。版本变化时重放已保留的旧检查点，以补齐新字段；
+当前解析器版本为 9。版本变化时重放已保留的旧检查点，以补齐新字段并修正历史解析结果；
 重放后的文件以原子方式用新的用量和额度观测替换旧的缓存事实。
