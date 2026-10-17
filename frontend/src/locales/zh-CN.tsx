@@ -126,6 +126,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Cost: "费用",
   "Cost by speed": "按速度划分的费用",
   "Cost by type": "按类型划分的费用",
+  "Could not connect. Check the phone link and network, then try again.":
+    "连接失败，请检查手机链接和网络后重试。",
   "Could not create the theme.": "无法创建主题。",
   "Could not save the theme.": "无法保存主题。",
   "Could not save.": "保存失败。",
@@ -614,8 +616,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "This collection conflicts with a theme outside the collection. No themes were changed.":
     "该合集与合集外的主题冲突，未做任何更改。",
   "This device": "本机",
-  "This is not a complete Yousage phone link. Copy it again from the desktop app.":
-    "这不是完整的 Yousage 手机链接，请从桌面端重新复制。",
   "This link is incomplete": "链接不完整",
   "This model already has a row. Edit its prices there.":
     "该模型已有一行，请在那一行编辑价格。",

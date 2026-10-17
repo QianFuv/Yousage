@@ -8,7 +8,7 @@ import * as mobileApi from "../../bindings/yousage/internal/mobile/service";
 import { t, useI18n } from "../i18n";
 
 /**
- * Ask for the desktop's phone link and save it on the device.
+ * Verify the desktop's phone link before saving it on the device.
  *
  * @param props - Called once the link is saved, and, when a link is saved already, to keep it instead.
  * @returns The pairing screen.
@@ -24,7 +24,7 @@ export function PairScreen({
   const [link, setLink] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState("");
-  /** Save the typed link, or explain why it was not accepted. */
+  /** Connect using the typed link, keeping existing pairing data if verification fails. */
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setIsBusy(true);
@@ -35,7 +35,7 @@ export function PairScreen({
     } catch {
       setError(
         t(
-          "This is not a complete Yousage phone link. Copy it again from the desktop app.",
+          "Could not connect. Check the phone link and network, then try again.",
         ),
       );
       setIsBusy(false);
@@ -72,12 +72,14 @@ export function PairScreen({
           placeholder="https://…/v/…#…"
           aria-label={t("Phone link")}
           value={link}
+          disabled={isBusy}
           onChange={(event) => setLink(event.target.value)}
         />
         <Button
           type="button"
           variant="outline"
           aria-label={t("Paste")}
+          disabled={isBusy}
           onClick={() => void paste()}
         >
           <ClipboardPasteIcon aria-hidden />
@@ -93,7 +95,12 @@ export function PairScreen({
         {t("Connect")}
       </Button>
       {onCancel && (
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={isBusy}
+          onClick={onCancel}
+        >
           {t("Keep the current link")}
         </Button>
       )}

@@ -128,11 +128,18 @@ func (service *Service) GetPairing() (Pairing, error) {
 	return Pairing{IsPaired: pairing.ID != "", RelayOrigin: pairing.Origin}, err
 }
 
-// Pair atomically saves a validated link without contacting the relay.
+// Pair verifies a candidate snapshot before replacing the saved link and encrypted cache.
 func (service *Service) Pair(link string) (Pairing, error) {
 	pairing, err := parseLink(link)
 	if err != nil {
 		return Pairing{}, err
+	}
+	snapshot, envelope, err := service.loadSnapshot(pairing, "")
+	if err != nil {
+		return Pairing{}, err
+	}
+	if snapshot.Status != "ok" {
+		return Pairing{}, errors.New("could not connect to the new phone link")
 	}
 	data, err := json.Marshal(pairing)
 	if err != nil {
@@ -143,8 +150,9 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	if err = service.writePrivate(pairingFile, data); err != nil {
 		return Pairing{}, err
 	}
-	if err = service.removePrivate(snapshotFile); err != nil {
-		return Pairing{}, err
+	cached, err := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: snapshot.ETag, Envelope: envelope})
+	if err == nil {
+		_ = service.writePrivate(snapshotFile, cached)
 	}
 	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
 }
@@ -240,9 +248,18 @@ func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
 	if pairing.ID == "" {
 		return SnapshotResult{Status: "unpaired"}, nil
 	}
+	result, envelope, err := service.loadSnapshot(pairing, etag)
+	if err == nil && result.Status == "ok" {
+		service.cacheSnapshot(pairing, result.ETag, envelope)
+	}
+	return result, err
+}
+
+// loadSnapshot authenticates a specific candidate without changing saved credentials or cache.
+func (service *Service) loadSnapshot(pairing storedPairing, etag string) (SnapshotResult, []byte, error) {
 	request, err := http.NewRequest(http.MethodGet, pairing.Origin+"/api/spaces/"+pairing.ID, nil)
 	if err != nil {
-		return SnapshotResult{}, err
+		return SnapshotResult{}, nil, err
 	}
 	request.Header.Set("Cache-Control", "no-store")
 	if etag != "" {
@@ -250,35 +267,34 @@ func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
 	}
 	response, err := service.client.Do(request)
 	if err != nil {
-		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil, nil
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {
 	case http.StatusNotModified:
-		return SnapshotResult{Status: "unchanged", ETag: response.Header.Get("ETag")}, nil
+		return SnapshotResult{Status: "unchanged", ETag: response.Header.Get("ETag")}, nil, nil
 	case http.StatusNotFound:
-		return SnapshotResult{Status: "problem", Problem: "missing"}, nil
+		return SnapshotResult{Status: "problem", Problem: "missing"}, nil, nil
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil, nil
 	}
 	envelope, err := io.ReadAll(io.LimitReader(response.Body, maxEnvelopeBytes+1))
 	if err != nil {
-		return SnapshotResult{Status: "problem", Problem: "network"}, nil
+		return SnapshotResult{Status: "problem", Problem: "network"}, nil, nil
 	}
 	if len(envelope) > maxEnvelopeBytes {
-		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil
+		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil, nil
 	}
 	payload, err := datasync.Open(envelope, pairing.Key, "space:"+pairing.ID)
 	if errors.Is(err, datasync.ErrEnvelopeVersion) {
-		return SnapshotResult{Status: "problem", Problem: "version"}, nil
+		return SnapshotResult{Status: "problem", Problem: "version"}, nil, nil
 	}
 	if err != nil || !json.Valid(payload) {
-		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil
+		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil, nil
 	}
 	etag = response.Header.Get("ETag")
-	service.cacheSnapshot(pairing, etag, envelope)
-	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: etag}, nil
+	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: etag}, envelope, nil
 }
 
 // OpenURL opens an HTTPS destination through the native Android browser bridge.

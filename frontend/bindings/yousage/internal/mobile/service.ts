@@ -51,7 +51,7 @@ export function OpenURL(destination: string): $CancellablePromise<void> {
 }
 
 /**
- * Pair atomically saves a validated link without contacting the relay.
+ * Pair verifies a candidate snapshot before replacing the saved link and encrypted cache.
  */
 export function Pair(link: string): $CancellablePromise<$models.Pairing> {
     return $Call.ByID(1595144256, link).then(($result: any) => {

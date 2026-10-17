@@ -67,14 +67,20 @@ func TestPairingPersistence(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	link := "https://relay.example/v/" + strings.Repeat("A", 22) + "#" + key
+	envelope, err := datasync.Seal([]byte(`{"formatVersion":1}`), key, "space:"+strings.Repeat("A", 22))
+	if err != nil {
+		test.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) { writer.Write(envelope) }))
+	defer server.Close()
+	link := server.URL + "/v/" + strings.Repeat("A", 22) + "#" + key
 	pairing, err := service.GetPairing()
 	if err != nil || pairing.IsPaired {
 		test.Fatalf("initial pairing = %+v, error = %v", pairing, err)
 	}
 	for range 2 {
 		pairing, err = service.Pair(link)
-		if err != nil || !pairing.IsPaired || pairing.RelayOrigin != "https://relay.example" {
+		if err != nil || !pairing.IsPaired || pairing.RelayOrigin != server.URL {
 			test.Fatalf("pairing = %+v, error = %v", pairing, err)
 		}
 	}
@@ -100,7 +106,7 @@ func TestPairingPersistence(test *testing.T) {
 		test.Fatal("invalid replacement damaged existing credentials")
 	}
 	entries, _ := os.ReadDir(directory)
-	if len(entries) != 1 {
+	if len(entries) != 2 {
 		test.Fatalf("temporary files remain: %v", entries)
 	}
 	for range 2 {
@@ -157,7 +163,7 @@ func TestLoadSnapshot(test *testing.T) {
 			}))
 			defer server.Close()
 			service := newService(test.TempDir(), nil)
-			if _, err := service.Pair(server.URL + "/v/" + identifier + "#" + scenario.key); err != nil {
+			if _, err := seedPairing(test, service, server.URL+"/v/"+identifier+"#"+scenario.key); err != nil {
 				test.Fatal(err)
 			}
 			result, err := service.LoadSnapshot(`"cached"`)
@@ -177,7 +183,7 @@ func TestLoadSnapshot(test *testing.T) {
 		test.Fatalf("unpaired result = %+v, error = %v", result, err)
 	}
 	server := httptest.NewServer(http.NotFoundHandler())
-	if _, err = service.Pair(server.URL + "/v/" + identifier + "#" + key); err != nil {
+	if _, err = seedPairing(test, service, server.URL+"/v/"+identifier+"#"+key); err != nil {
 		test.Fatal(err)
 	}
 	server.Close()
@@ -211,7 +217,7 @@ func TestCachedSnapshot(test *testing.T) {
 		test.Fatalf("unpaired cache = %+v, error = %v", result, err)
 	}
 	link := server.URL + "/v/" + identifier + "#" + key
-	if _, err = service.Pair(link); err != nil {
+	if _, err = seedPairing(test, service, link); err != nil {
 		test.Fatal(err)
 	}
 	if result, err := service.CachedSnapshot(); err != nil || result.Status != "empty" {
@@ -241,13 +247,13 @@ func TestCachedSnapshot(test *testing.T) {
 	isChanged = true
 	service.LoadSnapshot("")
 	otherKey, _ := datasync.NewKey()
-	if _, err = service.Pair(server.URL + "/v/" + strings.Repeat("B", 22) + "#" + otherKey); err != nil {
+	if _, err = seedPairing(test, service, server.URL+"/v/"+strings.Repeat("B", 22)+"#"+otherKey); err != nil {
 		test.Fatal(err)
 	}
 	if result, err := service.CachedSnapshot(); err != nil || result.Status != "empty" {
 		test.Fatalf("replaced pairing reused the old cache: %+v, error = %v", result, err)
 	}
-	if _, err = service.Pair(link); err != nil {
+	if _, err = seedPairing(test, service, link); err != nil {
 		test.Fatal(err)
 	}
 	service.LoadSnapshot("")
@@ -271,7 +277,7 @@ func TestSnapshotTimeout(test *testing.T) {
 	}
 	service.client.Timeout = 20 * time.Millisecond
 	key, _ := datasync.NewKey()
-	if _, err := service.Pair(server.URL + "/v/" + strings.Repeat("A", 22) + "#" + key); err != nil {
+	if _, err := seedPairing(test, service, server.URL+"/v/"+strings.Repeat("A", 22)+"#"+key); err != nil {
 		test.Fatal(err)
 	}
 	if result, err := service.LoadSnapshot(""); err != nil || result.Problem != "network" {
@@ -294,4 +300,26 @@ func TestOpenURL(test *testing.T) {
 	if err := service.OpenURL("https://example.com/docs"); err != nil || opened != "https://example.com/docs" {
 		test.Fatalf("HTTPS destination = %s, error = %v", opened, err)
 	}
+}
+
+// seedPairing restores legacy saved credentials without requiring a successful network read.
+func seedPairing(test *testing.T, service *Service, link string) (Pairing, error) {
+	test.Helper()
+	pairing, err := parseLink(link)
+	if err != nil {
+		return Pairing{}, err
+	}
+	data, err := json.Marshal(pairing)
+	if err != nil {
+		return Pairing{}, err
+	}
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if err := service.writePrivate(pairingFile, data); err != nil {
+		return Pairing{}, err
+	}
+	if err := service.removePrivate(snapshotFile); err != nil {
+		return Pairing{}, err
+	}
+	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
 }
