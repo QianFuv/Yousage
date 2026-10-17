@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -259,7 +258,7 @@ func validateUsage(data json.RawMessage) (string, error) {
 			Utilization *float64 `json:"utilization"`
 			ResetsAt    string   `json:"resets_at"`
 		}
-		if json.Unmarshal(data, &window) != nil || (window.Utilization != nil && (math.IsNaN(*window.Utilization) || math.IsInf(*window.Utilization, 0))) {
+		if json.Unmarshal(data, &window) != nil {
 			return "", errors.New("invalid usage window")
 		}
 	}
