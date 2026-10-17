@@ -9,6 +9,7 @@ import { configureTimestampLocale } from "../../vendor/timestampFormat";
 import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
 import { followSnapshots, type FollowStatus } from "./follow";
+import { DISPLAY_CHANGES_EVENT, displayChanges } from "./displaySync";
 import { ReadOnlyContext } from "./readOnly";
 import { WebViewer } from "./WebViewer";
 import type { ViewerConnection } from "./ViewerSettings";
@@ -70,9 +71,15 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   const follower = followSnapshots(
     host.fetchNewer,
     (next) => {
+      const changes = displayChanges(
+        snapshot.display.value,
+        next.display.value,
+      );
       snapshot = next;
       render();
       dispatchEvent("appearance-snapshot", snapshot.appearance);
+      if (Object.keys(changes).length)
+        dispatchEvent(DISPLAY_CHANGES_EVENT, changes);
       dispatchEvent("usage-invalidated", null);
     },
     (next) => {

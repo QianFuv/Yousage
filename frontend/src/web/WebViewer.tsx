@@ -2,6 +2,7 @@
 import {
   lazy,
   Suspense,
+  useEffect,
   useLayoutEffect,
   useState,
   type ReactNode,
@@ -16,10 +17,12 @@ import {
 import { useData } from "../usage/controller";
 import { UsagePage } from "../usage/UsagePage";
 import { NavItem } from "../NavItem";
-import { t, useI18n } from "../i18n";
+import { Events } from "@wailsio/runtime";
+import { resolveLanguage, setLanguage, t, useI18n } from "../i18n";
 import { ViewerSettings, type ViewerConnection } from "./ViewerSettings";
 import { RefreshStatus } from "./RefreshStatus";
 import type { FollowStatus } from "./follow";
+import { DISPLAY_CHANGES_EVENT } from "./displaySync";
 
 const LossPage = lazy(() =>
   import("../loss/LossPage").then((module) => ({ default: module.LossPage })),
@@ -59,6 +62,20 @@ export function WebViewer({
   useLayoutEffect(() => {
     document.documentElement.dataset.density = data.display.value.density;
   }, [data.display.value.density]);
+  useLayoutEffect(
+    () => setLanguage(resolveLanguage(data.display.value.language, locale)),
+    [data.display.value.language, locale],
+  );
+  /** Apply preferences the desktop changed, keeping choices made only in this viewer. */
+  useEffect(
+    () =>
+      Events.On(DISPLAY_CHANGES_EVENT, (event) => {
+        void data
+          .patchDisplay(event.data as Partial<typeof data.display.value>)
+          .catch(() => {});
+      }),
+    [data.patchDisplay],
+  );
   /** Show a page and keep it mounted afterwards, like the desktop navigation. */
   const navigate = (next: ViewerRoute) => {
     setVisited((current) => new Set([...current, next]));
