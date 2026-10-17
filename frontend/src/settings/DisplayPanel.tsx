@@ -54,9 +54,9 @@ function translated<Value>(
 export function DisplayPanel() {
   const data = useData();
   const value = data.display.value;
-  /** Report failed ordinary preference writes while retaining the last acknowledged choice. */
+  /** Save ordinary preferences; the shared controller reports failed writes. */
   function change(patch: Partial<typeof value>) {
-    void data.patchDisplay(patch).catch(notifyError);
+    void data.patchDisplay(patch).catch(() => {});
   }
   /** The system's login registration; `null` until it is read or while it changes. */
   const [isAutostart, setIsAutostart] = useState<boolean | null>(null);
