@@ -6,10 +6,10 @@ describe("displayChanges", () => {
   it("reports changed preferences and leaves the rest to the viewer", () => {
     expect(
       displayChanges(
-        { language: "system", density: "comfortable", windowDays: 30 },
-        { language: "zh-CN", density: "compact", windowDays: 30 },
+        { language: "system", timestampFormat: "locale", windowDays: 30 },
+        { language: "zh-CN", timestampFormat: "24h", windowDays: 30 },
       ),
-    ).toEqual({ language: "zh-CN", density: "compact" });
+    ).toEqual({ language: "zh-CN", timestampFormat: "24h" });
   });
 
   it("reports nothing when only the snapshot changed", () => {
@@ -25,8 +25,8 @@ describe("displayChanges", () => {
     expect(
       displayChanges(
         { language: "en" },
-        { language: "en", density: "compact" },
+        { language: "en", timestampFormat: "24h" },
       ),
-    ).toEqual({ density: "compact" });
+    ).toEqual({ timestampFormat: "24h" });
   });
 });

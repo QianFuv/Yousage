@@ -10,7 +10,6 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as domain$0 from "../domain/models.js";
 
 export class Display {
-    "density": string;
     "zoom": number;
     "metric": string;
     "windowDays": number;
@@ -24,9 +23,6 @@ export class Display {
 
     /** Creates a new Display instance. */
     constructor($$source: Partial<Display> = {}) {
-        if (!("density" in $$source)) {
-            this["density"] = "";
-        }
         if (!("zoom" in $$source)) {
             this["zoom"] = 0;
         }

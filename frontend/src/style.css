@@ -26,11 +26,6 @@ body {
   --page-gap: 2rem;
   --row-padding-block: 0.875rem;
 }
-:root[data-density="compact"] {
-  --page-padding-block: 1.125rem;
-  --page-gap: 1.375rem;
-  --row-padding-block: 0.5rem;
-}
 .desktop-layout {
   height: 100dvh;
   min-height: 0;

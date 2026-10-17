@@ -10,7 +10,6 @@ if (!import.meta.env.DEV)
 let display = {
   revision: 0,
   value: {
-    density: "comfortable",
     zoom: 1,
     shouldRestoreWindow: true,
     shouldCloseToTray: true,

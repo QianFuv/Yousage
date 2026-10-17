@@ -21,7 +21,6 @@ type WindowBounds struct {
 	Maximized bool `json:"maximized"`
 }
 type Display struct {
-	Density              string  `json:"density"`
 	Zoom                 float64 `json:"zoom"`
 	Metric               string  `json:"metric"`
 	WindowDays           int     `json:"windowDays"`
@@ -61,13 +60,10 @@ type Service struct{ repository Repository }
 
 func New(repository Repository) *Service { return &Service{repository: repository} }
 func Defaults() Display {
-	return Display{Density: "comfortable", Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, ShouldCloseToTray: true, TimestampFormat: "locale", Breakdown: "model", Language: "system"}
+	return Display{Zoom: 1, Metric: "limits", WindowDays: 30, ShouldAutoRefresh: true, ShouldRestoreWindow: true, ShouldCloseToTray: true, TimestampFormat: "locale", Breakdown: "model", Language: "system"}
 }
 
 func (display Display) Validate() error {
-	if display.Density != "comfortable" && display.Density != "compact" {
-		return errors.New("invalid density")
-	}
 	if !domain.Finite(display.Zoom) || display.Zoom < 1 || display.Zoom > 2 {
 		return errors.New("zoom must be between 100% and 200%")
 	}

@@ -19,10 +19,6 @@ const LANGUAGE_OPTIONS = [
   { value: "zh-CN", label: "简体中文" },
   { value: "en", label: "English" },
 ];
-const DENSITY_OPTIONS = [
-  { value: "comfortable", label: msg("Comfortable") },
-  { value: "compact", label: msg("Compact") },
-];
 const ZOOM_OPTIONS = [1, 1.1, 1.25, 1.5, 1.75, 2].map((zoom) => ({
   value: zoom,
   label: `${Math.round(zoom * 100)}%`,
@@ -112,20 +108,6 @@ export function DisplayPanel() {
                     : option,
                 )}
                 onChange={(language) => change({ language })}
-              />
-            }
-          />
-          <SettingsRow
-            title={t("Information density")}
-            description={t(
-              "Both modes show all statistics; compact reduces spacing.",
-            )}
-            control={
-              <OptionSelect
-                label={t("Information density")}
-                value={value.density}
-                options={translated(DENSITY_OPTIONS)}
-                onChange={(density) => change({ density })}
               />
             }
           />

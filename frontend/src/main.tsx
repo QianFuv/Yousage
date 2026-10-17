@@ -122,9 +122,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
   const [isClosing, setIsClosing] = useState(false);
   const [closeError, setCloseError] = useState("");
   const data = useData();
-  useLayoutEffect(() => {
-    document.documentElement.dataset.density = data.display.value.density;
-  }, [data.display.value.density]);
   useLayoutEffect(
     () => applyLanguage(data.display.value.language, systemLocale),
     [data.display.value.language, systemLocale],
@@ -339,7 +336,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
     appearance: isThemeDirty || appearance.editorState.isDirty,
   };
   return (
-    <div className="desktop-layout" data-density={data.display.value.density}>
+    <div className="desktop-layout">
       <nav
         inert={isClosing}
         className="app-sidebar"

@@ -68,8 +68,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Blank cache rates use the input price. Enter 0 for free tokens. A mapped model’s usage counts as the model it maps to.":
     "缓存单价留空时使用输入单价；填 0 表示免费。映射后的模型用量计入目标模型。",
   Border: "边框",
-  "Both modes show all statistics; compact reduces spacing.":
-    "两种模式显示的统计内容相同，紧凑模式间距更小。",
   "Brand & content": "品牌与内容",
   Breakdown: "明细",
   "Browse theme catalogue": "浏览主题目录",
@@ -114,8 +112,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Codex returned invalid usage limits.": "Codex 返回了无效的用量额度。",
   Collections: "主题合集",
   Colors: "颜色",
-  Comfortable: "舒适",
-  Compact: "紧凑",
   Confidence: "可信度",
   "Conflicting observations": "观测相互矛盾",
   Connect: "连接",
@@ -220,7 +216,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Import themes": "导入主题",
   "Imported theme licenses": "已导入主题的许可证",
   "Independent of Windows display scaling.": "与 Windows 显示缩放相互独立。",
-  "Information density": "信息密度",
   Input: "输入",
   "Input rate": "同输入单价",
   Inspect: "检查",

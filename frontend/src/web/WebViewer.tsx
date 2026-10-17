@@ -59,9 +59,6 @@ export function WebViewer({
   const data = useData();
   const [route, setRoute] = useState<ViewerRoute>("statistics");
   const [visited, setVisited] = useState<Set<ViewerRoute>>(() => new Set());
-  useLayoutEffect(() => {
-    document.documentElement.dataset.density = data.display.value.density;
-  }, [data.display.value.density]);
   useLayoutEffect(
     () => setLanguage(resolveLanguage(data.display.value.language, locale)),
     [data.display.value.language, locale],
@@ -82,7 +79,7 @@ export function WebViewer({
     setRoute(next);
   };
   return (
-    <div className="desktop-layout" data-density={data.display.value.density}>
+    <div className="desktop-layout">
       <nav className="app-sidebar" aria-label={t("Application")}>
         <div className="sidebar-brand">
           <strong className="sidebar-wordmark" aria-label="Yousage">

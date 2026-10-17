@@ -52,7 +52,7 @@ func TestSavedDisplayPricingAndSources(t *testing.T) {
 		t.Fatal(display, err)
 	}
 	old := display
-	display.Value.Density, display.Value.Zoom = "compact", 2
+	display.Value.Zoom = 2
 	display, err = service.SaveDisplay(ctx, display)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestSavedDisplayPricingAndSources(t *testing.T) {
 		t.Fatal("stale UI overwrote saved settings", err)
 	}
 	recovered, err := service.Display(ctx)
-	if err != nil || recovered.Value.Zoom != 2 || recovered.Value.Density != "compact" {
+	if err != nil || recovered.Value.Zoom != 2 {
 		t.Fatal(recovered, err)
 	}
 	pricing, err := service.Pricing(ctx, "local")

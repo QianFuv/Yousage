@@ -66,7 +66,7 @@ export function PageHeader({
 }
 
 /**
- * Centered, density-aware page content column.
+ * Centered page content column.
  *
  * @param props - Content and optional width preset.
  * @returns The page body element.
