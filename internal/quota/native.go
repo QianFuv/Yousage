@@ -19,6 +19,7 @@ type NativeOptions struct {
 	IsEnabled            bool
 	IsManagedAuth        bool
 	ExpectedAccountEmail string
+	ExpectedWorkspaceId  string
 	Version              string
 	ProbeLimit           time.Duration
 	EnrichmentLimit      time.Duration

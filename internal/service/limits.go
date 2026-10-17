@@ -368,6 +368,7 @@ func (service *Service) ConsumeReset(ctx context.Context, route quota.RedeemRout
 							for _, provider := range quotas.Providers {
 								if provider.InstanceId == target.Id {
 									options.ExpectedAccountEmail = provider.Auth.Email
+									options.ExpectedWorkspaceId = provider.Auth.WorkspaceId
 								}
 							}
 							result = quota.ConsumeCodex(ctx, options, operationId)

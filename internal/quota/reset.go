@@ -64,7 +64,8 @@ func (hub HubClient) Consume(ctx context.Context, config HubConfig, accountId, c
 	return result
 }
 
-// ConsumeCodex sends a stable idempotency key without automatically replaying an ambiguous spend.
+// ConsumeCodex verifies the selected account and any known workspace before sending a stable idempotency key.
+// Legacy observations without a workspace retain email verification; ambiguous spends are never replayed automatically.
 func ConsumeCodex(ctx context.Context, options NativeOptions, operationId string) ResetResult {
 	result := ResetResult{Outcome: "failed", OperationId: operationId}
 	if !options.IsEnabled || options.IsManagedAuth || strings.TrimSpace(operationId) == "" || strings.TrimSpace(options.ExpectedAccountEmail) == "" {
@@ -98,7 +99,19 @@ func ConsumeCodex(ctx context.Context, options NativeOptions, operationId string
 		result.Warning = "The signed-in account changed. Refresh limits before resetting."
 		return result
 	}
-	data, err := session.request(deadline, 3, "account/rateLimitResetCredit/consume", map[string]string{"idempotencyKey": operationId})
+	requestId := 3
+	if expected := strings.TrimSpace(options.ExpectedWorkspaceId); expected != "" {
+		data, err := session.request(deadline, requestId, "account/rateLimits/read", nil)
+		var current struct {
+			AccountId string `json:"accountId"`
+		}
+		if err != nil || json.Unmarshal(data, &current) != nil || strings.TrimSpace(current.AccountId) != expected {
+			result.Warning = "The signed-in workspace could not be verified. Refresh limits before resetting."
+			return result
+		}
+		requestId++
+	}
+	data, err := session.request(deadline, requestId, "account/rateLimitResetCredit/consume", map[string]string{"idempotencyKey": operationId})
 	result.Outcome, result.Warning = "unknown", "The reset result is unknown. Refresh limits before deciding whether to retry explicitly."
 	if err != nil {
 		return result
@@ -116,7 +129,7 @@ func ConsumeCodex(ctx context.Context, options NativeOptions, operationId string
 		return result
 	}
 	if result.Outcome == "reset" || result.Outcome == "alreadyRedeemed" {
-		data, err = session.request(deadline, 4, "account/rateLimits/read", nil)
+		data, err = session.request(deadline, requestId+1, "account/rateLimits/read", nil)
 		if err == nil {
 			_, err = MapCodex(data, checked(time.Now()))
 		}
