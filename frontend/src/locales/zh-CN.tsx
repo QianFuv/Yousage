@@ -233,6 +233,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "It has expired, was revoked, or the link was replaced.":
     "它已过期、已被撤回，或链接已被重置。",
   "Keep editing": "继续编辑",
+  "Keep the current link": "保留当前链接",
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
   "Last 24 hours": "最近 24 小时",

@@ -10,10 +10,16 @@ import { t, useI18n } from "../i18n";
 /**
  * Ask for the desktop's phone link and save it on the device.
  *
- * @param props - Called once the link is saved.
+ * @param props - Called once the link is saved, and, when a link is saved already, to keep it instead.
  * @returns The pairing screen.
  */
-export function PairScreen({ onPaired }: { onPaired: () => void }) {
+export function PairScreen({
+  onPaired,
+  onCancel,
+}: {
+  onPaired: () => void;
+  onCancel?: () => void;
+}) {
   useI18n();
   const [link, setLink] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -86,6 +92,11 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
         <LinkIcon aria-hidden />
         {t("Connect")}
       </Button>
+      {onCancel && (
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {t("Keep the current link")}
+        </Button>
+      )}
       <p className="android-pair-note">
         {t(
           "The part after # is the key. It stays on this phone and is never sent to the relay.",

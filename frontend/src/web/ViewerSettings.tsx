@@ -10,7 +10,7 @@ import { PageBody, PageHeader, SettingsRow, SettingsSection } from "../ui";
 export type ViewerConnection = {
   /** Relay origin shown to the reader. */
   relay: string;
-  /** Forget the saved link and ask for another one. */
+  /** Ask for another link; the saved one stays until a new one connects. */
   onChangeLink?: () => void;
 };
 

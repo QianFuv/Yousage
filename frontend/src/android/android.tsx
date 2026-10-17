@@ -36,19 +36,45 @@ function applyDeviceLook() {
   );
 }
 
-/** Forget the saved link and ask for a new one. */
-async function changeLink() {
-  leaveViewer();
-  await mobileApi.Unpair().catch(() => {});
-  showPairing();
+/** Whether the change-link screen added a history entry that the back button closes. */
+let isChangingLink = false;
+
+/** Ask for another link while keeping the saved one until a new link connects. */
+function changeLink() {
+  if (!isChangingLink) {
+    history.pushState(null, "");
+    isChangingLink = true;
+  }
+  showPairing(true);
 }
 
-/** Ask for the desktop's phone link. */
-function showPairing() {
+/** Leave the change-link screen, or open the newly saved link on first pairing. */
+function finishPairing() {
+  if (isChangingLink) history.back();
+  else void openSnapshot().catch(() => showProblem("network"));
+}
+
+/**
+ * Ask for the desktop's phone link.
+ *
+ * @param canKeepLink - A link is saved already, so the screen offers a way back to it.
+ */
+function showPairing(canKeepLink = false) {
   leaveViewer();
   applyDeviceLook();
-  root.render(<PairScreen onPaired={() => void openSnapshot()} />);
+  root.render(
+    <PairScreen
+      onPaired={finishPairing}
+      onCancel={canKeepLink ? () => history.back() : undefined}
+    />,
+  );
 }
+
+addEventListener("popstate", () => {
+  if (!isChangingLink) return;
+  isChangingLink = false;
+  void openSnapshot().catch(() => showProblem("network"));
+});
 
 /**
  * Explain why the snapshot cannot be shown, with ways forward.
@@ -68,7 +94,7 @@ function showProblem(problem: keyof typeof PROBLEMS) {
           <RefreshCwIcon aria-hidden />
           {t("Try again")}
         </Button>
-        <Button variant="outline" onClick={() => void changeLink()}>
+        <Button variant="outline" onClick={changeLink}>
           <Unlink2Icon aria-hidden />
           {t("Use another link")}
         </Button>
@@ -131,7 +157,7 @@ async function openSnapshot() {
     open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
     connection: {
       relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",
-      onChangeLink: () => void changeLink(),
+      onChangeLink: changeLink,
     },
   });
 }
