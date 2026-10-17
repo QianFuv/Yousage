@@ -28,7 +28,9 @@ export interface ChartSeries {
 }
 
 /**
- * Smooth layered lines with soft fills, an immediate hover readout and start, middle and end labels.
+ * Smooth layered lines with soft fills, a readout that follows the pointer and start, middle and end labels.
+ *
+ * A horizontal touch drag moves the readout between buckets; a vertical drag still scrolls the page.
  *
  * Every series measures from zero and the scale tops out at the largest single value.
  *
@@ -128,7 +130,7 @@ export function SeriesChart({
     return observeResize([plot, tooltip], positionTooltip);
   }, [hoverIndex, positionTooltip]);
 
-  /** Snap the hover to the nearest bucket. */
+  /** Snap the readout to the bucket nearest the mouse or touch point. */
   const handleMove = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       const plot = plotRef.current;
@@ -170,7 +172,9 @@ export function SeriesChart({
         <div
           ref={plotRef}
           className="relative h-56 flex-1"
-          onMouseMove={handleMove}
+          style={{ touchAction: "pan-y" }}
+          onPointerDown={handleMove}
+          onPointerMove={handleMove}
           onMouseLeave={() => {
             hoverPositionRef.current = null;
             setHoverIndex(null);

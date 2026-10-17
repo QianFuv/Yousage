@@ -361,7 +361,9 @@ export function UsageProviderChart({
         <div
           ref={plotRef}
           className="relative h-56 flex-1"
-          onMouseMove={handleMove}
+          style={{ touchAction: "pan-y" }}
+          onPointerDown={handleMove}
+          onPointerMove={handleMove}
           onMouseLeave={() => {
             hoverPositionRef.current = null;
             setHoverIndex(null);
