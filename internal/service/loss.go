@@ -113,7 +113,7 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 
 // cacheRewrite recognizes context reuse that collapsed, independently of its cause.
 func cacheRewrite(previous, current domain.Record) (int64, string, bool) {
-	if previous.Model != current.Model || current.SessionId == "" {
+	if previous.Model != current.Model {
 		return 0, "exact", false
 	}
 	before, after := previous.Totals, current.Totals
