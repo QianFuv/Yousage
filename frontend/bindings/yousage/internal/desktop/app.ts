@@ -124,6 +124,13 @@ export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
 }
 
 /**
+ * GetAutostart reports whether this executable is registered to launch at login.
+ */
+export function GetAutostart(): $CancellablePromise<boolean> {
+    return $Call.ByID(3280491753);
+}
+
+/**
  * GetBootstrap returns native preferences after application initialization.
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
@@ -350,6 +357,13 @@ export function SaveSync(input: sync$0.SaveInput): $CancellablePromise<sync$0.St
     return $Call.ByID(2010684434, input).then(($result: any) => {
         return $$createType14($result);
     });
+}
+
+/**
+ * SetAutostart registers or removes the login launch and returns the resulting registration state.
+ */
+export function SetAutostart(isEnabled: boolean): $CancellablePromise<boolean> {
+    return $Call.ByID(97457885, isEnabled);
 }
 
 /**

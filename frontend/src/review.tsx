@@ -21,6 +21,7 @@ let display = {
     shouldAutoRefresh: false,
   },
 };
+let isAutostart = false;
 let sourceSettings = {
   revision: 1,
   value: [
@@ -275,6 +276,11 @@ setTransport({
       case 31117496:
         return null;
 
+      case 3280491753:
+        return isAutostart;
+      case 97457885:
+        isAutostart = request.args[0] as boolean;
+        return isAutostart;
       case 2885542999:
         return JSON.parse(JSON.stringify(display));
       case 920552350:

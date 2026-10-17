@@ -1,4 +1,5 @@
 /** Immediate display preferences acknowledge durable native state before updating controls. */
+import { useEffect, useState } from "react";
 import { useData } from "../usage/controller";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
@@ -60,6 +61,36 @@ export function DisplayPanel() {
   /** Report failed ordinary preference writes while retaining the last acknowledged choice. */
   function change(patch: Partial<typeof value>) {
     void data.patchDisplay(patch).catch(notifyError);
+  }
+  /** The system's login registration; `null` until it is read or while it changes. */
+  const [isAutostart, setIsAutostart] = useState<boolean | null>(null);
+  const [savedAutostart, setSavedAutostart] = useState(false);
+  useEffect(() => {
+    void nativeApi
+      .GetAutostart()
+      .then((isEnabled) => {
+        setSavedAutostart(isEnabled);
+        setIsAutostart(isEnabled);
+      })
+      .catch(notifyError);
+  }, []);
+  /**
+   * Register or remove the login launch, showing what the system reports afterwards.
+   *
+   * @param isEnabled - Whether Yousage should start at login.
+   */
+  function changeAutostart(isEnabled: boolean) {
+    setIsAutostart(null);
+    void nativeApi
+      .SetAutostart(isEnabled)
+      .then((isRegistered) => {
+        setSavedAutostart(isRegistered);
+        setIsAutostart(isRegistered);
+      })
+      .catch((cause: unknown) => {
+        setIsAutostart(savedAutostart);
+        notifyError(cause);
+      });
   }
   return (
     <section aria-label={t("Display & behavior")}>
@@ -151,6 +182,18 @@ export function DisplayPanel() {
                 onCheckedChange={(isChecked) =>
                   change({ shouldRestoreWindow: isChecked })
                 }
+              />
+            }
+          />
+          <SettingsRow
+            title={t("Launch at login")}
+            description={t("Start Yousage when you sign in to this computer.")}
+            control={
+              <Switch
+                aria-label={t("Launch at login")}
+                checked={isAutostart ?? savedAutostart}
+                disabled={isAutostart === null}
+                onCheckedChange={changeAutostart}
               />
             }
           />

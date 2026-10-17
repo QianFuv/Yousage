@@ -240,6 +240,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Last updated": "最近更新",
   "Last upload": "上次上传",
   "Last {days} days": "最近 {days} 天",
+  "Launch at login": "开机自启",
   Left: "剩余",
   Light: "亮色",
   "Link copied.": "链接已复制。",
@@ -484,6 +485,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Spend over time": "花费趋势",
   Spent: "已花费",
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
+  "Start Yousage when you sign in to this computer.":
+    "登录这台电脑时自动启动 Yousage。",
   Standard: "标准",
   Status: "状态",
   "Subtle surface": "浅色背景",
