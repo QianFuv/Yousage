@@ -103,10 +103,7 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 	if err != nil {
 		return LossReport{}, err
 	}
-	rates, err := service.Rates(ctx)
-	if err != nil {
-		return LossReport{}, err
-	}
+	rates := service.Rates(ctx)
 	records := []domain.Record{}
 	for _, sourceRecords := range bySource {
 		records = append(records, sourceRecords...)

@@ -165,7 +165,7 @@ func TestRatesKeepLastGoodOnFailedRefreshAndExpireFreshness(test *testing.T) {
 	if err := service.RefreshRates(ctx, request); err != nil {
 		test.Fatal(err)
 	}
-	first, _ := service.Rates(ctx)
+	first := service.Rates(ctx)
 	if len(first.Rates) != 1 || first.Provenance(service.Now()).Status != "fresh" {
 		test.Fatal(first)
 	}
@@ -183,7 +183,7 @@ func TestRatesKeepLastGoodOnFailedRefreshAndExpireFreshness(test *testing.T) {
 	if err := service.RefreshRates(ctx, request); err == nil {
 		test.Fatal("fixture failure not surfaced")
 	}
-	retained, _ := service.Rates(ctx)
+	retained := service.Rates(ctx)
 	if len(retained.Rates) != 1 || retained.Provenance(instant).Status != "cached" {
 		test.Fatal("failure replaced last-good rates")
 	}

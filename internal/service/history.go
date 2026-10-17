@@ -170,10 +170,7 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 	if err != nil {
 		return summary, err
 	}
-	rates, err := service.Rates(ctx)
-	if err != nil {
-		return summary, err
-	}
+	rates := service.Rates(ctx)
 	summary.Pricing = rates.Provenance(now)
 	inputs := []any{window, entries, pricing, rates.encodedRates, service.Scope, now.UTC().Format(time.DateOnly)}
 	for _, entry := range entries {

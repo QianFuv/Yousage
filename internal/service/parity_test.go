@@ -124,9 +124,9 @@ func TestPriceCacheFailureDoesNotBlockHistoryOrFreshRates(test *testing.T) {
 	if err := service.RefreshRates(ctx, refresh.Request{IsManual: true}); err != nil {
 		test.Fatal("cache write failure rejected valid fresh download", err)
 	}
-	rates, err := service.Rates(ctx)
-	if err != nil || len(rates.Rates) != 1 || rates.Provenance(service.Now()).Status != "fresh" {
-		test.Fatal(rates, err)
+	rates := service.Rates(ctx)
+	if len(rates.Rates) != 1 || rates.Provenance(service.Now()).Status != "fresh" {
+		test.Fatal(rates)
 	}
 }
 

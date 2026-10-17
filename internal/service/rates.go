@@ -44,45 +44,43 @@ func (snapshot RateSnapshot) Provenance(now time.Time) remote.Pricing {
 }
 
 // Rates reuses persisted prices until their setting revision changes.
-func (service *Service) Rates(ctx context.Context) (RateSnapshot, error) {
+// An unavailable optional cache yields an empty price table.
+func (service *Service) Rates(ctx context.Context) RateSnapshot {
 	if current := service.rates.Snapshot("public"); current.HasValue {
 		value := current.Value
 		if value.encodedRates == nil {
 			value.encodedRates, _ = json.Marshal(value.Rates)
 		}
 		value.IsFresh = current.Error == nil
-		return value, nil
+		return value
 	}
 	service.rateMutex.Lock()
 	defer service.rateMutex.Unlock()
 	revision, err := service.Store.SettingRevision(ctx, "public-model-rates")
 	if err != nil {
-		return RateSnapshot{Rates: accounting.RateTable{}}, nil
+		return RateSnapshot{Rates: accounting.RateTable{}}
 	}
 	if service.savedRates.value.Rates != nil && service.savedRates.revision == revision {
-		return service.savedRates.value, nil
+		return service.savedRates.value
 	}
 	value := RateSnapshot{Rates: accounting.RateTable{}}
 	revision, err = service.Store.ReadSetting(ctx, "public-model-rates", &value)
 	if err != nil {
-		return RateSnapshot{Rates: accounting.RateTable{}}, nil
+		return RateSnapshot{Rates: accounting.RateTable{}}
 	}
 	value.encodedRates, _ = json.Marshal(value.Rates)
 	service.savedRates = savedRateCache{revision: revision, value: value}
-	return value, nil
+	return value
 }
 
 // RefreshRates honors persisted freshness, retains failed rates and respects deferred notifications.
 func (service *Service) RefreshRates(ctx context.Context, request refresh.Request) error {
-	current, err := service.Rates(ctx)
-	if err != nil {
-		return err
-	}
+	current := service.Rates(ctx)
 	age := service.Now().Sub(time.UnixMilli(current.FetchedAtMs))
 	if len(current.Rates) > 0 && current.Source == ratesUrl && ((!request.IsManual && age < 24*time.Hour) || (request.IsManual && age < time.Minute)) {
 		return nil
 	}
-	_, err = service.rates.Run(ctx, "public", request, func(owner context.Context) (RateSnapshot, error) {
+	_, err := service.rates.Run(ctx, "public", request, func(owner context.Context) (RateSnapshot, error) {
 		owner, cancelOwner := context.WithCancel(owner)
 		stop := context.AfterFunc(service.owner, cancelOwner)
 		defer stop()

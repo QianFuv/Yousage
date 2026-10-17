@@ -202,10 +202,7 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 	if err != nil {
 		return nil
 	}
-	rates, err := service.Rates(ctx)
-	if err != nil {
-		return nil
-	}
+	rates := service.Rates(ctx)
 	series := []quota.CycleSeries{}
 	if _, err = service.Store.ReadSetting(ctx, "quota-samples", &series); err != nil {
 		series = nil
