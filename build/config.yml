@@ -4,7 +4,7 @@ info:
   productName: Yousage
   productIdentifier: app.yousage.desktop
   description: Usage monitoring and themes
-  version: 0.1.0
+  version: 0.1.1
 dev_mode:
   root_path: .
   log_level: warn
