@@ -793,9 +793,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 
-## go:github.com/wailsapp/wails/v3@v3.0.0-beta.28
+## go:github.com/wailsapp/wails/v3@v3.0.0-beta.30
 
-Source: https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0-beta.28
+Source: https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0-beta.30
 
 ### LICENSE
 
@@ -3988,9 +3988,9 @@ MIT License
 ```
 
 
-## npm:@wailsio/runtime@3.0.0-beta.28
+## npm:@wailsio/runtime@3.0.0-beta.30
 
-Source: https://registry.npmjs.org/@wailsio/runtime/-/runtime-3.0.0-beta.28.tgz
+Source: https://registry.npmjs.org/@wailsio/runtime/-/runtime-3.0.0-beta.30.tgz
 
 ### LICENSE
 

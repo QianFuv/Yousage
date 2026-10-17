@@ -56,6 +56,6 @@ bound method over `window.open`, whose popup behavior depends on the WebView.
 The Activity applies native system-bar and display-cutout insets to the WebView's
 container and consumes them before they reach the WebView. Frontend layouts do
 not need to query native inset sizes or add system-bar padding. Insets and
-keyboard behavior still need device/emulator validation. The installed beta.28
+keyboard behavior still need device/emulator validation. The installed beta.30
 JavaScript Android namespace exposes haptics, device info, and toast methods;
 it does not expose the newer Go `SafeAreaJSON` helper.

@@ -245,7 +245,7 @@ setTransport({
         return JSON.stringify(
           {
             application: "Yousage",
-            wails: "3.0.0-beta.28",
+            wails: "3.0.0-beta.30",
             platform: "browser-fixture",
             historySources: sourceSettings.value.length,
           },

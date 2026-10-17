@@ -321,7 +321,7 @@ func (service *App) GetDiagnostics() (string, error) {
 		RemoteEnvironments int    `json:"remoteEnvironments"`
 		QuotaTargets       int    `json:"quotaTargets"`
 		QuotaHubs          int    `json:"quotaHubs"`
-	}{"Yousage", "3.0.0-beta.28", runtime.Version(), runtime.GOOS + "/" + runtime.GOARCH, "51f7f77f87318a5329d3bab15d513fda5654200b", len(sources), len(config.Value.Connections), len(config.Value.Providers), len(config.Value.Hubs)}
+	}{"Yousage", "3.0.0-beta.30", runtime.Version(), runtime.GOOS + "/" + runtime.GOARCH, "51f7f77f87318a5329d3bab15d513fda5654200b", len(sources), len(config.Value.Connections), len(config.Value.Providers), len(config.Value.Hubs)}
 	data, err := json.MarshalIndent(value, "", "  ")
 	return string(data), err
 }
