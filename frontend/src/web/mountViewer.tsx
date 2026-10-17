@@ -8,12 +8,29 @@ import { resolveLanguage, setLanguage } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
 import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
+import { followSnapshots } from "./follow";
 import { ReadOnlyContext } from "./readOnly";
 import { WebViewer } from "./WebViewer";
 import type { ViewerConnection } from "./ViewerSettings";
 import { clearNotifications, Toaster } from "../notify";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/**
+ * Deliver an event to runtime listeners as if the native side had sent it.
+ *
+ * @param name - Event name.
+ * @param data - Event payload.
+ */
+function dispatchEvent(name: string, data: unknown) {
+  (
+    window as unknown as {
+      _wails?: {
+        dispatchWailsEvent: (event: { name: string; data: unknown }) => void;
+      };
+    }
+  )._wails?.dispatchWailsEvent({ name, data });
+}
 
 /** What a page hosting the viewer provides. */
 export type ViewerHost = {
@@ -37,7 +54,7 @@ export type ViewerHost = {
  * Route binding calls to the snapshot and render the viewer.
  *
  * @param host - Snapshot source and page integration.
- * @returns A function that stops following the device color scheme and restores the fallback transport.
+ * @returns A function that stops following the relay and device color scheme and restores the fallback transport.
  */
 export async function mountViewer(host: ViewerHost): Promise<() => void> {
   const fallback = host.fallback ?? null;
@@ -46,16 +63,17 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   const darkQuery = matchMedia(DARK_QUERY);
   /** Render the shell again so the banner shows the latest snapshot time. */
   let renderTime: (generatedAt: string) => void = () => {};
+  /** Hand each newer snapshot's theme and reports to the mounted pages. */
+  const follower = followSnapshots(host.fetchNewer, (next) => {
+    snapshot = next;
+    renderTime(snapshot.generatedAt);
+    dispatchEvent("appearance-snapshot", snapshot.appearance);
+    dispatchEvent("usage-invalidated", null);
+  });
   setTransport(
     createSnapshotTransport(names, {
       current: () => snapshot,
-      async refetch() {
-        const next = await host.fetchNewer();
-        if (next) {
-          snapshot = next;
-          renderTime(snapshot.generatedAt);
-        }
-      },
+      refetch: follower.refetch,
       device: { isDark: () => darkQuery.matches, locale: host.locale },
       open: host.open,
       fallback,
@@ -63,16 +81,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   );
   /** Tell the theme controller that the device color scheme changed. */
   const onSchemeChange = (event: MediaQueryListEvent) =>
-    (
-      window as unknown as {
-        _wails?: {
-          dispatchWailsEvent: (event: { name: string; data: boolean }) => void;
-        };
-      }
-    )._wails?.dispatchWailsEvent({
-      name: "system-appearance",
-      data: event.matches,
-    });
+    dispatchEvent("system-appearance", event.matches);
   darkQuery.addEventListener("change", onSchemeChange);
   const [bootstrap, appearance, display] = await Promise.all([
     nativeApi.GetBootstrap(),
@@ -103,6 +112,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
     );
   renderTime(snapshot.generatedAt);
   return () => {
+    follower.stop();
     clearNotifications();
     darkQuery.removeEventListener("change", onSchemeChange);
     setTransport(fallback);

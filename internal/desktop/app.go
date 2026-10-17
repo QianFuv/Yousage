@@ -144,7 +144,10 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	service.themeDone = make(chan struct{})
 	go func() {
 		defer close(service.themeDone)
-		if err := service.themes.Watch(watcher, func(snapshot theme.LibrarySnapshot) { service.nativeApp.Event.Emit("appearance-snapshot", snapshot) }); err != nil && watcher.Err() == nil {
+		if err := service.themes.Watch(watcher, func(snapshot theme.LibrarySnapshot) {
+			service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
+			service.triggerSync()
+		}); err != nil && watcher.Err() == nil {
 			if snapshot, readError := service.themes.Read(watcher); readError == nil {
 				snapshot.Error = err.Error()
 				service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
@@ -262,6 +265,7 @@ func (service *App) SaveDisplay(saved preferences.SavedDisplay) (preferences.Sav
 		if service.backgroundRefresh != nil {
 			service.backgroundRefresh.reconcile()
 		}
+		service.triggerSync()
 	}
 	return value, err
 }
@@ -328,6 +332,7 @@ func (service *App) SaveAppearance(revision int64, value theme.LibraryValue) (th
 	snapshot, err := service.themes.Save(ctx, revision, value)
 	if err == nil {
 		service.nativeApp.Event.Emit("appearance-snapshot", snapshot)
+		service.triggerSync()
 	}
 	return snapshot, err
 }
