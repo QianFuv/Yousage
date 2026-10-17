@@ -15,6 +15,7 @@ import {
 import { SavedSources } from "../../bindings/yousage/internal/desktop/models";
 import { useData } from "../usage/controller";
 import { t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import { Notice, PageBody, PageHeader, SettingsSection } from "../ui";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { Switch } from "../../../tools/parity/upstream/apps/web/src/components/ui/switch";
@@ -57,7 +58,7 @@ export function SourcesPanel({
     null,
   );
   const [detections, setDetections] = useState<ProviderDetection[]>([]);
-  const [status, setStatus] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [isPending, setIsPending] = useState(false);
   const isWorking = useRef(false);
   const isSourcesDirty =
@@ -84,7 +85,7 @@ export function SourcesPanel({
         }
       })
       .catch((cause) => {
-        if (!isDisposed) setStatus(String(cause));
+        if (!isDisposed) setLoadError(String(cause));
       });
     return () => {
       isDisposed = true;
@@ -95,11 +96,10 @@ export function SourcesPanel({
     if (isWorking.current) return;
     isWorking.current = true;
     setIsPending(true);
-    setStatus("");
     try {
       await operation();
     } catch (cause) {
-      setStatus(String(cause));
+      notifyError(cause);
     } finally {
       isWorking.current = false;
       setIsPending(false);
@@ -110,8 +110,8 @@ export function SourcesPanel({
       <section aria-label={t("Sources & connections")}>
         <PageHeader parent={t("Settings")} title={t("Sources & connections")} />
         <PageBody width="narrow">
-          <Notice tone={status ? "error" : "default"}>
-            {status || t("Loading configuration…")}
+          <Notice tone={loadError ? "error" : "default"}>
+            {loadError || t("Loading configuration…")}
           </Notice>
         </PageBody>
       </section>
@@ -153,7 +153,7 @@ export function SourcesPanel({
           onClick={() =>
             void act(async () => {
               setDetections(await nativeApi.DetectProviders());
-              setStatus(t("Provider detection updated."));
+              notify(t("Provider detection updated."));
             })
           }
         >
@@ -162,7 +162,6 @@ export function SourcesPanel({
         </Button>
       </PageHeader>
       <PageBody width="narrow">
-        {status && <Notice>{status}</Notice>}
         <fieldset disabled={isPending} className="m-0 min-w-0 border-0 p-0">
           <SettingsSection
             title={
@@ -253,7 +252,7 @@ export function SourcesPanel({
                 isPending={isPending}
                 onDiscard={() => {
                   setSources(savedSources);
-                  setStatus(t("History draft discarded."));
+                  notify(t("History draft discarded."), "info");
                 }}
                 onApply={() =>
                   void act(async () => {
@@ -263,7 +262,7 @@ export function SourcesPanel({
                     setSources(next);
                     setSavedSources(next);
                     await data.reload();
-                    setStatus(t("History sources applied."));
+                    notify(t("History sources applied."));
                   })
                 }
               />
@@ -275,7 +274,7 @@ export function SourcesPanel({
                 isPending={isPending}
                 onDiscard={() => {
                   setConfig(savedConfig);
-                  setStatus(t("Quota account draft discarded."));
+                  notify(t("Quota account draft discarded."), "info");
                 }}
                 onApply={() =>
                   void act(async () => {
@@ -285,7 +284,7 @@ export function SourcesPanel({
                     setConfig(saved);
                     setSavedConfig(saved);
                     await data.reload();
-                    setStatus(t("Quota accounts applied."));
+                    notify(t("Quota accounts applied."));
                   })
                 }
               />

@@ -1,9 +1,7 @@
 /** Immediate display preferences acknowledge durable native state before updating controls. */
-import { useState } from "react";
 import { useData } from "../usage/controller";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
-  Notice,
   OptionSelect,
   PageBody,
   PageHeader,
@@ -11,6 +9,7 @@ import {
   SettingsSection,
 } from "../ui";
 import { msg, t } from "../i18n";
+import { notifyError } from "../notify";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { Switch } from "../../../tools/parity/upstream/apps/web/src/components/ui/switch";
 
@@ -58,19 +57,14 @@ function translated<Value>(
 export function DisplayPanel() {
   const data = useData();
   const value = data.display.value;
-  const [status, setStatus] = useState("");
   /** Report failed ordinary preference writes while retaining the last acknowledged choice. */
   function change(patch: Partial<typeof value>) {
-    void data
-      .patchDisplay(patch)
-      .then(() => setStatus(""))
-      .catch((cause) => setStatus(String(cause)));
+    void data.patchDisplay(patch).catch(notifyError);
   }
   return (
     <section aria-label={t("Display & behavior")}>
       <PageHeader parent={t("Settings")} title={t("Display & behavior")} />
       <PageBody width="narrow">
-        {status && <Notice tone="error">{status}</Notice>}
         <SettingsSection title={t("Display")}>
           <SettingsRow
             title={t("Language")}
@@ -183,10 +177,7 @@ export function DisplayPanel() {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  void nativeApi
-                    .RecenterWindow()
-                    .then(() => setStatus(""))
-                    .catch((cause) => setStatus(String(cause)))
+                  void nativeApi.RecenterWindow().catch(notifyError)
                 }
               >
                 {t("Recenter")}

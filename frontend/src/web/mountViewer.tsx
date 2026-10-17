@@ -11,6 +11,7 @@ import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
 import { ReadOnlyContext } from "./readOnly";
 import { WebViewer } from "./WebViewer";
+import { clearNotifications, Toaster } from "../notify";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
@@ -95,11 +96,13 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
               bannerAction={host.bannerAction}
             />
           </DataProvider>
+          <Toaster />
         </AppearanceProvider>
       </ReadOnlyContext.Provider>,
     );
   renderTime(snapshot.generatedAt);
   return () => {
+    clearNotifications();
     darkQuery.removeEventListener("change", onSchemeChange);
     setTransport(fallback);
   };

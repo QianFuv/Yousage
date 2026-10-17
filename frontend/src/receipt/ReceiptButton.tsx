@@ -11,6 +11,7 @@ import { Events } from "@wailsio/runtime";
 import { CopyIcon, ReceiptTextIcon, Share2Icon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import { usePeriodDays } from "../usage/PeriodToggle";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import type { Receipt } from "../../bindings/yousage/internal/service/models";
@@ -223,7 +224,6 @@ function ReceiptPrinter({
     isReducedMotion ? "shown" : "loading",
   );
   const [confetti] = useState(createConfetti);
-  const [status, setStatus] = useState("");
   const paper = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -252,12 +252,6 @@ function ReceiptPrinter({
     window.addEventListener("keydown", pressed);
     return () => window.removeEventListener("keydown", pressed);
   }, [onClose, isSharing]);
-
-  useEffect(() => {
-    if (!status) return;
-    const timer = window.setTimeout(() => setStatus(""), 2000);
-    return () => window.clearTimeout(timer);
-  }, [status]);
 
   return createPortal(
     <>
@@ -292,14 +286,14 @@ function ReceiptPrinter({
               if (!paper.current) return;
               try {
                 await copyReceiptImage(paper.current);
-                setStatus(t("Copied"));
+                notify(t("Receipt image copied."));
               } catch (cause) {
-                setStatus(String(cause));
+                notifyError(cause);
               }
             }}
           >
             <CopyIcon aria-hidden />
-            {status || t("Copy as PNG")}
+            {t("Copy as PNG")}
           </Button>
           <Button
             variant="outline"

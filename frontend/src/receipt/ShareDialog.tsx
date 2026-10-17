@@ -18,6 +18,7 @@ import {
   type ShareView,
 } from "../../bindings/yousage/internal/sync/models";
 import { msg, t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import { Notice, OptionSelect } from "../ui";
 import { SharePage } from "../web/SharePage";
 import type { SharePayload } from "../web/payloads";
@@ -90,14 +91,12 @@ export function ShareDialog({
   const [created, setCreated] = useState<ShareView | null>(null);
   const [error, setError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [copyStatus, setCopyStatus] = useState("");
   const request = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
     setCreated(null);
     setError("");
-    setCopyStatus("");
     void nativeApi
       .GetSync()
       .then((state) => setIsEnabled(state.isEnabled))
@@ -121,7 +120,6 @@ export function ShareDialog({
   /** Upload the previewed page and keep its link. */
   async function create() {
     setIsCreating(true);
-    setError("");
     try {
       const share = await nativeApi.CreateShare(
         buildShareRequest(days, ttlDays, hideAmounts, zone),
@@ -129,7 +127,7 @@ export function ShareDialog({
       setCreated(share);
       onCreated(share);
     } catch (cause) {
-      setError(String(cause));
+      notifyError(cause);
     } finally {
       setIsCreating(false);
     }
@@ -188,12 +186,12 @@ export function ShareDialog({
                       onClick={() =>
                         void nativeApi
                           .CopyText(created.url)
-                          .then(() => setCopyStatus(t("Copied")))
-                          .catch((cause) => setCopyStatus(String(cause)))
+                          .then(() => notify(t("Link copied.")))
+                          .catch(notifyError)
                       }
                     >
                       <CopyIcon aria-hidden />
-                      {copyStatus || t("Copy link")}
+                      {t("Copy link")}
                     </Button>
                   </div>
                 </div>

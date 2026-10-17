@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import {
   Notice,
   PageBody,
@@ -15,20 +16,17 @@ import { Button } from "../../../tools/parity/upstream/apps/web/src/components/u
 /** Preview precisely what is copied or exported; no account labels, URLs, paths or credentials. */
 export function DiagnosticsPanel({ nativeStatus }: { nativeStatus: string }) {
   const [report, setReport] = useState("");
-  const [status, setStatus] = useState("");
   useEffect(() => {
-    void nativeApi
-      .GetDiagnostics()
-      .then(setReport)
-      .catch((cause) => setStatus(String(cause)));
+    void nativeApi.GetDiagnostics().then(setReport).catch(notifyError);
   }, []);
   /** Show only the actual outcome of the explicit native operation. */
   async function act(operation: () => Promise<unknown>, message: string) {
     try {
       const result = await operation();
-      setStatus(result === false ? t("Canceled.") : message);
+      if (result === false) notify(t("Canceled."), "info");
+      else notify(message);
     } catch (cause) {
-      setStatus(String(cause));
+      notifyError(cause);
     }
   }
   return (
@@ -36,7 +34,6 @@ export function DiagnosticsPanel({ nativeStatus }: { nativeStatus: string }) {
       <PageHeader parent={t("Settings")} title={t("About & diagnostics")} />
       <PageBody width="narrow">
         {nativeStatus && <Notice tone="error">{nativeStatus}</Notice>}
-        {status && <Notice>{status}</Notice>}
         <SettingsSection title={t("About")}>
           <SettingsRow
             title="Yousage"
@@ -73,7 +70,7 @@ export function DiagnosticsPanel({ nativeStatus }: { nativeStatus: string }) {
                 void nativeApi
                   .GetDiagnostics()
                   .then(setReport)
-                  .catch((cause) => setStatus(String(cause)))
+                  .catch(notifyError)
               }
             >
               <RefreshCwIcon aria-hidden />

@@ -20,6 +20,7 @@ import {
   State as SyncState,
 } from "../../bindings/yousage/internal/sync/models";
 import { t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import {
   Field,
   Notice,
@@ -103,8 +104,7 @@ export function SyncPanel() {
   const [state, setState] = useState<SyncState | null>(null);
   const [relayUrl, setRelayUrl] = useState("");
   const [token, setToken] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [confirm, setConfirm] = useState<PendingConfirm>(null);
 
@@ -115,7 +115,7 @@ export function SyncPanel() {
         setState(value);
         setRelayUrl(value.relayUrl);
       })
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setLoadError(String(cause)));
     return Events.On("sync-state", (event) =>
       setState(event.data as SyncState),
     );
@@ -129,14 +129,12 @@ export function SyncPanel() {
    */
   async function run(action: () => Promise<SyncState | void>, success: string) {
     setIsBusy(true);
-    setError("");
-    setMessage("");
     try {
       const result = await action();
       setState((current) => nextSyncState(current, result));
-      setMessage(success);
+      notify(success);
     } catch (cause) {
-      setError(String(cause));
+      notifyError(cause);
     } finally {
       setIsBusy(false);
     }
@@ -167,8 +165,7 @@ export function SyncPanel() {
     <section aria-label={t("Sync & sharing")}>
       <PageHeader parent={t("Settings")} title={t("Sync & sharing")} />
       <PageBody width="narrow">
-        {error && <Notice tone="error">{error}</Notice>}
-        {message && !error && <Notice>{message}</Notice>}
+        {loadError && <Notice tone="error">{loadError}</Notice>}
         <SettingsSection title={t("Relay")}>
           <SettingsRow
             title={t("Sync to phone")}

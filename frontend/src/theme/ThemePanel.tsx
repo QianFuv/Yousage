@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ActionMenu, ActionMenuItem } from "../ActionMenu";
 import { msg, t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import {
   Notice,
   OptionSelect,
@@ -326,7 +327,6 @@ export function ThemePanel({
 }) {
   const context = useAppearance();
   const preferences = context.snapshot.value.preferences;
-  const [status, setStatus] = useState("");
   const [paste, setPaste] = useState("");
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [shouldReplace, setShouldReplace] = useState(true);
@@ -359,7 +359,7 @@ export function ThemePanel({
     try {
       await execute();
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : String(cause));
+      notifyError(cause);
     }
   }
   /** Stage a selected or dropped batch with the revision used to resolve its collisions. */
@@ -370,10 +370,9 @@ export function ThemePanel({
       const themes = parseThemeBatch(files);
       if (themes.length) {
         setDraft({ themes, revision: context.snapshot.revision });
-        setStatus("");
       }
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : String(cause));
+      notifyError(cause);
     }
   }
   useEffect(() => {
@@ -395,8 +394,7 @@ export function ThemePanel({
           if (!controller.signal.aborted) setExtensions([...value]);
         })
         .catch((cause) => {
-          if (!controller.signal.aborted)
-            setStatus(cause instanceof Error ? cause.message : String(cause));
+          if (!controller.signal.aborted) notifyError(cause);
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsSearching(false);
@@ -424,7 +422,6 @@ export function ThemePanel({
         controller.signal,
       );
       setDraft({ themes: [...themes], revision, attribution: extension });
-      setStatus("");
     } finally {
       clearTimeout(timer);
       setIsDownloading(false);
@@ -467,7 +464,7 @@ export function ThemePanel({
     );
     setDraft(null);
     setPaste("");
-    setStatus(t("Themes imported."));
+    notify(t("Themes imported."));
   }
   /** Delete only selected custom members, retaining missing raw owners for published themes that may return. */
   async function removeThemes(ids: string[]) {
@@ -492,7 +489,7 @@ export function ThemePanel({
       }),
       context.snapshot.revision,
     );
-    setStatus(t("Selected themes removed."));
+    notify(t("Selected themes removed."));
   }
   /** Request local-font access when supported; manual family input always remains available. */
   async function discoverFonts() {
@@ -502,10 +499,11 @@ export function ThemePanel({
       }
     ).queryLocalFonts;
     if (!queryFonts) {
-      setStatus(
+      notify(
         t(
           "Local font discovery is unavailable here. Enter an installed font family manually.",
         ),
+        "info",
       );
       return;
     }
@@ -582,7 +580,9 @@ export function ThemePanel({
       }),
     );
   }
-  const message = context.error || context.snapshot.error || status;
+  useEffect(() => {
+    if (context.error) notifyError(context.error);
+  }, [context.error]);
   return (
     <section aria-label={t("Appearance")}>
       <PageHeader parent={t("Settings")} title={t("Appearance")}>
@@ -627,12 +627,8 @@ export function ThemePanel({
         </Button>
       </PageHeader>
       <PageBody>
-        {message && (
-          <Notice
-            tone={context.error || context.snapshot.error ? "error" : "default"}
-          >
-            {message}
-          </Notice>
+        {context.snapshot.error && (
+          <Notice tone="error">{context.snapshot.error}</Notice>
         )}
         <section className="flex flex-col gap-2.5">
           <SectionHeading
@@ -787,11 +783,8 @@ export function ThemePanel({
                                       JSON.stringify(definition),
                                     ),
                                   );
-                                  setStatus(
-                                    wasSaved
-                                      ? t("Theme exported.")
-                                      : t("Export cancelled."),
-                                  );
+                                  if (wasSaved) notify(t("Theme exported."));
+                                  else notify(t("Export cancelled."), "info");
                                 })
                               }
                             >
@@ -805,7 +798,7 @@ export function ThemePanel({
                                   await navigator.clipboard.writeText(
                                     serializeThemeFile(definition),
                                   );
-                                  setStatus(t("Theme JSON copied."));
+                                  notify(t("Theme JSON copied."));
                                 })
                               }
                             >

@@ -291,11 +291,11 @@ export function ResetCredits({
   readonly credits: ServerProviderResetCredits;
   readonly now: number;
 }) {
-  const { confirming, setConfirming, busy, status, redeem } = useResetCredit(
+  const { confirming, setConfirming, busy, redeem } = useResetCredit(
     environmentId,
     input,
   );
-  if (credits.availableCount === 0 && status === null) return null;
+  if (credits.availableCount === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="tabular-nums">{resetCreditsSummary(credits, now)}</span>
@@ -309,7 +309,6 @@ export function ResetCredits({
           {busy ? t("Using…") : t("Use reset")}
         </Button>
       ) : null}
-      {status ? <span className="text-foreground">{status}</span> : null}
       <ResetCreditDialog
         open={confirming}
         onOpenChange={setConfirming}

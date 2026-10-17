@@ -1,5 +1,6 @@
 /** Native action adapters for original quota renderers without app atoms or browser credentials. */
 import { msg, t } from "../i18n";
+import { notify, notifyError } from "../notify";
 import { formatUpcomingTimestamp as upstreamUpcomingTimestamp } from "../../vendor/timestampFormat";
 import { useData } from "./controller";
 import { useRef, useState } from "react";
@@ -90,7 +91,6 @@ export function useResetCredit(
 ) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const attempted = useRef(false);
   const isWorking = useRef(false);
   const identity = JSON.stringify([environmentId, input]);
@@ -100,7 +100,6 @@ export function useResetCredit(
     isWorking.current = true;
     setConfirming(false);
     setBusy(true);
-    setStatus(null);
     let operationId = RESET_OPERATIONS.get(identity);
     if (!operationId) {
       operationId = crypto.randomUUID();
@@ -125,20 +124,21 @@ export function useResetCredit(
           }),
         )
         .catch(() => {});
-      setStatus(
+      notify(
         t(
           result.warning ||
             OUTCOMES[result.outcome] ||
             msg("Could not use the reset credit."),
         ),
+        result.outcome === "reset" && !result.warning ? "success" : "info",
       );
     } catch (cause) {
       attempted.current = true;
-      setStatus(String(cause));
+      notifyError(cause);
     } finally {
       isWorking.current = false;
       setBusy(false);
     }
   }
-  return { confirming, setConfirming, busy, status, redeem };
+  return { confirming, setConfirming, busy, redeem };
 }

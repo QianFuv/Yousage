@@ -614,19 +614,6 @@ function RedeemableSegmentPopup({
         onOpenChange={redeem.setConfirming}
         onConfirm={() => void redeem.redeem()}
       />
-      {/* The popover closed before the confirm, so the outcome needs a home outside it. */}
-      {redeem.status ? (
-        <span
-          role="status"
-          className="col-span-full text-xs text-muted-foreground"
-        >
-          <AccountName
-            account={account}
-            className="font-medium text-foreground"
-          />{" "}
-          {redeem.status}
-        </span>
-      ) : null}
     </>
   );
 }

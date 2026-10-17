@@ -13,6 +13,7 @@ import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { msg, t } from "../i18n";
+import { notifyError } from "../notify";
 import { useData } from "../usage/controller";
 import type { UsageProviderKind } from "../usage/contracts";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
@@ -107,6 +108,7 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const request = useRef(0);
+  const hasReport = useRef(false);
 
   /** Read the selected window, ignoring answers to superseded selections. */
   const load = useCallback(async () => {
@@ -115,10 +117,13 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
     try {
       const value = await nativeApi.GetSpeedReport(days, zone);
       if (identity !== request.current) return;
+      hasReport.current = true;
       setReport(value);
       setError("");
     } catch (cause) {
-      if (identity === request.current) setError(String(cause));
+      if (identity !== request.current) return;
+      if (hasReport.current) notifyError(cause);
+      else setError(String(cause));
     } finally {
       if (identity === request.current) setIsLoading(false);
     }

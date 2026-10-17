@@ -17,6 +17,7 @@ import { UsagePage } from "./usage/UsagePage";
 import * as nativeApi from "../bindings/yousage/internal/desktop/app";
 import { canvasBackground, sidebarBackground } from "./native";
 import { configureTimestampLocale } from "../vendor/timestampFormat";
+import { notifyError, Toaster } from "./notify";
 import {
   formattingLocale,
   msg,
@@ -277,7 +278,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
           const mode = appearance.snapshot.value.preferences.mode;
           void appearance
             .patch({ mode: modes[(modes.indexOf(mode) + 1) % modes.length] })
-            .catch((cause) => setStatus(String(cause)));
+            .catch(notifyError);
         } else navigate("settings", "appearance");
       } else if (
         (event.ctrlKey || event.metaKey) &&
@@ -632,6 +633,7 @@ async function start() {
       <DataProvider initial={display}>
         <Desktop systemLocale={bootstrap.systemLocale} />
       </DataProvider>
+      <Toaster />
     </AppearanceProvider>,
   );
 }

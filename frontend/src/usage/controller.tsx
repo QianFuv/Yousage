@@ -13,6 +13,7 @@ import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { SavedDisplay } from "../../bindings/yousage/internal/preferences/models";
 import { Request } from "../../bindings/yousage/internal/refresh/models";
 import type { UsageSnapshot } from "./data";
+import { notifyError } from "../notify";
 
 type DataContextValue = {
   setUsageActive: (
@@ -51,6 +52,7 @@ export function DataProvider({
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [error, setError] = useState("");
+  const hasSnapshot = useRef(false);
   const [isSavingDisplay, setIsSavingDisplay] = useState(false);
   const preferenceWrites = useRef(0);
   const [isBusy, setIsBusy] = useState(false);
@@ -92,10 +94,15 @@ export function DataProvider({
           if (
             identity === sequence.current &&
             days === displayRef.current.value.windowDays
-          )
+          ) {
+            hasSnapshot.current = true;
             setSnapshot(value as unknown as UsageSnapshot);
+            setError("");
+          }
         } catch (cause) {
-          if (identity === sequence.current) setError(String(cause));
+          if (identity !== sequence.current) continue;
+          if (hasSnapshot.current) notifyError(cause);
+          else setError(String(cause));
         }
       }
     })().finally(() => {
@@ -138,7 +145,7 @@ export function DataProvider({
           displayRef.current = next;
           setDisplay(next);
         } catch (cause) {
-          setError(String(cause));
+          notifyError(cause);
           throw cause;
         } finally {
           preferenceWrites.current--;
@@ -212,7 +219,7 @@ export function DataProvider({
           await nativeApi.RefreshLimits(targets, request);
         else await refreshUsage();
       } catch (cause) {
-        setError(String(cause));
+        notifyError(cause);
       } finally {
         await reload();
         isRefreshing.current = false;
