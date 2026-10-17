@@ -217,9 +217,6 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 		}
 		detection := ProviderDetection{Driver: pair.driver, Provider: pair.provider}
 		for _, root := range service.historyRoots(pair.provider) {
-			if _, err := os.Stat(root); err == nil {
-				detection.IsInstalled = true
-			}
 			historyRoot := root
 			if pair.provider == domain.Codex {
 				historyRoot = filepath.Join(root, "sessions")
