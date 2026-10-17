@@ -94,9 +94,6 @@ func (service *Service) Display(ctx context.Context) (SavedDisplay, error) {
 	if saved.Value.Zoom > 0 && saved.Value.Zoom < 1 {
 		saved.Value.Zoom = 1
 	}
-	if saved.Value.Language == "" {
-		saved.Value.Language = "system"
-	}
 	return saved, saved.Value.Validate()
 }
 func (service *Service) SaveDisplay(ctx context.Context, saved SavedDisplay) (SavedDisplay, error) {

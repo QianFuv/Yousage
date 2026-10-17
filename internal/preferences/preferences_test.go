@@ -168,6 +168,16 @@ func TestDisplayLanguageIsValidated(test *testing.T) {
 	if _, err := service.SaveDisplay(ctx, saved); err == nil {
 		test.Fatal("unsupported language was saved")
 	}
+	saved.Value.Language = ""
+	if _, err := service.SaveDisplay(ctx, saved); err == nil {
+		test.Fatal("empty language was saved")
+	}
+	if _, err := store.WriteSetting(ctx, "display", saved.Revision, saved.Value); err != nil {
+		test.Fatal(err)
+	}
+	if _, err := service.Display(ctx); err == nil {
+		test.Fatal("invalid stored language was silently replaced")
+	}
 }
 
 func TestEmptySavedPricingCanBePatched(t *testing.T) {

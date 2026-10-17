@@ -101,7 +101,7 @@ export function DisplayPanel() {
             control={
               <OptionSelect
                 label={t("Language")}
-                value={value.language || "system"}
+                value={value.language}
                 options={LANGUAGE_OPTIONS.map((option) =>
                   option.value === "system"
                     ? { ...option, label: t(option.label) }
