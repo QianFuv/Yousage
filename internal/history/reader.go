@@ -10,11 +10,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"yousage/internal/domain"
 )
 
-// ParserVersion replays retained transcripts to add time to first token and end Claude requests at their last block.
-const ParserVersion = 8
+// ParserVersion replays retained transcripts to repair Claude final blocks across scan and EOF boundaries.
+const ParserVersion = 9
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -151,5 +152,27 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 		return result, err
 	}
 	result.Checkpoint.Reducer, err = json.Marshal(state)
+	if provider == domain.Claude {
+		seen := map[string]bool{}
+		result.Tail = lastClaudeBlocks(result.Tail, seen)
+		result.Records = lastClaudeBlocks(result.Records, seen)
+	}
 	return result, err
+}
+
+// lastClaudeBlocks keeps the final block of each message, including blocks in the replayable EOF tail.
+func lastClaudeBlocks(records []domain.Record, seen map[string]bool) []domain.Record {
+	output := make([]domain.Record, 0, len(records))
+	for index := len(records) - 1; index >= 0; index-- {
+		record := records[index]
+		if record.DedupeKey != "" {
+			if seen[record.DedupeKey] {
+				continue
+			}
+			seen[record.DedupeKey] = true
+		}
+		output = append(output, record)
+	}
+	slices.Reverse(output)
+	return output
 }

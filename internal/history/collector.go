@@ -265,6 +265,27 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 						seenRecords[record.DedupeKey] = true
 					}
 				}
+				if fingerprint.Provider == domain.Claude {
+					previous := previousByPath[path]
+					shouldReplay := previous.Offset < previous.FileSize
+					for _, records := range [][]domain.Record{read.Records, read.Tail} {
+						for _, record := range records {
+							shouldReplay = shouldReplay || seenRecords[record.DedupeKey]
+						}
+					}
+					if shouldReplay {
+						previous.ParserVersion = 0
+						read, err = ReadTranscript(ctx, path, fingerprint.Provider, previous)
+						if err != nil {
+							if ctx.Err() != nil {
+								return result, ctx.Err()
+							}
+							result.Status, result.Notice = "partial", "A history read failed; saved facts were retained."
+							continue
+						}
+						seenRecords = map[string]bool{}
+					}
+				}
 			}
 			unique := func(records []domain.Record) []domain.Record {
 				output := []domain.Record{}
