@@ -7,6 +7,7 @@
 /frontend/package.json.md5
 /build/bin/
 /bin/
+/artifacts/releases/
 /.task/
 /build/*.log
 /*.syso

@@ -265,7 +265,7 @@ func assemble(root, sdk, mode, architecture string) error {
 	}
 	source := filepath.Join(project, "app", "build", "outputs", "apk", mode, "app-"+mode+".apk")
 	for _, name := range []string{"yousage.apk", "yousage-" + mode + "-" + architecture + ".apk"} {
-		destination := filepath.Join(root, "bin", name)
+		destination := filepath.Join(root, "artifacts", "releases", name)
 		if err = copyFile(source, destination); err != nil {
 			return err
 		}

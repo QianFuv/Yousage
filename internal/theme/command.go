@@ -57,6 +57,9 @@ func RunCommand(ctx context.Context, arguments []string, output, diagnostics io.
 	}
 	if failure == nil && directory == "" {
 		directory, failure = appstate.Directory()
+		if failure == nil {
+			failure = appstate.Prepare(directory, false)
+		}
 	}
 	if failure == nil {
 		directory, failure = filepath.Abs(directory)

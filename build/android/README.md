@@ -12,8 +12,8 @@ release APK. Both generate mobile bindings before running
 `pnpm --dir frontend build:android`, then embed `frontend/dist-android` into Go.
 Neither task starts an emulator or installs the app.
 
-Outputs are `bin/yousage.apk` and an additional
-`bin/yousage-<debug|release>-<amd64|arm64>.apk`. Set `ANDROID_ARCH=arm64` or
+Outputs are `artifacts/releases/yousage.apk` and an additional
+`artifacts/releases/yousage-<debug|release>-<amd64|arm64>.apk`. Set `ANDROID_ARCH=arm64` or
 `ANDROID_ARCH=amd64` to override a task's default architecture.
 
 The build helper supports Windows, Linux, and macOS. It resolves the SDK from

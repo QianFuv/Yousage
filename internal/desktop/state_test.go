@@ -5,8 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"yousage/internal/appstate"
 	"yousage/internal/preferences"
+	"yousage/internal/storage"
 )
 
 // TestPortableRestartPreservesDatabase verifies upgrades reopen saved data instead of resetting it.
@@ -38,8 +41,63 @@ func TestPortableRestartPreservesDatabase(test *testing.T) {
 	if second.stateDirectory != directory || filepath.Dir(filepath.Dir(second.logPath)) != filepath.Join(directory, "logs") {
 		test.Fatal("state or logs escaped the portable directory", second.stateDirectory, second.logPath)
 	}
-	if _, err := os.Stat(filepath.Join(directory, "yousage.sqlite")); err != nil {
-		test.Fatal("database is not beside the executable", err)
+	if _, err := os.Stat(appstate.DatabasePath(directory)); err != nil {
+		test.Fatal("database is not inside the selected data directory", err)
+	}
+}
+
+// TestPortableMigrationReopensSavedDatabase verifies the new layout preserves real settings.
+func TestPortableMigrationReopensSavedDatabase(test *testing.T) {
+	if runtime.GOOS != "windows" {
+		test.Skip("Windows portable layout")
+	}
+	root := test.TempDir()
+	legacy, err := storage.Open(filepath.Join(root, "yousage.sqlite"))
+	if err != nil {
+		test.Fatal(err)
+	}
+	if _, err := legacy.WriteSetting(context.Background(), "upgrade-sentinel", 0, "preserved"); err != nil {
+		test.Fatal(err)
+	}
+	snapshotRoot := test.TempDir()
+	for _, name := range []string{"yousage.sqlite", "yousage.sqlite-wal", "yousage.sqlite-shm"} {
+		content, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			test.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(snapshotRoot, name), content, 0600); err != nil {
+			test.Fatal(err)
+		}
+	}
+	if err := legacy.Close(); err != nil {
+		test.Fatal(err)
+	}
+	root = snapshotRoot
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0700); err != nil {
+		test.Fatal(err)
+	}
+	directory := filepath.Join(root, "data")
+	smoke, err := newAppInDirectory(directory, true)
+	if err != nil {
+		test.Fatal(err)
+	}
+	if err := smoke.store.Close(); err != nil {
+		test.Fatal(err)
+	}
+	smoke.logFile.Close()
+	if err := appstate.Prepare(directory, true); err != nil {
+		test.Fatal(err)
+	}
+	app, err := newAppInDirectory(directory, false)
+	if err != nil {
+		test.Fatal(err)
+	}
+	defer app.store.Close()
+	defer app.logFile.Close()
+	var value string
+	revision, err := app.store.ReadSetting(context.Background(), "upgrade-sentinel", &value)
+	if err != nil || revision != 1 || value != "preserved" {
+		test.Fatal("migration did not reopen saved settings", value, revision, err)
 	}
 }
 

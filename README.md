@@ -95,11 +95,15 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 ## 数据存储与隐私
 
-- Windows 便携版将设置、最近 90 天的统计事实、增量检查点和界面主题保存到 exe 同目录的
-  `yousage.sqlite`；发布的主题位于 `themes/`，主题命令配置为 `settings.json`，WebView 数据和
-  缓存位于 `webview/`，运行日志位于 `logs/`。程序目录必须可写，不会退回 AppData 或系统临时目录。
+- Windows 便携版的程序目录只有 `yousage.exe` 和 `data/`。设置、最近 90 天的统计事实、增量
+  检查点和界面主题保存在 `data/database/yousage.sqlite`；发布的主题位于 `data/themes/`，主题
+  命令配置为 `data/settings.json`，WebView 数据和缓存位于 `data/webview/`，运行日志位于
+  `data/logs/`，随包文档、许可证和校验和位于 `data/package/`。程序目录必须可写，不会退回
+  AppData 或系统临时目录。
 - 覆盖升级前先退出程序，再将新版 ZIP 解压覆盖原目录；安装包不包含运行数据，因此会保留并复用
-  原有数据库、主题和缓存。不会自动迁移旧版 `%APPDATA%\Yousage` 中的数据。
+  原有数据库、主题和缓存。旧版位于 exe 同级的数据库、主题、WebView 和日志会在桌面程序首次
+  启动时移入 `data/`；新旧路径同时存在数据时会报错，不会覆盖或合并。升级前必须退出旧程序，
+  主题命令遇到旧布局时会提示先启动桌面程序迁移。不会自动迁移旧版 `%APPDATA%\Yousage` 中的数据。
 - macOS / Linux 继续使用系统用户配置目录下的 `Yousage` 目录。
 - 数据库只保存归一化的用量数字，不保存提示词、回复内容或任何凭据。
 - 额度中心密钥、远程访问令牌等凭据保存在系统凭据库（Windows 凭据管理器、macOS 钥匙串、
@@ -113,7 +117,7 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 1. 确认已安装 [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
    （Windows 11 通常已自带）。安装包不会自动下载它。
-2. 解压 `yousage-0.1.1-windows-amd64.zip`，运行其中的 `yousage.exe`。
+2. 解压下载的 `yousage-<version>-windows-amd64.zip`，运行其中的 `yousage.exe`。
 
 可执行文件未签名，首次运行时 Windows 可能会提示安全警告。
 

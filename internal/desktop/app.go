@@ -63,12 +63,20 @@ func newApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !hasNativeSmokeArgument() {
+		if err := appstate.Prepare(stateDirectory, true); err != nil {
+			return nil, err
+		}
+	}
 	return newAppInDirectory(stateDirectory, hasNativeSmokeArgument())
 }
 
 // newAppInDirectory keeps logs and smoke-test state inside the selected application directory.
 func newAppInDirectory(stateDirectory string, isSmoke bool) (*App, error) {
 	logsDirectory := filepath.Join(stateDirectory, "logs")
+	if isSmoke {
+		logsDirectory = filepath.Join(stateDirectory, "smoke", "logs")
+	}
 	if err := os.MkdirAll(logsDirectory, 0700); err != nil {
 		return nil, err
 	}
@@ -84,7 +92,7 @@ func newAppInDirectory(stateDirectory string, isSmoke bool) (*App, error) {
 	if isSmoke {
 		stateDirectory = filepath.Join(directory, "isolated-state")
 	}
-	database, err := storage.Open(filepath.Join(stateDirectory, "yousage.sqlite"))
+	database, err := storage.Open(appstate.DatabasePath(stateDirectory))
 	if err != nil {
 		logFile.Close()
 		return nil, err

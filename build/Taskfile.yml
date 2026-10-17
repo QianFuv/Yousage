@@ -22,7 +22,7 @@ tasks:
       CGO_ENABLED: '0'
   notices:
     cmds:
-      - node -e "require('fs').mkdirSync('bin', {recursive:true})"
-      - pnpm --dir frontend list --prod --depth Infinity --json > bin/frontend-dependencies.json
-      - pnpm --dir tools/parity list --prod --depth Infinity --json > bin/reference-dependencies.json
-      - node build/notices.mjs bin/frontend-dependencies.json bin/reference-dependencies.json
+      - node -e "require('fs').mkdirSync('.task/build', {recursive:true})"
+      - pnpm --dir frontend list --prod --depth Infinity --json > .task/build/frontend-dependencies.json
+      - pnpm --dir tools/parity list --prod --depth Infinity --json > .task/build/reference-dependencies.json
+      - node build/notices.mjs .task/build/frontend-dependencies.json .task/build/reference-dependencies.json

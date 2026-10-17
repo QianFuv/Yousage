@@ -29,8 +29,9 @@ powershell -NoProfile -File build/package-windows.ps1  # 生成便携版 ZIP 和
 `THIRD_PARTY_NOTICES.md`，包含嵌套的原生运行时许可证）、生成 TypeScript 绑定、构建前端，
 最后以 `production` 标签编译 GUI 子系统的可执行文件。构建期的 Node 工具不会被打包。
 
-便携版 ZIP 包含 `yousage.exe`、`README.md`、`THIRD_PARTY_NOTICES.md`、
-`dependencies.json` 和 `SHA256SUMS.txt`，ZIP 自身的摘要写入 `bin/SHA256SUMS.txt`。
+便携版 ZIP 的根目录只包含 `yousage.exe` 和 `data/`，文档、许可证、依赖清单和文件校验和放在
+`data/package/`，不会打包本机数据库或缓存。ZIP 和 ZIP 自身的 `SHA256SUMS.txt` 输出到
+`artifacts/releases/`；依赖分析临时文件放在 `.task/build/`，使 `bin/` 只保留程序和数据。
 
 ### 中继与网页
 

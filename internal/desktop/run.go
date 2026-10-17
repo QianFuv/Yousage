@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"time"
+	"yousage/internal/appstate"
 	"yousage/internal/secrets"
 	"yousage/internal/theme"
 )
@@ -37,26 +39,53 @@ func Run(assets fs.FS) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	service, err := newApp()
+	stateDirectory, err := appstate.Directory()
 	if err != nil {
 		log.Fatal(err)
+	}
+	var service *App
+	var instanceService atomic.Pointer[App]
+	if hasNativeSmokeArgument() {
+		service, err = newApp()
+		if err != nil {
+			log.Fatal(err)
+		}
+		stateDirectory = service.stateDirectory
 	}
 	var singleInstance *application.SingleInstanceOptions
 	if !hasNativeSmokeArgument() {
 		allowForegroundHandoff()
 		singleInstance = &application.SingleInstanceOptions{
-			UniqueID:               "app.yousage.desktop",
-			OnSecondInstanceLaunch: func(application.SecondInstanceData) { service.ShowWindow() },
+			UniqueID: "app.yousage.desktop",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				if currentService := instanceService.Load(); currentService != nil {
+					currentService.ShowWindow()
+				}
+			},
 		}
 	}
 	nativeApp := application.New(application.Options{
 		Name: "Yousage", Description: "Usage monitoring and themes",
-		Services:       []application.Service{application.NewService(service)},
 		SingleInstance: singleInstance,
 		Assets:         application.AssetOptions{Handler: application.BundledAssetFileServer(frontendAssets)},
 		Mac:            application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
-		Windows:        application.WindowsOptions{WebviewUserDataPath: filepath.Join(service.stateDirectory, "webview"), WndProcInterceptor: service.interceptWindowMessage},
+		Windows: application.WindowsOptions{
+			WebviewUserDataPath: filepath.Join(stateDirectory, "webview"),
+			WndProcInterceptor: func(hwnd uintptr, message uint32, wParam, lParam uintptr) (uintptr, bool) {
+				if service == nil {
+					return 0, false
+				}
+				return service.interceptWindowMessage(hwnd, message, wParam, lParam)
+			},
+		},
 	})
+	if service == nil {
+		service, err = newApp()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	nativeApp.RegisterService(application.NewService(service))
 	service.nativeApp = nativeApp
 	service.window = nativeApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "yousage", Title: "Yousage", URL: "/", Width: 1280, Height: 900, MinWidth: DesktopMinWidth, MinHeight: DesktopMinHeight,
@@ -65,6 +94,7 @@ func Run(assets fs.FS) {
 	})
 	service.installDesktopHooks()
 	service.installTray(trayIcon)
+	instanceService.Store(service)
 	nativeApp.Event.OnApplicationEvent(events.Common.ThemeChanged, func(event *application.ApplicationEvent) {
 		nativeApp.Event.Emit("system-appearance", event.Context().IsDarkMode())
 	})
