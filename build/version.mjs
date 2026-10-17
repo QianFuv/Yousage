@@ -39,6 +39,13 @@ const LOCATIONS = [
     patterns: [/("ProductVersion":")([^"]+)(")/],
   },
   {
+    path: "build/windows/wails.exe.manifest",
+    format: (version) => `${version}.0`,
+    patterns: [
+      /(<assemblyIdentity type="win32" name="app\.yousage\.desktop" version=")([^"]+)(")/,
+    ],
+  },
+  {
     path: "build/darwin/Info.plist",
     patterns: [
       /(<key>CFBundleVersion<\/key><string>)([^<]+)(<\/string>)/,
