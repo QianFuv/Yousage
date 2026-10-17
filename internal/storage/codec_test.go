@@ -82,14 +82,28 @@ func TestPayloadRejectsCorruption(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	lookup := func(identity int64) (string, bool) { return "", identity == 0 }
+	if _, err := decodeRecord(data, 0, "", false, nil, lookup); err != nil {
+		test.Fatal("valid payload was rejected", err)
+	}
 	for length := range len(data) {
-		if _, err := decodeRecord(data[:length], 0, "", false, nil, func(identity int64) (string, bool) { return "", identity == 0 }); err == nil {
+		if _, err := decodeRecord(data[:length], 0, "", false, nil, lookup); err == nil {
 			test.Fatalf("accepted truncated payload of length %d", length)
 		}
 	}
-	for _, invalid := range [][]byte{append(append([]byte{}, data...), 0), {2}, data} {
-		if _, err := decodeRecord(invalid, 0, "", false, nil, func(int64) (string, bool) { return "", false }); err == nil {
-			test.Fatal("accepted invalid payload")
-		}
+	for _, scenario := range []struct {
+		name   string
+		data   []byte
+		lookup func(int64) (string, bool)
+	}{
+		{"unknown version", append([]byte{6}, data[1:]...), lookup},
+		{"trailing bytes", append(append([]byte{}, data...), 0), lookup},
+		{"missing dictionary", data, func(int64) (string, bool) { return "", false }},
+	} {
+		test.Run(scenario.name, func(test *testing.T) {
+			if _, err := decodeRecord(scenario.data, 0, "", false, nil, scenario.lookup); err == nil {
+				test.Fatal("accepted invalid payload")
+			}
+		})
 	}
 }
