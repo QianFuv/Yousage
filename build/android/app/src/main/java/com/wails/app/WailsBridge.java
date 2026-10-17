@@ -1119,7 +1119,7 @@ public class WailsBridge {
             }
             boolean lowPower = false;
             PowerManager pm = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
-            if (pm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (pm != null) {
                 lowPower = pm.isPowerSaveMode();
             }
             return new JSONObject().put("level", level)
