@@ -75,11 +75,6 @@
   color: var(--muted-foreground);
   font-size: 0.875rem;
 }
-.android-loading > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 .android-loading svg {
   width: 1rem;
   height: 1rem;

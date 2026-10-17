@@ -103,25 +103,18 @@ function showProblem(problem: keyof typeof PROBLEMS) {
   );
 }
 
-/** Show the wordmark while the first snapshot downloads. */
+/** Keep the startup screen from `android.html` while the first snapshot downloads. */
 function showLoading() {
   leaveViewer();
   applyDeviceLook();
   root.render(
-    <div className="android-loading" role="status">
-      <strong className="sidebar-wordmark android-pair-wordmark">
-        <span aria-hidden>Y</span>
-        <span className="sidebar-wordmark-tail" aria-hidden>
-          ou
-        </span>
-        <span className="sidebar-wordmark-tail" aria-hidden>
-          sage
-        </span>
+    <div className="android-loading" role="status" aria-label={t("Loading…")}>
+      <strong className="sidebar-wordmark android-pair-wordmark" aria-hidden>
+        <span>Y</span>
+        <span className="sidebar-wordmark-tail">ou</span>
+        <span className="sidebar-wordmark-tail">sage</span>
       </strong>
-      <span>
-        <RefreshCwIcon aria-hidden className="animate-spin" />
-        {t("Loading…")}
-      </span>
+      <RefreshCwIcon aria-hidden className="animate-spin" />
     </div>,
   );
 }
