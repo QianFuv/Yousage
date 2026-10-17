@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -111,6 +112,7 @@ func TestShareZeroCostModelsStillSumToOne(test *testing.T) {
 	}
 }
 
+// TestSettingsAndShareValidation checks each request boundary with otherwise valid input.
 func TestSettingsAndShareValidation(test *testing.T) {
 	for _, scenario := range []struct {
 		value      string
@@ -140,16 +142,23 @@ func TestSettingsAndShareValidation(test *testing.T) {
 			test.Fatal("invalid CSS key accepted", key)
 		}
 	}
+	request := shareRequest()
+	request.Palette.Colors = map[string]string{}
+	for index := range 128 {
+		request.Palette.Colors["--color-"+strconv.Itoa(index)] = "red"
+	}
+	if err := request.Validate(); err != nil {
+		test.Fatal("maximum valid palette rejected", err)
+	}
+	request.Palette.Colors["--one-more"] = "red"
+	if request.Validate() == nil {
+		test.Fatal("oversized palette accepted")
+	}
 	for _, mutate := range []func(*ShareRequest){
 		func(request *ShareRequest) { request.Days = 14 },
 		func(request *ShareRequest) { request.TtlDays = 90 },
 		func(request *ShareRequest) { request.TimeZone = "bad-zone" },
 		func(request *ShareRequest) { request.Palette.Appearance = "system" },
-		func(request *ShareRequest) {
-			for index := range 129 {
-				request.Palette.Colors["--color-"+strings.Repeat("a", index+1)] = "red"
-			}
-		},
 	} {
 		request := shareRequest()
 		mutate(&request)
