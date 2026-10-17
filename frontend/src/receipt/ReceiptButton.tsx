@@ -22,6 +22,7 @@ import type {
 import { ReceiptPaper } from "./ReceiptPaper";
 import { copyReceiptImage } from "./exportReceipt";
 import { ShareDialog } from "./ShareDialog";
+import { useIsReadOnly } from "../web/readOnly";
 import "./printer.css";
 
 /** Time for the paper to feed out of the printer. */
@@ -120,6 +121,7 @@ export function ReceiptButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [shares, setShares] = useState<readonly ShareView[]>([]);
   const request = useRef(0);
+  const isReadOnly = useIsReadOnly();
 
   /** Read the receipt of the selected period, ignoring superseded answers. */
   const load = useCallback(async () => {
@@ -140,6 +142,7 @@ export function ReceiptButton() {
   }, [load]);
 
   useEffect(() => {
+    if (isReadOnly) return;
     void nativeApi
       .GetSync()
       .then((state) => setShares(state.shares))
@@ -147,7 +150,7 @@ export function ReceiptButton() {
     return Events.On("sync-state", (event) =>
       setShares((event.data as SyncState).shares),
     );
-  }, []);
+  }, [isReadOnly]);
 
   const shown = receipt?.days === days ? receipt : null;
   const code = shown ? shareCode(shares, shown.days) : undefined;
@@ -217,6 +220,7 @@ function ReceiptPrinter({
   onClose: () => void;
 }) {
   const [isSharing, setIsSharing] = useState(false);
+  const isReadOnly = useIsReadOnly();
   const [isReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -295,25 +299,29 @@ function ReceiptPrinter({
             <CopyIcon aria-hidden />
             {t("Copy as PNG")}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSharing(true)}
-          >
-            <Share2Icon aria-hidden />
-            {t("Share link")}
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSharing(true)}
+            >
+              <Share2Icon aria-hidden />
+              {t("Share link")}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("Close")}
           </Button>
         </div>
       </div>
-      <ShareDialog
-        days={receipt.days}
-        isOpen={isSharing}
-        onOpenChange={setIsSharing}
-        onCreated={onShared}
-      />
+      {!isReadOnly && (
+        <ShareDialog
+          days={receipt.days}
+          isOpen={isSharing}
+          onOpenChange={setIsSharing}
+          onCreated={onShared}
+        />
+      )}
       {!isReducedMotion && (
         <div className="receipt-confetti" data-sharing={isSharing} aria-hidden>
           {confetti.map((style, index) => (
