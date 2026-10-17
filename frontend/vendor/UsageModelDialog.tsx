@@ -118,8 +118,8 @@ export function UsageModelDialog({
         if (!open) onClose();
       }}
     >
-      <DialogPopup className="max-w-3xl">
-        <DialogHeader>
+      <DialogPopup className="max-w-3xl max-sm:rounded-t-2xl">
+        <DialogHeader className="max-sm:px-4 max-sm:pt-5">
           <div className="flex items-center gap-2">
             <ProviderInstanceIcon
               driverKind={presentation.driverKind}
@@ -135,15 +135,15 @@ export function UsageModelDialog({
               : ` · ${t("{share} of cost", { share: formatPercent(model.costShare) })}`}
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel>
-          <div className="flex flex-col gap-8">
+        <DialogPanel className="max-sm:px-4">
+          <div className="flex flex-col gap-6 sm:gap-8">
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
               {stats.map((stat) => (
                 <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-xs text-muted-foreground">
                     {stat.label}
                   </span>
-                  <span className="text-2xl font-semibold text-foreground">
+                  <span className="text-xl font-semibold text-foreground sm:text-2xl">
                     {stat.value}
                   </span>
                 </div>
@@ -210,7 +210,7 @@ export function UsageModelDialog({
                 </p>
               )}
             </section>
-            <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+            <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2 sm:gap-y-8">
               {costUnknown ? null : (
                 <UsageShareBar
                   label={t("Cost by type")}
