@@ -302,6 +302,9 @@ func (service *Service) localHistoryRecordsBetween(ctx context.Context, entries 
 	for index, records := range deduped {
 		owner := owners[index]
 		for _, record := range records {
+			if record.TimestampMs > now.UnixMilli() {
+				continue
+			}
 			if !shouldIncludeQuota && (record.IsQuotaOnly || record.ErrorKind != "") {
 				continue
 			}
