@@ -141,19 +141,14 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	if snapshot.Status != "ok" {
 		return Pairing{}, errors.New("could not connect to the new phone link")
 	}
-	data, err := json.Marshal(pairing)
-	if err != nil {
-		return Pairing{}, err
-	}
+	data, _ := json.Marshal(pairing)
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
 	if err = service.writePrivate(pairingFile, data); err != nil {
 		return Pairing{}, err
 	}
-	cached, err := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: snapshot.ETag, Envelope: envelope})
-	if err == nil {
-		_ = service.writePrivate(snapshotFile, cached)
-	}
+	cached, _ := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: snapshot.ETag, Envelope: envelope})
+	_ = service.writePrivate(snapshotFile, cached)
 	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
 }
 
@@ -226,10 +221,7 @@ func (service *Service) CachedSnapshot() (SnapshotResult, error) {
 
 // cacheSnapshot keeps an authenticated envelope unless the pairing changed during the read.
 func (service *Service) cacheSnapshot(pairing storedPairing, etag string, envelope []byte) {
-	data, err := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: etag, Envelope: envelope})
-	if err != nil {
-		return
-	}
+	data, _ := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: etag, Envelope: envelope})
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
 	if current, err := service.readPairing(); err == nil && current == pairing {
