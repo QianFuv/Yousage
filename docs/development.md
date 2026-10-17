@@ -33,6 +33,10 @@ powershell -NoProfile -File build/package-windows.ps1  # 生成便携版 ZIP 和
 `data/package/`，不会打包本机数据库或缓存。ZIP 和 ZIP 自身的 `SHA256SUMS.txt` 输出到
 `artifacts/releases/`；依赖分析临时文件放在 `.task/build/`，使 `bin/` 只保留程序和数据。
 
+GitHub Release 从上一个已发布且在当前历史中的稳定版本起列出全部提交，按 Conventional Commit
+类型分为 Features、Bug fixes、CI、Documentation、Maintenance 等类别，保留每条提交的链接及
+完整版本对比链接。首次稳定发布列出全部历史；草稿、预发布及其他分支的版本不作为基线。
+
 ### 中继与网页
 
 中继独立于桌面程序，网页资源由 `build:web` 输出到 `internal/relay/web/dist`，再由 Go 内嵌。

@@ -32,6 +32,8 @@ jobs:
           go-version-file: go.mod
       - name: Check version consistency
         run: node build/version.mjs check
+      - name: Test categorized release notes
+        run: node --test build/release-notes.test.mjs
       - name: Verify portable package layout and upgrades
         run: ./build/test-package-windows.ps1
       - name: Install dependencies

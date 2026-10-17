@@ -308,16 +308,31 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       COMMIT: ${{ needs.prepare.outputs.commit }}
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: dist
           merge-multiple: true
+      - name: Generate categorized commit notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          RELAY_IMAGE="$image:$VERSION" node build/release-notes.mjs > "$RUNNER_TEMP/release-notes.md"
       - name: Publish relay image
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
+          image="$IMAGE"
           gunzip --stdout dist/relay-image.tar.gz | docker load
           rm dist/relay-image.tar.gz
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
@@ -326,7 +341,6 @@ jobs:
           docker tag yousage-relay:ci "$image:latest"
           docker push "$image:$VERSION"
           docker push "$image:latest"
-          echo "IMAGE=$image" >> "$GITHUB_ENV"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -339,6 +353,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$COMMIT" \
             --title "Yousage $VERSION" \
-            --generate-notes \
-            --notes "Relay image: \`$IMAGE:$VERSION\`" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             -- *
