@@ -1,5 +1,4 @@
 /** Mount the read-only usage pages over a snapshot-backed transport. */
-import type { ReactNode } from "react";
 import type { Root } from "react-dom/client";
 import { setTransport, type RuntimeTransport } from "@wailsio/runtime";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
@@ -11,6 +10,7 @@ import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
 import { ReadOnlyContext } from "./readOnly";
 import { WebViewer } from "./WebViewer";
+import type { ViewerConnection } from "./ViewerSettings";
 import { clearNotifications, Toaster } from "../notify";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -29,8 +29,8 @@ export type ViewerHost = {
   locale: string;
   /** Transport for calls the snapshot does not answer, such as a native bridge. */
   fallback?: RuntimeTransport | null;
-  /** Extra control shown in the snapshot banner. */
-  bannerAction?: ReactNode;
+  /** The relay shown on the settings page, with an optional way to replace the link. */
+  connection?: ViewerConnection;
 };
 
 /**
@@ -92,8 +92,9 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
           <DataProvider initial={display}>
             <WebViewer
               generatedAt={generatedAt}
+              appVersion={snapshot.appVersion}
               locale={host.locale}
-              bannerAction={host.bannerAction}
+              connection={host.connection}
             />
           </DataProvider>
           <Toaster />

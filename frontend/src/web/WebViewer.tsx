@@ -1,4 +1,4 @@
-/** Relay viewer shell: the four usage pages from a snapshot, without settings or native actions. */
+/** Relay viewer shell: the four usage pages from a snapshot plus a viewer settings page, without native actions. */
 import {
   lazy,
   Suspense,
@@ -10,12 +10,14 @@ import {
   ChartNoAxesCombinedIcon,
   FlameIcon,
   GaugeIcon,
+  Settings2Icon,
   TimerIcon,
 } from "lucide-react";
 import { useData } from "../usage/controller";
 import { UsagePage } from "../usage/UsagePage";
 import { NavItem } from "../NavItem";
 import { t, useI18n } from "../i18n";
+import { ViewerSettings, type ViewerConnection } from "./ViewerSettings";
 
 const LossPage = lazy(() =>
   import("../loss/LossPage").then((module) => ({ default: module.LossPage })),
@@ -27,40 +29,24 @@ const SpeedPage = lazy(() =>
 );
 
 /** Pages offered by the viewer, in navigation order. */
-type ViewerRoute = "statistics" | "quota" | "loss" | "speed";
-
-/**
- * Format the snapshot time for the banner in the viewer's locale.
- *
- * @param instant - RFC 3339 time the desktop generated the snapshot.
- * @param locale - Viewing device locale.
- * @returns A short date and time, or the raw value when it cannot be parsed.
- */
-export function formatSnapshotTime(instant: string, locale: string): string {
-  const date = new Date(instant);
-  if (Number.isNaN(date.getTime())) return instant;
-  return new Intl.DateTimeFormat(locale, {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
+type ViewerRoute = "statistics" | "quota" | "loss" | "speed" | "settings";
 
 /**
  * Read-only pages rendered from the latest relay snapshot.
  *
- * @param props - Snapshot time, the viewing device locale and an optional banner control.
+ * @param props - Snapshot time and version, the viewing device locale and the relay connection.
  * @returns The viewer layout.
  */
 export function WebViewer({
   generatedAt,
+  appVersion,
   locale,
-  bannerAction,
+  connection,
 }: {
   generatedAt: string;
+  appVersion: string;
   locale: string;
-  bannerAction?: ReactNode;
+  connection?: ViewerConnection;
 }) {
   useI18n();
   const data = useData();
@@ -113,15 +99,15 @@ export function WebViewer({
             isCurrent={route === "speed"}
             onClick={() => navigate("speed")}
           />
+          <NavItem
+            icon={Settings2Icon}
+            label={t("Settings")}
+            isCurrent={route === "settings"}
+            onClick={() => navigate("settings")}
+          />
         </div>
       </nav>
       <main tabIndex={-1} aria-label={t("Page content")}>
-        <p className="viewer-banner" role="status">
-          {t("Snapshot from the desktop app · updated {time}", {
-            time: formatSnapshotTime(generatedAt, locale),
-          })}
-          {bannerAction}
-        </p>
         <div hidden={route !== "statistics" && route !== "quota"}>
           <UsagePage
             isActive={route === "statistics" || route === "quota"}
@@ -141,6 +127,14 @@ export function WebViewer({
             </div>
           )}
         </Suspense>
+        {route === "settings" && (
+          <ViewerSettings
+            generatedAt={generatedAt}
+            appVersion={appVersion}
+            locale={locale}
+            connection={connection}
+          />
+        )}
       </main>
     </div>
   );

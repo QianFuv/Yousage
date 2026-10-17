@@ -51,6 +51,7 @@ async function start() {
       if (/^https:\/\//.test(url))
         window.open(url, "_blank", "noopener,noreferrer");
     },
+    connection: { relay: location.host },
   });
 }
 

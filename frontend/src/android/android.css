@@ -14,22 +14,6 @@
   --muted-foreground: #a3a3a3;
 }
 
-.viewer-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem 0.75rem;
-}
-.android-banner-action {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--primary);
-  font: inherit;
-  cursor: pointer;
-}
-
 .android-problem-actions {
   display: flex;
   flex-wrap: wrap;

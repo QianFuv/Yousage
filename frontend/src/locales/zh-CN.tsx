@@ -86,6 +86,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Change link": "更换链接",
   "Changes apply to {destination}": "更改将应用于 {destination}",
   "ChatGPT shared usage": "ChatGPT 共享用量",
+  "Check for a newer snapshot": "检查新快照",
   "Check your connection and try again.": "请检查网络连接后重试。",
   "Choose files": "选择文件",
   "Choose the variants to remove. Selected owners will fall back to the standard palette.":
@@ -120,6 +121,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Connect: "连接",
   "Connect an environment to set model prices.": "连接环境后才能设置模型价格。",
   "Connect to your desktop": "连接桌面端",
+  Connection: "连接",
   Context: "上下文区域",
   Contrast: "对比度",
   "Copy JSON": "复制 JSON",
@@ -152,7 +154,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Daily spend": "每日花费",
   "Daily tokens": "每日 Token",
   Dark: "暗色",
+  Data: "数据",
   Day: "日",
+  "Desktop {version}": "桌面端 {version}",
   "Detect providers again": "重新识别 Provider",
   "Detected automatically. Account access is checked only after enabling quotas.":
     "已自动识别。启用额度监控后才会检查账户。",
@@ -232,6 +236,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
   "Last 24 hours": "最近 24 小时",
+  "Last updated": "最近更新",
   "Last upload": "上次上传",
   "Last {days} days": "最近 {days} 天",
   Left: "剩余",
@@ -370,6 +375,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "额度已被使用，但本设备没有记录本周期的用量。",
   "Raised surface": "凸起背景",
   "Read-only access": "只读访问",
+  "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":
+    "桌面端快照的只读视图，在这里做的更改不会保存。",
+  "Reads the relay again. It does not make the desktop refresh.":
+    "重新读取 relay 上的快照，不会让桌面端刷新。",
   "Ready to import {count} themes": "准备导入 {count} 个主题",
   "Receipt image copied.": "小票图片已复制。",
   Recenter: "居中",
@@ -465,8 +474,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Sidebar selection": "侧边栏选中项",
   "Signed in": "登录位置",
   "Smooth fonts": "字体平滑",
-  "Snapshot from the desktop app · updated {time}":
-    "来自桌面端的快照 · 更新于 {time}",
   "Snapshot uploaded.": "快照已上传。",
   "Some environment prices are unavailable.": "部分环境的价格不可用。",
   "Some environments are still reporting. Totals include {count} available environments.":
@@ -547,6 +554,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "即 relay 上设置的 YOUSAGE_RELAY_TOKEN。",
   "The current link stops working and its snapshot is deleted from the relay. Scan the new code on your phone.":
     "当前链接会立即失效，relay 上的快照也会被删除。请在手机上扫描新的二维码。",
+  "The desktop app uploads a new snapshot after each refresh.":
+    "桌面端每次刷新后都会上传新的快照。",
   "The key does not match the stored data. Copy the whole link or scan the code again.":
     "密钥与存储的数据不匹配。请复制完整链接或重新扫码。",
   "The line is where even spending would be.": "竖线表示均匀消耗时应处的位置。",

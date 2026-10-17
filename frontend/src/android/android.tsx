@@ -85,6 +85,7 @@ async function openSnapshot() {
   if (first.status !== "ok")
     return showProblem(first.status === "problem" ? first.problem : "network");
   let etag = first.etag;
+  const pairing = await mobileApi.GetPairing().catch(() => null);
   unmountViewer = await mountViewer({
     root,
     initial: first.payload,
@@ -99,15 +100,10 @@ async function openSnapshot() {
       return next.payload;
     },
     open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
-    bannerAction: (
-      <button
-        type="button"
-        className="android-banner-action"
-        onClick={() => void changeLink()}
-      >
-        {t("Change link")}
-      </button>
-    ),
+    connection: {
+      relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",
+      onChangeLink: () => void changeLink(),
+    },
   });
 }
 
