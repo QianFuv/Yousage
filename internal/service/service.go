@@ -226,7 +226,7 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		if !service.isDriverInScope(provider.Driver) {
 			return saved, errors.New("provider is not monitored")
 		}
-		if (provider.Driver == "codex" || provider.Driver == "claudeAgent") && provider.Executable != "" && !filepath.IsAbs(provider.Executable) {
+		if provider.Executable != "" && !filepath.IsAbs(provider.Executable) {
 			return saved, errors.New("select an absolute native executable path")
 		}
 		seen[provider.Id] = true
