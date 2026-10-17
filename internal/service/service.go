@@ -193,7 +193,7 @@ func (service *Service) Configuration(ctx context.Context) (SavedConfiguration, 
 	return value, err
 }
 
-// SaveConfiguration validates bounded explicit targets before replacing the saved draft atomically.
+// SaveConfiguration commits validated targets before retiring their unreferenced system credentials.
 func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfiguration) (SavedConfiguration, error) {
 	ctx, release, err := service.ownOperation(ctx)
 	if err != nil {
@@ -271,6 +271,9 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 	if !isValid {
 		return saved, errors.New("pair or provide a new credential for the changed target")
 	}
+	if err := service.queueCredentialCleanup(ctx, previous.Value, saved.Value); err != nil {
+		return saved, err
+	}
 	revision, err := service.Store.WriteSetting(ctx, "configuration", saved.Revision, saved.Value)
 	if err != nil {
 		return saved, err
@@ -285,6 +288,7 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 	}
 	service.mutex.Unlock()
 	service.ReconcileConnections()
+	_ = service.cleanupRetiredCredentials(ctx)
 	service.emit("usage-invalidated", nil)
 	return saved, nil
 }
@@ -352,7 +356,7 @@ func (service *Service) BeginWrite(ctx context.Context) (context.Context, func()
 	return service.ownOperation(ctx)
 }
 
-// PrepareClose atomically refuses new writes after all accepted writes settle.
+// PrepareClose fences new writes and retries draft and retired credential cleanup before exit.
 func (service *Service) PrepareClose(ctx context.Context) error {
 	service.mutex.Lock()
 	if service.isStopping {
@@ -383,6 +387,12 @@ func (service *Service) PrepareClose(ctx context.Context) error {
 		service.mutex.Lock()
 		delete(service.draftCredentials, id)
 		service.mutex.Unlock()
+	}
+	if err := service.cleanupRetiredCredentials(ctx); err != nil {
+		service.mutex.Lock()
+		service.isStopping = false
+		service.mutex.Unlock()
+		return err
 	}
 	return nil
 }
