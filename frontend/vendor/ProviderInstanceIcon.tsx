@@ -7,7 +7,7 @@ const MARKS:Record<string,Icon>={codex:OpenAI,claudeAgent:ClaudeAI};
 export function ProviderInstanceIcon({driverKind,displayName,accentColor,showBadge=false,indicatorBackground="var(--card)",className,iconClassName}:{driverKind:string;displayName:string;accentColor?:string;showBadge?:boolean;indicatorBackground?:string;className?:string;iconClassName?:string}){
 	const Mark=MARKS[driverKind];
 	return <span className={cn("relative isolate z-30 inline-flex shrink-0 items-center justify-center overflow-visible",className)} data-provider-accent-color={accentColor}>
-		{Mark?<Mark className={cn("size-5 shrink-0",iconClassName)} aria-hidden/>:<span className={cn("text-3xs font-semibold leading-none",iconClassName)}>{providerInstanceInitials(displayName)}</span>}
+		{Mark?<Mark className={cn("size-5 shrink-0",iconClassName)} aria-hidden/>:<span className={cn("inline-flex items-center justify-center text-3xs font-semibold leading-none",iconClassName)} aria-hidden>{providerInstanceInitials(displayName)}</span>}
 		{showBadge && <span className="absolute -bottom-1 -right-1 rounded-full px-0.5 text-3xs font-semibold" style={{background:accentColor??indicatorBackground,boxShadow:`0 0 0 2px ${indicatorBackground}`}}>{providerInstanceInitials(displayName)}</span>}
 	</span>;
 }

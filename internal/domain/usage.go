@@ -15,6 +15,7 @@ type Provider string
 const (
 	Codex  Provider = "codex"
 	Claude Provider = "claude"
+	Pi     Provider = "pi"
 )
 
 // SourceFingerprint identifies physical history independently of its environment connection.
@@ -33,7 +34,7 @@ func (source SourceFingerprint) Id() string {
 
 func (provider Provider) Valid() bool {
 	switch provider {
-	case Codex, Claude:
+	case Codex, Claude, Pi:
 		return true
 	}
 	return false
@@ -106,7 +107,7 @@ func (record Record) Validate() error {
 		return errors.New("invalid time to first token")
 	}
 	if record.ErrorKind != "" {
-		if (record.Provider != Codex && record.Provider != Claude) || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 || record.GenerationMs != 0 {
+		if !record.Provider.Valid() || !ValidErrorKind(record.ErrorKind) || record.Totals != (Tokens{}) || record.ReportedCostUsd != nil || record.Quota != nil || record.IsQuotaOnly || record.RateModel != "" || record.Speed != "" || record.CacheTtlMs != 0 || record.GenerationMs != 0 {
 			return errors.New("invalid error fact")
 		}
 		return nil

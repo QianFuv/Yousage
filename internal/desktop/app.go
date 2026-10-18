@@ -122,7 +122,7 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	if err != nil {
 		return err
 	}
-	usage.Scope = []domain.Provider{domain.Codex, domain.Claude}
+	usage.Scope = []domain.Provider{domain.Codex, domain.Claude, domain.Pi}
 	service.usage = usage
 	if err = service.initializeSync(ctx); err != nil {
 		usage.Close()

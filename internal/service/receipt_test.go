@@ -74,7 +74,7 @@ func seedReportRecords(t *testing.T, service *Service, records []domain.Record) 
 		groups[record.Provider] = append(groups[record.Provider], record)
 	}
 	entries := []sourceIndex{}
-	for _, provider := range []domain.Provider{domain.Claude, domain.Codex} {
+	for _, provider := range []domain.Provider{domain.Claude, domain.Codex, domain.Pi} {
 		if len(groups[provider]) == 0 {
 			continue
 		}

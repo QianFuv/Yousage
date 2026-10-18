@@ -89,9 +89,12 @@ pnpm --dir tools/parity test                  # 参考实现对照测试，见 d
 go run ./tools/spikes/theme --app bin/yousage.exe  # 用真实可执行文件验证命令行主题
 ```
 
-- `go test` 使用合成的 Codex / Claude 数据
+- `go test` 使用合成的 Codex / Claude / Pi 数据
   覆盖解析、去重、定价、时间窗口、额度合并和损耗、速率、小票等报表，不会读取真实账户，
   也不会消耗重置券。
+- Pi 的 Go 解析测试和固定版本上游读取器共同读取 `tools/parity/fixtures/pi-usage.json`，
+  验证响应模型、独立缓存分类、辅助调用、部分完成请求和费用回退；服务测试另覆盖
+  来源升级、多个会话目录、分叉去重、损耗边界与未知支付金额的分享隐私。
 - `tools/spikes/claude` 是 Claude 控制协议的测试替身，`tools/spikes/theme`
   在隔离目录中运行生产可执行文件的命令行主题流程。
 - 浏览器中的尺寸测试只能验证 CSS 布局，不能代替原生 DPI、文件对话框、标题栏颜色和进程退出等检查。

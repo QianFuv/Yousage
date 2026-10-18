@@ -2,7 +2,7 @@
 export type EnvironmentId = string;
 export type ProviderInstanceId = string;
 export type ProviderDriverKind = string;
-export type UsageProviderKind = "codex" | "claude";
+export type UsageProviderKind = "codex" | "claude" | "pi";
 export type UsageDay = string;
 export type UsageResolution = "day" | "hour";
 export type UsageSummaryInput = {

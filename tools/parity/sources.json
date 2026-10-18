@@ -348,6 +348,24 @@
       "path": "apps/web/src/lib/observeResize.ts",
       "sha256": "78e4d11c6330b35d7379f5031f3a474f71a1a512f3537e52a9cde99b51a53d09",
       "bytes": 3815
+    },
+    {
+      "gitBlob": "bce75c298750fc3cb51dac4e1f4fa5375ded7faa",
+      "path": "packages/provider-pi/src/server/usage.ts",
+      "sha256": "222573e89de0635f5c745c937d7f15e2659044ea7ece7afc70f521953320813a",
+      "bytes": 5475
+    },
+    {
+      "gitBlob": "1cc52dd0e9d7c97a2d94755e5d6b272593c5bf33",
+      "path": "packages/provider-core/src/server/pathExpansion.ts",
+      "sha256": "7f6bd3972d317477d9940bc890de5fdae80612f1f8324d51b0bdd783bf643cff",
+      "bytes": 968
+    },
+    {
+      "gitBlob": "f30b83234d693b0180e089a7f160dca4fc0f925a",
+      "path": "packages/shared/src/HostProcess.ts",
+      "sha256": "db6f13db034a5163f36c42c728a5a24577d0d00c0627f3bde5dd4fd7b0e4f621",
+      "bytes": 3726
     }
   ]
 }

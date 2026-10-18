@@ -19,25 +19,28 @@ type ShareWindow struct {
 
 // ShareItem exposes only a receipt model's aggregate counts and optional amount.
 type ShareItem struct {
-	Provider       string   `json:"provider"`
-	Model          string   `json:"model"`
-	Tokens         int64    `json:"tokens"`
-	CostUsd        *float64 `json:"costUsd,omitempty"`
-	IsSubscription bool     `json:"isSubscription"`
+	Provider         string   `json:"provider"`
+	Model            string   `json:"model"`
+	Tokens           int64    `json:"tokens"`
+	CostUsd          *float64 `json:"costUsd,omitempty"`
+	IsSubscription   bool     `json:"isSubscription"`
+	IsPaymentUnknown bool     `json:"isPaymentUnknown,omitempty"`
+	UnpricedRecords  int      `json:"unpricedRecords,omitempty"`
 }
 
 // ShareReceipt carries the receipt totals without private source or session identities.
 type ShareReceipt struct {
-	Number          string      `json:"number"`
-	TotalUsd        *float64    `json:"totalUsd,omitempty"`
-	SubscriptionUsd *float64    `json:"subscriptionUsd,omitempty"`
-	PaidUsd         *float64    `json:"paidUsd,omitempty"`
-	CacheSavingsUsd *float64    `json:"cacheSavingsUsd,omitempty"`
-	Tokens          int64       `json:"tokens"`
-	Sessions        int         `json:"sessions"`
-	ActiveDays      int         `json:"activeDays"`
-	UnpricedRecords int         `json:"unpricedRecords"`
-	Items           []ShareItem `json:"items"`
+	Number            string      `json:"number"`
+	TotalUsd          *float64    `json:"totalUsd,omitempty"`
+	SubscriptionUsd   *float64    `json:"subscriptionUsd,omitempty"`
+	PaidUsd           *float64    `json:"paidUsd,omitempty"`
+	UnknownPaymentUsd *float64    `json:"unknownPaymentUsd,omitempty"`
+	CacheSavingsUsd   *float64    `json:"cacheSavingsUsd,omitempty"`
+	Tokens            int64       `json:"tokens"`
+	Sessions          int         `json:"sessions"`
+	ActiveDays        int         `json:"activeDays"`
+	UnpricedRecords   int         `json:"unpricedRecords"`
+	Items             []ShareItem `json:"items"`
 }
 
 // ShareValue aggregates one provider in a time slot, including explicit zeros.
@@ -55,11 +58,12 @@ type SharePoint struct {
 
 // ShareModel is a model's fraction of visible costs or, for hidden amounts, tokens.
 type ShareModel struct {
-	Provider string   `json:"provider"`
-	Model    string   `json:"model"`
-	Tokens   int64    `json:"tokens"`
-	CostUsd  *float64 `json:"costUsd,omitempty"`
-	Share    float64  `json:"share"`
+	Provider        string   `json:"provider"`
+	Model           string   `json:"model"`
+	Tokens          int64    `json:"tokens"`
+	CostUsd         *float64 `json:"costUsd,omitempty"`
+	Share           float64  `json:"share"`
+	UnpricedRecords int      `json:"unpricedRecords,omitempty"`
 }
 
 // SharePayload is the version-one public, local-environment-only receipt payload.
@@ -107,13 +111,16 @@ func BuildShare(ctx context.Context, source ShareSource, request ShareRequest) (
 	for key, value := range request.Palette.Colors {
 		payload.Palette.Colors[key] = value
 	}
+	if receipt.UnknownPaymentUsd > 0 {
+		payload.Receipt.UnknownPaymentUsd = amount(receipt.UnknownPaymentUsd)
+	}
 	weightTotal := receipt.TotalUsd
 	shouldUseTokens := request.HideAmounts || weightTotal <= 0
 	if shouldUseTokens {
 		weightTotal = float64(receipt.Tokens)
 	}
 	for _, item := range receipt.Items {
-		payload.Receipt.Items = append(payload.Receipt.Items, ShareItem{item.Provider, item.Model, item.Tokens, amount(item.CostUsd), item.IsSubscription})
+		payload.Receipt.Items = append(payload.Receipt.Items, ShareItem{Provider: item.Provider, Model: item.Model, Tokens: item.Tokens, CostUsd: amount(item.CostUsd), IsSubscription: item.IsSubscription, IsPaymentUnknown: item.IsPaymentUnknown, UnpricedRecords: item.UnpricedRecords})
 		weight := item.CostUsd
 		if shouldUseTokens {
 			weight = float64(item.Tokens)
@@ -122,7 +129,7 @@ func BuildShare(ctx context.Context, source ShareSource, request ShareRequest) (
 		if weightTotal > 0 {
 			share = weight / weightTotal
 		}
-		payload.Models = append(payload.Models, ShareModel{item.Provider, item.Model, item.Tokens, amount(item.CostUsd), share})
+		payload.Models = append(payload.Models, ShareModel{Provider: item.Provider, Model: item.Model, Tokens: item.Tokens, CostUsd: amount(item.CostUsd), Share: share, UnpricedRecords: item.UnpricedRecords})
 	}
 	sort.Slice(payload.Models, func(first, second int) bool {
 		left, right := payload.Models[first], payload.Models[second]

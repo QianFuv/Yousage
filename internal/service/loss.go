@@ -113,6 +113,9 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 
 // cacheRewrite recognizes context reuse that collapsed, independently of its cause.
 func cacheRewrite(previous, current domain.Record) (int64, string, bool) {
+	if current.Provider == domain.Pi && (previous.CacheTtlMs == 0 || current.CacheTtlMs == 0) {
+		return 0, "exact", false
+	}
 	if previous.Model != current.Model {
 		return 0, "exact", false
 	}
@@ -170,6 +173,9 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 		}
 		// Unknown session identities cannot safely share predecessors.
 		key := string(record.Provider) + "\x00" + record.SessionId + "\x00" + record.ContextId
+		if record.Provider == domain.Pi {
+			key = record.SourcePath + "\x00" + key
+		}
 		if record.SessionId == "" {
 			continue
 		}

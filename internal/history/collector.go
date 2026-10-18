@@ -47,7 +47,15 @@ func DefaultRoots() ([]Root, error) {
 	if claude == "" {
 		claude = filepath.Join(home, ".claude")
 	}
-	return []Root{{domain.Codex, codex}, {domain.Claude, claude}}, nil
+	pi := strings.TrimSpace(os.Getenv("PI_CODING_AGENT_SESSION_DIR"))
+	if pi == "" {
+		agent := strings.TrimSpace(os.Getenv("PI_CODING_AGENT_DIR"))
+		if agent == "" {
+			agent = filepath.Join(home, ".pi", "agent")
+		}
+		pi = filepath.Join(agent, "sessions")
+	}
+	return []Root{{domain.Codex, codex}, {domain.Claude, claude}, {domain.Pi, pi}}, nil
 }
 func ExpandHome(path string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, "~\\") {
@@ -78,18 +86,14 @@ func (collector Collector) scan(ctx context.Context, roots []Root, now time.Time
 	results := []SourceResult{}
 	seen := map[string]bool{}
 	for _, root := range roots {
-		if root.Provider != domain.Codex && root.Provider != domain.Claude {
+		if !root.Provider.Valid() {
 			return nil, errors.New("unsupported history root")
 		}
 		home, err := ExpandHome(root.Home)
 		if err != nil {
 			return nil, err
 		}
-		subdirectory := "sessions"
-		if root.Provider == domain.Claude {
-			subdirectory = "projects"
-		}
-		directory := filepath.Join(home, subdirectory)
+		directory := (Root{Provider: root.Provider, Home: home}).Directory()
 		key := string(root.Provider) + ":" + directory
 		var previous domain.SourceFingerprint
 		revision, err := collector.Store.ReadSetting(ctx, "history-source:"+key, &previous)

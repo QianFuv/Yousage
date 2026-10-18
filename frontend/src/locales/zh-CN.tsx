@@ -852,4 +852,21 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Requests: "请求数",
   "Model speed table": "模型速率表",
   "{count} without timing": "{count} 次无计时",
+  "Add {label} session folder": "添加 {label} 会话文件夹",
+  "{label} session folder {number}": "{label} 会话文件夹 {number}",
+  "Custom session folder": "自定义会话文件夹",
+  "Enter the folder where the session files are saved.":
+    "请输入保存会话文件的文件夹。",
+  "Remove {label}": "删除 {label}",
+  "{label} path": "{label} 路径",
+  "Session folder path": "会话文件夹路径",
+  "Enter a path for every custom session folder.":
+    "请为每个自定义会话文件夹填写路径。",
+  "Quota limits are not available: {label} does not report subscription quotas. Its usage still appears from saved history.":
+    "无法查看额度：{label} 不提供订阅额度信息。其用量仍会根据已保存的历史显示。",
+  "payment unknown": "支付方式未知",
+  "Payment method unknown": "支付方式未知",
+  "Known amount paid": "已知实付",
+  "Not measured: saved history has no request timing.":
+    "未测量：已保存的历史不含请求计时。",
 };

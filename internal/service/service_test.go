@@ -26,6 +26,9 @@ func testService(test *testing.T) *Service {
 	if _, err = preferences.New(store).SaveSources(context.Background(), []preferences.Source{}, 0); err != nil {
 		test.Fatal(err)
 	}
+	if _, err = store.WriteSetting(context.Background(), "pi-history-source-version", 0, 1); err != nil {
+		test.Fatal(err)
+	}
 	service, err := New(context.Background(), store, nil)
 	if err != nil {
 		test.Fatal(err)

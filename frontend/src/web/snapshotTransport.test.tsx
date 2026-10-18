@@ -98,6 +98,40 @@ describe("snapshot transport", () => {
     expect(snapshot.periods["7"].usage).toStrictEqual(usage);
   });
 
+  it("reads receipts from older snapshots as having no unknown payments", async () => {
+    const snapshot = snapshotFixture();
+    snapshot.periods["7"].receipt = {
+      totalUsd: 3,
+      subscriptionUsd: 1,
+      paidUsd: 2,
+      items: [{ provider: "codex", model: "m", costUsd: 3 }],
+    };
+    snapshot.periods["30"].receipt = {
+      totalUsd: 4,
+      subscriptionUsd: 1,
+      paidUsd: 2,
+      unknownPaymentUsd: 1,
+      items: [
+        { provider: "pi", model: "b/m", costUsd: 1, isPaymentUnknown: true },
+      ],
+    };
+    const names = await captureMethodIds(setTransport);
+    setTransport(
+      createSnapshotTransport(names, {
+        current: () => snapshot,
+        refetch: async () => {},
+        device: { isDark: () => false, locale: "en" },
+        open: () => {},
+      }),
+    );
+    const older = await nativeApi.GetReceipt(7, "UTC");
+    expect(older.unknownPaymentUsd).toBe(0);
+    expect(older.items[0].isPaymentUnknown).toBe(false);
+    const current = await nativeApi.GetReceipt(30, "UTC");
+    expect(current.unknownPaymentUsd).toBe(1);
+    expect(current.items[0].isPaymentUnknown).toBe(true);
+  });
+
   it("uses the viewing device for color scheme and locale", async () => {
     await install();
     const bootstrap = await nativeApi.GetBootstrap();

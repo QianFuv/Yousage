@@ -24,6 +24,9 @@ pnpm --dir tools/parity reference    # 在 127.0.0.1:4174 打开参考工作台
 - 定价、聚合、转录解析、额度合并与汇总、格式化以及调色板生成都与原始实现对照，
   另有手算用例覆盖推理 Token 包含关系、上报价格与自定义价格、缓存回退、三个时区与夏令时、
   别名、来源归属、会话去重和稀疏的等权账户汇总。
+- Pi 原生读取器保持固定版本原文，`src/pi.test.tsx` 与 Go 的 Pi 测试共享
+  `fixtures/pi-usage.json` 中手算的预期值，覆盖实际响应模型、工具和摘要费用、互斥缓存计数、
+  推理子集、缺失价格与分叉复制的稳定身份。
 - `fixtures/theme-golden.json` 记录六套完整的 61 角色调色板（两种外观、三组种子色，
   包括灰度、透明度和 OKLCH）。正常测试只做比较；确需更新时运行
   `UPDATE_REFERENCE=1 pnpm --dir tools/parity test:theme`。Go 侧的

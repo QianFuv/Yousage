@@ -471,6 +471,8 @@ export class ProviderDetection {
     "provider": domain$0.Provider;
     "isInstalled": boolean;
     "hasHistory": boolean;
+    "supportsHistory": boolean;
+    "supportsQuota": boolean;
     "message": string;
 
     /** Creates a new ProviderDetection instance. */
@@ -486,6 +488,12 @@ export class ProviderDetection {
         }
         if (!("hasHistory" in $$source)) {
             this["hasHistory"] = false;
+        }
+        if (!("supportsHistory" in $$source)) {
+            this["supportsHistory"] = false;
+        }
+        if (!("supportsQuota" in $$source)) {
+            this["supportsQuota"] = false;
         }
         if (!("message" in $$source)) {
             this["message"] = "";
@@ -519,6 +527,7 @@ export class Receipt {
     "totalUsd": number;
     "subscriptionUsd": number;
     "paidUsd": number;
+    "unknownPaymentUsd": number;
     "tokens": number;
     "sessions": number;
     "cacheSavingsUsd": number;
@@ -567,6 +576,9 @@ export class Receipt {
         if (!("paidUsd" in $$source)) {
             this["paidUsd"] = 0;
         }
+        if (!("unknownPaymentUsd" in $$source)) {
+            this["unknownPaymentUsd"] = 0;
+        }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;
         }
@@ -604,7 +616,7 @@ export class Receipt {
     static createFrom($$source: any = {}): Receipt {
         const $$createField1_0 = $$createType15;
         const $$createField8_0 = $$createType24;
-        const $$createField20_0 = $$createType25;
+        const $$createField21_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField1_0($$parsedSource["window"]);
@@ -613,7 +625,7 @@ export class Receipt {
             $$parsedSource["items"] = $$createField8_0($$parsedSource["items"]);
         }
         if ("qrModules" in $$parsedSource) {
-            $$parsedSource["qrModules"] = $$createField20_0($$parsedSource["qrModules"]);
+            $$parsedSource["qrModules"] = $$createField21_0($$parsedSource["qrModules"]);
         }
         return new Receipt($$parsedSource as Partial<Receipt>);
     }
@@ -629,6 +641,7 @@ export class ReceiptItem {
     "costUsd": number;
     "unpricedRecords": number;
     "isSubscription": boolean;
+    "isPaymentUnknown": boolean;
 
     /** Creates a new ReceiptItem instance. */
     constructor($$source: Partial<ReceiptItem> = {}) {
@@ -649,6 +662,9 @@ export class ReceiptItem {
         }
         if (!("isSubscription" in $$source)) {
             this["isSubscription"] = false;
+        }
+        if (!("isPaymentUnknown" in $$source)) {
+            this["isPaymentUnknown"] = false;
         }
 
         Object.assign(this, $$source);

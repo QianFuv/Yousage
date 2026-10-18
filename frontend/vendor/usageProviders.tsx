@@ -24,6 +24,11 @@ export const PROVIDER_PRESENTATION = {
     color: "#d97757",
     driverKind: ProviderDriverKind.make("claudeAgent"),
   },
+  pi: {
+    label: "Pi",
+    color: "#4d9f8a",
+    driverKind: ProviderDriverKind.make("pi"),
+  },
 } satisfies Record<UsageProviderKind, UsageProviderPresentation>;
 
 /** Stable provider reading order across charts, summaries, tables, and hover rows. */

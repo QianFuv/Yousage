@@ -1,0 +1,26 @@
+{
+  "entries": [
+    { "type": "session", "id": "pi-parity" },
+    { "type": "message", "id": "a1", "timestamp": "2026-10-18T10:00:00Z", "message": { "role": "assistant", "provider": "anthropic", "model": "alias", "responseModel": "claude-test", "usage": { "input": 70, "cacheRead": 20, "cacheWrite": 10, "output": 40, "reasoning": 90, "cost": { "total": 0 } } } },
+    { "type": "message", "id": "t1", "timestamp": "2026-10-18T10:00:01Z", "message": { "role": "toolResult", "usage": { "input": 2, "output": 3, "cost": { "total": 0.5 } } } },
+    { "type": "compaction", "id": "c1", "timestamp": "2026-10-18T10:00:02Z", "usage": { "input": 4, "output": 5 } },
+    { "type": "branch_summary", "id": "b1", "timestamp": "2026-10-18T10:00:03Z", "usage": { "input": 6, "output": 7 } },
+    { "type": "usage", "id": "u1", "timestamp": "2026-10-18T10:00:04Z", "provider": "deepseek", "model": "custom", "usage": { "input": 8, "cacheRead": 9, "output": 10, "reasoning": 2, "cost": { "total": 1.25 } } },
+    { "type": "message", "id": "a2", "timestamp": "2026-10-18T10:00:05Z", "message": { "role": "assistant", "provider": "gateway", "model": "unknown", "usage": { "input": -1, "cacheRead": "4", "cacheWrite": 2.9, "output": 3.8, "reasoning": 1.9, "cost": { "total": -1 } } } },
+    { "type": "message", "id": "user", "timestamp": "2026-10-18T10:00:06Z", "message": { "role": "user", "usage": { "input": 999 } } },
+    { "type": "message", "id": "zero", "timestamp": "2026-10-18T10:00:07Z", "message": { "role": "assistant", "provider": "gateway", "model": "unknown", "usage": { "input": 0, "output": 0, "cost": { "total": 0 } } } },
+    { "type": "usage", "id": "invalid-time", "timestamp": "not-a-date", "provider": "gateway", "model": "unknown", "usage": { "output": 999 } },
+    { "type": "usage", "id": "cost-only", "timestamp": "2026-10-18T10:00:08Z", "provider": "gateway", "model": "cost-only", "usage": { "cost": { "total": 0.75 } } },
+    { "type": "message", "id": "partial", "timestamp": "2026-10-18T10:00:09Z", "message": { "role": "assistant", "provider": "gateway", "model": "partial", "stopReason": "aborted", "usage": { "output": 4, "cost": { "total": 0.1 } } } }
+  ],
+  "expected": [
+    { "model": "anthropic/claude-test", "rateModel": "claude-test", "input": 70, "cacheRead": 20, "cacheWrite": 10, "output": 40, "reasoning": 40, "cost": null },
+    { "model": "Tools/summaries", "rateModel": "", "input": 2, "cacheRead": 0, "cacheWrite": 0, "output": 3, "reasoning": 0, "cost": 0.5 },
+    { "model": "Tools/summaries", "rateModel": "", "input": 4, "cacheRead": 0, "cacheWrite": 0, "output": 5, "reasoning": 0, "cost": null },
+    { "model": "Tools/summaries", "rateModel": "", "input": 6, "cacheRead": 0, "cacheWrite": 0, "output": 7, "reasoning": 0, "cost": null },
+    { "model": "deepseek/custom", "rateModel": "custom", "input": 8, "cacheRead": 9, "cacheWrite": 0, "output": 10, "reasoning": 2, "cost": 1.25 },
+    { "model": "gateway/unknown", "rateModel": "unknown", "input": 0, "cacheRead": 0, "cacheWrite": 2, "output": 3, "reasoning": 1, "cost": null },
+    { "model": "gateway/cost-only", "rateModel": "cost-only", "input": 0, "cacheRead": 0, "cacheWrite": 0, "output": 0, "reasoning": 0, "cost": 0.75 },
+    { "model": "gateway/partial", "rateModel": "partial", "input": 0, "cacheRead": 0, "cacheWrite": 0, "output": 4, "reasoning": 0, "cost": 0.1 }
+  ]
+}

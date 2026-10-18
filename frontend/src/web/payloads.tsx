@@ -33,21 +33,30 @@ export type ShareSeriesValue = {
   costUsd?: number;
 };
 
-/** A receipt line, without its cost when amounts are hidden. */
+/**
+ * A receipt line, without its cost when amounts are hidden; older shares omit
+ * `isPaymentUnknown` and `unpricedRecords`.
+ */
 export type ShareReceiptItem = {
   provider: string;
   model: string;
   tokens: number;
   costUsd?: number;
+  unpricedRecords?: number;
   isSubscription: boolean;
+  isPaymentUnknown?: boolean;
 };
 
-/** A model's slice of the period, measured by cost or by tokens when amounts are hidden. */
+/**
+ * A model's slice of the period, measured by cost or by tokens when amounts are hidden;
+ * older shares omit `unpricedRecords`.
+ */
 export type ShareModel = {
   provider: string;
   model: string;
   tokens: number;
   costUsd?: number;
+  unpricedRecords?: number;
   share: number;
 };
 
@@ -71,6 +80,7 @@ export type SharePayload = {
     totalUsd?: number;
     subscriptionUsd?: number;
     paidUsd?: number;
+    unknownPaymentUsd?: number;
     cacheSavingsUsd?: number;
     tokens: number;
     sessions: number;

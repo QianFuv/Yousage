@@ -42,11 +42,13 @@ func (service *Service) isNativeInstalled(target NativeProvider) bool {
 
 // ProviderDetection separates filesystem availability from account authorization.
 type ProviderDetection struct {
-	Driver      string          `json:"driver"`
-	Provider    domain.Provider `json:"provider"`
-	IsInstalled bool            `json:"isInstalled"`
-	HasHistory  bool            `json:"hasHistory"`
-	Message     string          `json:"message"`
+	Driver          string          `json:"driver"`
+	Provider        domain.Provider `json:"provider"`
+	IsInstalled     bool            `json:"isInstalled"`
+	HasHistory      bool            `json:"hasHistory"`
+	SupportsHistory bool            `json:"supportsHistory"`
+	SupportsQuota   bool            `json:"supportsQuota"`
+	Message         string          `json:"message"`
 }
 
 func (service *Service) environmentValue(name string) string {
@@ -86,6 +88,14 @@ func (service *Service) historyRoots(provider domain.Provider) []string {
 		return []string{defaultRoot("CODEX_HOME", ".codex")}
 	case domain.Claude:
 		return []string{defaultRoot("CLAUDE_CONFIG_DIR", ".claude")}
+	case domain.Pi:
+		if directory := service.environmentValue("PI_CODING_AGENT_SESSION_DIR"); directory != "" {
+			return []string{service.absoluteHome(directory)}
+		}
+		if directory := service.environmentValue("PI_CODING_AGENT_DIR"); directory != "" {
+			return []string{filepath.Join(service.absoluteHome(directory), "sessions")}
+		}
+		return []string{filepath.Join(service.Home, ".pi", "agent", "sessions")}
 	}
 	return nil
 }
@@ -211,11 +221,11 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 	for _, pair := range []struct {
 		driver   string
 		provider domain.Provider
-	}{{"codex", domain.Codex}, {"claudeAgent", domain.Claude}} {
+	}{{"codex", domain.Codex}, {"claudeAgent", domain.Claude}, {"pi", domain.Pi}} {
 		if !service.isProviderInScope(pair.provider) {
 			continue
 		}
-		detection := ProviderDetection{Driver: pair.driver, Provider: pair.provider}
+		detection := ProviderDetection{Driver: pair.driver, Provider: pair.provider, SupportsHistory: true, SupportsQuota: pair.provider != domain.Pi}
 		for _, root := range service.historyRoots(pair.provider) {
 			historyRoot := root
 			if pair.provider == domain.Codex {
@@ -228,6 +238,12 @@ func (service *Service) DetectProviders(ctx context.Context) ([]ProviderDetectio
 			}
 		}
 		detection.IsInstalled = service.resolveExecutable(pair.driver, "") != ""
+		if pair.provider == domain.Pi {
+			detection.IsInstalled = service.isPiInstalled()
+			detection.Message = "Pi history is read locally. Native quota monitoring is not supported."
+			detections = append(detections, detection)
+			continue
+		}
 		if detection.IsInstalled {
 			detection.Message = "Detected automatically. Account access is checked only after enabling quotas."
 		} else {

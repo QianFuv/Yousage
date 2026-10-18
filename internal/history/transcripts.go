@@ -29,6 +29,7 @@ type CodexState struct {
 	NextFirstOutputMs     int64       `json:"nextFirstOutputMs,omitempty"`
 	IsTimingAmbiguous     bool        `json:"isTimingAmbiguous,omitempty"`
 	Claude                ClaudeState `json:"claude,omitzero"`
+	Pi                    PiState     `json:"pi,omitzero"`
 }
 
 // ClaudeState checkpoints native context identity, request starts and unfinished messages without transcript content,

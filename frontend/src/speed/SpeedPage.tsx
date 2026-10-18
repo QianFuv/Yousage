@@ -95,6 +95,40 @@ function formatLatency(milliseconds: number): string {
 }
 
 /**
+ * Summary line of one provider: its measured requests, or why it has no speed.
+ *
+ * Providers whose history records no request timing, such as Pi, list their requests
+ * without inventing a rate or first-token time.
+ *
+ * @param provider - Provider statistics.
+ * @returns The request count and detail text.
+ */
+export function providerSpeedSummary(provider: SpeedProvider): {
+  count: string;
+  detail: string;
+} {
+  if (provider.requests === 0)
+    return {
+      count: t("{count} without timing", {
+        count: formatCount(provider.unmeasuredRequests),
+      }),
+      detail: t("Not measured: saved history has no request timing."),
+    };
+  return {
+    count: t(
+      provider.requests === 1
+        ? msg("{count} request")
+        : msg("{count} requests"),
+      { count: formatCount(provider.requests) },
+    ),
+    detail: t("TTFT {ttft} · generation {rate}", {
+      ttft: formatLatency(provider.medianTtftMs),
+      rate: formatSpeed(provider.decodeTokensPerSecond),
+    }),
+  };
+}
+
+/**
  * Speed page: per-model output rates over the shared period, with a per-bucket trend.
  *
  * @param props - Whether the page is the visible route.
@@ -182,6 +216,9 @@ function SpeedContent({ report }: { report: SpeedReport }) {
   const labels = bucketLabels(report.window);
   const providers = orderProviders(
     report.providers,
+    (provider) => provider.requests > 0 || provider.unmeasuredRequests > 0,
+  );
+  const measuredProviders = providers.filter(
     (provider) => provider.requests > 0,
   );
   return (
@@ -202,17 +239,8 @@ function SpeedContent({ report }: { report: SpeedReport }) {
             <ProviderSummaryRow
               key={provider.provider}
               provider={provider.provider}
-              count={t(
-                provider.requests === 1
-                  ? msg("{count} request")
-                  : msg("{count} requests"),
-                { count: formatCount(provider.requests) },
-              )}
               value={formatSpeed(provider.tokensPerSecond)}
-              detail={t("TTFT {ttft} · generation {rate}", {
-                ttft: formatLatency(provider.medianTtftMs),
-                rate: formatSpeed(provider.decodeTokensPerSecond),
-              })}
+              {...providerSpeedSummary(provider)}
             />
           ))}
         </div>
@@ -220,10 +248,10 @@ function SpeedContent({ report }: { report: SpeedReport }) {
           <h2 className="text-sm font-medium">
             {labels.isHourly ? t("Hourly speed") : t("Daily speed")}
           </h2>
-          {providers.length > 0 ? (
+          {measuredProviders.length > 0 ? (
             <SpeedChart
               buckets={report.buckets}
-              providers={providers}
+              providers={measuredProviders}
               reportWindow={report.window}
             />
           ) : (

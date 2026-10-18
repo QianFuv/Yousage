@@ -182,7 +182,7 @@ func (service *Service) Sources(ctx context.Context) ([]Source, int64, error) {
 	return sources, revision, err
 }
 func (service *Service) SaveSources(ctx context.Context, sources []Source, revision int64) (int64, error) {
-	if len(sources) > 64 {
+	if len(sources) > 65 {
 		return revision, errors.New("too many history sources")
 	}
 	seen := map[string]bool{}

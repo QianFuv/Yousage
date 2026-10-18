@@ -13,7 +13,7 @@ type scopedDriver struct {
 	Label    string
 }
 
-// ScopedDrivers lists the local providers the desktop application monitors, in display order.
+// ScopedDrivers lists supported native quota providers in display order, independently of history support.
 var ScopedDrivers = []scopedDriver{
 	{Provider: domain.Codex, Driver: "codex", Label: "Codex"},
 	{Provider: domain.Claude, Driver: "claudeAgent", Label: "Claude Code"},
@@ -37,7 +37,7 @@ func (service *Service) isDriverInScope(driver string) bool {
 	return false
 }
 
-// scopedSources keeps the first history source of each monitored provider.
+// scopedSources keeps monitored histories and retains every configured Pi session location.
 func (service *Service) scopedSources(sources []preferences.Source) []preferences.Source {
 	if len(service.Scope) == 0 {
 		return sources
@@ -45,7 +45,7 @@ func (service *Service) scopedSources(sources []preferences.Source) []preference
 	result := []preferences.Source{}
 	seen := map[domain.Provider]bool{}
 	for _, source := range sources {
-		if service.isProviderInScope(source.Provider) && !seen[source.Provider] {
+		if service.isProviderInScope(source.Provider) && (source.Provider == domain.Pi || !seen[source.Provider]) {
 			seen[source.Provider] = true
 			result = append(result, source)
 		}

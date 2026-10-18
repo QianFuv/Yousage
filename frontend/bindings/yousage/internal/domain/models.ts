@@ -40,6 +40,7 @@ export enum Provider {
 
     Codex = "codex",
     Claude = "claude",
+    Pi = "pi",
 };
 
 /**

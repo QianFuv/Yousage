@@ -17,7 +17,7 @@ import {
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import type { Receipt } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
-import type { SharePayload } from "./payloads";
+import type { ShareModel, SharePayload } from "./payloads";
 import "./web.css";
 
 /** Fallback color for a provider this build does not present. */
@@ -104,7 +104,8 @@ export function shareChart(payload: SharePayload) {
  * Adapt the payload receipt to the receipt paper, which reads the desktop receipt shape.
  *
  * @param payload - Share payload.
- * @returns A receipt without a summary code; hidden amounts read as zero and are not shown.
+ * @returns A receipt without a summary code; hidden amounts and fields absent from older
+ * shares read as zero or false.
  */
 export function shareReceipt(payload: SharePayload): Receipt {
   const receipt = payload.receipt;
@@ -121,12 +122,14 @@ export function shareReceipt(payload: SharePayload): Receipt {
       model: item.model,
       tokens: item.tokens,
       costUsd: item.costUsd ?? 0,
-      unpricedRecords: 0,
+      unpricedRecords: item.unpricedRecords ?? 0,
       isSubscription: item.isSubscription,
+      isPaymentUnknown: item.isPaymentUnknown ?? false,
     })),
     totalUsd: receipt.totalUsd ?? 0,
     subscriptionUsd: receipt.subscriptionUsd ?? 0,
     paidUsd: receipt.paidUsd ?? 0,
+    unknownPaymentUsd: receipt.unknownPaymentUsd ?? 0,
     tokens: receipt.tokens,
     sessions: receipt.sessions,
     cacheSavingsUsd: receipt.cacheSavingsUsd ?? 0,
@@ -137,6 +140,24 @@ export function shareReceipt(payload: SharePayload): Receipt {
     qrText: "",
     qrModules: [],
   } as unknown as Receipt;
+}
+
+/**
+ * Cost and token detail of a model slice.
+ *
+ * @param model - Model slice from the payload.
+ * @param isHidden - Whether amounts are withheld.
+ * @returns Tokens alone when amounts are hidden or absent, "Unpriced" in place of a zero
+ * cost that only reflects unpriced records, and the formatted cost otherwise.
+ */
+function modelDetail(model: ShareModel, isHidden: boolean): string {
+  const tokens = `${formatTokens(model.tokens)} tokens`;
+  if (isHidden || model.costUsd === undefined) return tokens;
+  const cost =
+    model.costUsd === 0 && (model.unpricedRecords ?? 0) > 0
+      ? t("Unpriced")
+      : formatUsd(model.costUsd);
+  return `${cost} · ${tokens}`;
 }
 
 /**
@@ -271,9 +292,7 @@ export function SharePage({ payload }: { payload: SharePayload }) {
                     />
                   </div>
                   <span className="share-model-detail share-number">
-                    {isHidden || model.costUsd === undefined
-                      ? `${formatTokens(model.tokens)} tokens`
-                      : `${formatUsd(model.costUsd)} · ${formatTokens(model.tokens)} tokens`}
+                    {modelDetail(model, isHidden)}
                   </span>
                 </li>
               );

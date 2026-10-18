@@ -168,6 +168,10 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 			return nil, err
 		}
 	}
+	if err = service.ensurePiHistorySource(ctx); err != nil {
+		service.Close()
+		return nil, err
+	}
 	return service, nil
 }
 func (service *Service) emit(name string, value any) {

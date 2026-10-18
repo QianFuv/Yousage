@@ -14,8 +14,8 @@ import (
 	"yousage/internal/domain"
 )
 
-// ParserVersion replays retained transcripts to repair Claude final blocks across scan and EOF boundaries.
-const ParserVersion = 9
+// ParserVersion includes Pi accounting and native context boundaries in retained transcripts.
+const ParserVersion = 10
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -41,7 +41,7 @@ func guard(file *os.File, offset int64, length int) (string, error) {
 // ReadTranscript streams selected facts, replaying incomplete EOF independently of committed state.
 func ReadTranscript(ctx context.Context, path string, provider domain.Provider, previous domain.Checkpoint) (FileRead, error) {
 	result := FileRead{Checkpoint: previous, Records: []domain.Record{}, Tail: []domain.Record{}}
-	if provider != domain.Codex && provider != domain.Claude {
+	if !provider.Valid() {
 		return result, errors.New("unsupported transcript parser")
 	}
 	file, err := os.Open(path)
@@ -67,6 +67,9 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 		state = InitialCodexState()
 		state.TranscriptId = filepath.Base(path)
 		state.Claude.TranscriptId = state.TranscriptId
+		if provider == domain.Pi {
+			state.Pi.TranscriptId = state.TranscriptId
+		}
 	}
 	result.Checkpoint.Offset = start
 	reader := bufio.NewReaderSize(io.NewSectionReader(file, start, info.Size()-start), 256*1024)
@@ -101,6 +104,8 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 			var record *domain.Record
 			if provider == domain.Codex {
 				record = ParseCodex(projected, &lineState)
+			} else if provider == domain.Pi {
+				record = ParsePi(projected, &lineState.Pi)
 			} else {
 				parsedRecords = ParseClaudeLine(projected, &lineState.Claude)
 				for _, parsed := range parsedRecords {

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"time"
@@ -110,11 +109,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 			return false, err
 		}
 		jsonRoots = append(jsonRoots, history.Root{Provider: source.Provider, Home: root})
-		directory := "sessions"
-		if source.Provider == domain.Claude {
-			directory = "projects"
-		}
-		fingerprint := service.fingerprint(source.Provider, filepath.Join(root, directory))
+		fingerprint := service.fingerprint(source.Provider, (history.Root{Provider: source.Provider, Home: root}).Directory())
 		jsonIds[string(source.Provider)+":"+fingerprint.ResolvedHomePath] = source.Id
 	}
 	results, err := (history.Collector{Store: service.Store, HostId: service.hostId()}).Synchronize(ctx, jsonRoots, now)

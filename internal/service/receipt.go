@@ -13,37 +13,39 @@ import (
 
 // Receipt presents a local trailing window with the same pricing as Usage.
 type Receipt struct {
-	Days            int               `json:"days"`
-	Window          accounting.Window `json:"window"`
-	StartsAtMs      int64             `json:"startsAtMs"`
-	EndsAtMs        int64             `json:"endsAtMs"`
-	Number          string            `json:"number"`
-	TimeZone        string            `json:"timeZone"`
-	SinceDay        string            `json:"sinceDay"`
-	UntilDay        string            `json:"untilDay"`
-	Items           []ReceiptItem     `json:"items"`
-	TotalUsd        float64           `json:"totalUsd"`
-	SubscriptionUsd float64           `json:"subscriptionUsd"`
-	PaidUsd         float64           `json:"paidUsd"`
-	Tokens          int64             `json:"tokens"`
-	Sessions        int               `json:"sessions"`
-	CacheSavingsUsd float64           `json:"cacheSavingsUsd"`
-	UnpricedRecords int               `json:"unpricedRecords"`
-	ActiveDays      int               `json:"activeDays"`
-	FirstAtMs       *int64            `json:"firstAtMs"`
-	LastAtMs        *int64            `json:"lastAtMs"`
-	QrText          string            `json:"qrText"`
-	QrModules       []string          `json:"qrModules"`
+	Days              int               `json:"days"`
+	Window            accounting.Window `json:"window"`
+	StartsAtMs        int64             `json:"startsAtMs"`
+	EndsAtMs          int64             `json:"endsAtMs"`
+	Number            string            `json:"number"`
+	TimeZone          string            `json:"timeZone"`
+	SinceDay          string            `json:"sinceDay"`
+	UntilDay          string            `json:"untilDay"`
+	Items             []ReceiptItem     `json:"items"`
+	TotalUsd          float64           `json:"totalUsd"`
+	SubscriptionUsd   float64           `json:"subscriptionUsd"`
+	PaidUsd           float64           `json:"paidUsd"`
+	UnknownPaymentUsd float64           `json:"unknownPaymentUsd"`
+	Tokens            int64             `json:"tokens"`
+	Sessions          int               `json:"sessions"`
+	CacheSavingsUsd   float64           `json:"cacheSavingsUsd"`
+	UnpricedRecords   int               `json:"unpricedRecords"`
+	ActiveDays        int               `json:"activeDays"`
+	FirstAtMs         *int64            `json:"firstAtMs"`
+	LastAtMs          *int64            `json:"lastAtMs"`
+	QrText            string            `json:"qrText"`
+	QrModules         []string          `json:"qrModules"`
 }
 
 // ReceiptItem combines a provider/model's priced and unpriced usage.
 type ReceiptItem struct {
-	Provider        string  `json:"provider"`
-	Model           string  `json:"model"`
-	Tokens          int64   `json:"tokens"`
-	CostUsd         float64 `json:"costUsd"`
-	UnpricedRecords int     `json:"unpricedRecords"`
-	IsSubscription  bool    `json:"isSubscription"`
+	Provider         string  `json:"provider"`
+	Model            string  `json:"model"`
+	Tokens           int64   `json:"tokens"`
+	CostUsd          float64 `json:"costUsd"`
+	UnpricedRecords  int     `json:"unpricedRecords"`
+	IsSubscription   bool    `json:"isSubscription"`
+	IsPaymentUnknown bool    `json:"isPaymentUnknown"`
 }
 
 // Receipt returns only local facts, without contacting remote environments or probing accounts.
@@ -110,6 +112,9 @@ func (service *Service) Receipt(ctx context.Context, days int, timeZone string) 
 	}
 	result.Sessions, result.ActiveDays = len(sessions), len(active)
 	result.QrText = fmt.Sprintf("YOUSAGE %s %s..%s\nAPI $%.2f PAID $%.2f\n%s TOKENS %d SESSIONS", period, window.SinceDay, window.UntilDay, result.TotalUsd, result.PaidUsd, receiptTokenLabel(result.Tokens), result.Sessions)
+	if result.UnknownPaymentUsd > 0 {
+		result.QrText += fmt.Sprintf("\nPAYMENT UNKNOWN $%.2f", result.UnknownPaymentUsd)
+	}
 	result.QrModules, err = QrModules(result.QrText)
 	return result, err
 }
@@ -146,7 +151,7 @@ func receiptFromSummary(summary remote.Summary, subscriptions map[string]bool) R
 		key := string(bucket.Provider) + "\x00" + bucket.Model
 		item := items[key]
 		if item == nil {
-			item = &ReceiptItem{Provider: string(bucket.Provider), Model: bucket.Model, IsSubscription: subscriptions[string(bucket.Provider)]}
+			item = &ReceiptItem{Provider: string(bucket.Provider), Model: bucket.Model, IsSubscription: subscriptions[string(bucket.Provider)], IsPaymentUnknown: bucket.Provider == domain.Pi}
 			items[key] = item
 		}
 		item.Tokens += bucket.Totals.Total()
@@ -156,14 +161,16 @@ func receiptFromSummary(summary remote.Summary, subscriptions map[string]bool) R
 		result.Tokens += bucket.Totals.Total()
 		result.CacheSavingsUsd += bucket.CacheSavingsUsd
 		result.UnpricedRecords += bucket.UnpricedRecords
-		if item.IsSubscription {
+		if item.IsPaymentUnknown {
+			result.UnknownPaymentUsd += bucket.CostUsd
+		} else if item.IsSubscription {
 			result.SubscriptionUsd += bucket.CostUsd
 		}
 		if bucket.Records > 0 {
 			active[bucket.Day] = true
 		}
 	}
-	result.PaidUsd = max(0, result.TotalUsd-result.SubscriptionUsd)
+	result.PaidUsd = max(0, result.TotalUsd-result.SubscriptionUsd-result.UnknownPaymentUsd)
 	result.ActiveDays = len(active)
 	for _, item := range items {
 		result.Items = append(result.Items, *item)

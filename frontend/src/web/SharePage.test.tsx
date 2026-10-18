@@ -1,6 +1,7 @@
 /** Share data maps onto the chart and receipt without inventing hidden amounts. */
 import { describe, expect, it } from "vitest";
-import { shareChart, shareReceipt } from "./SharePage";
+import { renderToStaticMarkup } from "react-dom/server";
+import { SharePage, shareChart, shareReceipt } from "./SharePage";
 import { isSafePaletteEntry } from "./palette";
 import type { SharePayload } from "./payloads";
 
@@ -119,6 +120,188 @@ describe("share receipt", () => {
     expect(receipt.items[0].costUsd).toBe(0);
     expect(receipt.qrModules).toEqual([]);
     expect(receipt.tokens).toBe(600);
+  });
+
+  it("reads shares from older desktops as having no unknown payments", () => {
+    const receipt = shareReceipt(payloadFixture());
+    expect(receipt.unknownPaymentUsd).toBe(0);
+    expect(receipt.items[0].isPaymentUnknown).toBe(false);
+  });
+
+  it("keeps Pi usage of unknown payment apart from the amount paid", () => {
+    const base = payloadFixture().receipt;
+    const receipt = shareReceipt(
+      payloadFixture({
+        receipt: {
+          ...base,
+          totalUsd: 3.5,
+          paidUsd: 0,
+          unknownPaymentUsd: 0.5,
+          items: [
+            ...base.items,
+            {
+              provider: "pi",
+              model: "backend/pi-model",
+              tokens: 200,
+              costUsd: 0.5,
+              isSubscription: false,
+              isPaymentUnknown: true,
+            },
+          ],
+        },
+      }),
+    );
+    expect(receipt.unknownPaymentUsd).toBe(0.5);
+    expect(receipt.paidUsd).toBe(0);
+    expect(receipt.items.map((item) => item.isPaymentUnknown)).toEqual([
+      false,
+      true,
+    ]);
+  });
+});
+
+describe("share chart with Pi", () => {
+  it("draws Pi in its own color after the original providers", () => {
+    const chart = shareChart(
+      payloadFixture({
+        series: [
+          {
+            startMs: START,
+            values: [
+              { provider: "pi", tokens: 50, costUsd: 0.25 },
+              { provider: "codex", tokens: 300, costUsd: 1.5 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(chart.series.map((line) => [line.id, line.color])).toEqual([
+      ["codex", "var(--contrast-foreground)"],
+      ["pi", "#4d9f8a"],
+    ]);
+    expect(chart.series[1].values).toEqual([0.25]);
+  });
+});
+
+/**
+ * Build a share where a known free model sits beside an unknown Pi model with no price.
+ *
+ * @param hideAmounts - Whether amounts are withheld, as the desktop then omits every amount.
+ * @param hasUnpricedCounts - Whether the share carries per-line unpriced counts; older
+ * desktops omit them.
+ * @returns The payload.
+ */
+function unpricedPiPayload(
+  hideAmounts = false,
+  hasUnpricedCounts = true,
+): SharePayload {
+  const amount = (value: number) => (hideAmounts ? undefined : value);
+  const unpriced = hasUnpricedCounts ? 3 : undefined;
+  return payloadFixture({
+    hideAmounts,
+    series: [],
+    receipt: {
+      number: "N2",
+      totalUsd: amount(2),
+      subscriptionUsd: amount(0),
+      paidUsd: amount(2),
+      unknownPaymentUsd: amount(0),
+      cacheSavingsUsd: amount(0),
+      tokens: 900,
+      sessions: 2,
+      activeDays: 1,
+      unpricedRecords: 3,
+      items: [
+        {
+          provider: "claude",
+          model: "claude-model",
+          tokens: 300,
+          costUsd: amount(2),
+          isSubscription: false,
+        },
+        {
+          provider: "codex",
+          model: "free-model",
+          tokens: 200,
+          costUsd: amount(0),
+          isSubscription: false,
+        },
+        {
+          provider: "pi",
+          model: "backend/pi-unpriced-model",
+          tokens: 400,
+          costUsd: amount(0),
+          unpricedRecords: unpriced,
+          isSubscription: false,
+          isPaymentUnknown: true,
+        },
+      ],
+    },
+    models: [
+      {
+        provider: "claude",
+        model: "claude-model",
+        tokens: 300,
+        costUsd: amount(2),
+        share: hideAmounts ? 1 / 3 : 1,
+      },
+      {
+        provider: "codex",
+        model: "free-model",
+        tokens: 200,
+        costUsd: amount(0),
+        share: hideAmounts ? 2 / 9 : 0,
+      },
+      {
+        provider: "pi",
+        model: "backend/pi-unpriced-model",
+        tokens: 400,
+        costUsd: amount(0),
+        unpricedRecords: unpriced,
+        share: hideAmounts ? 4 / 9 : 0,
+      },
+    ],
+  });
+}
+
+/**
+ * Visible text of a rendered share page.
+ *
+ * @param payload - Share payload to render.
+ * @returns Text content without markup.
+ */
+function sharePageText(payload: SharePayload): string {
+  return renderToStaticMarkup(<SharePage payload={payload} />)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+describe("share page with unpriced Pi usage", () => {
+  it("shows an unknown Pi model as unpriced while a known free model stays at zero", () => {
+    const text = sharePageText(unpricedPiPayload());
+    expect(text).toContain("backend/pi-unpriced-model Unpriced");
+    expect(text).toContain("Unpriced · 400 tokens");
+    expect(text).toContain("free-model $0.00");
+    expect(text).toContain("$0.00 · 200 tokens");
+    expect(text).toContain("$2.00 · 300 tokens");
+    expect(text).not.toContain("backend/pi-unpriced-model $0.00");
+    expect(shareReceipt(unpricedPiPayload()).items[2].unpricedRecords).toBe(3);
+  });
+
+  it("reads shares without per-line unpriced counts as priced", () => {
+    const payload = unpricedPiPayload(false, false);
+    const text = sharePageText(payload);
+    expect(text).not.toContain("Unpriced ·");
+    expect(text).toContain("backend/pi-unpriced-model $0.00");
+    expect(shareReceipt(payload).items[2].unpricedRecords).toBe(0);
+  });
+
+  it("shows only tokens when amounts are hidden", () => {
+    const text = sharePageText(unpricedPiPayload(true));
+    expect(text).toContain("400 tokens");
+    expect(text).not.toContain("Unpriced");
+    expect(text).not.toContain("$");
+    expect(text).not.toMatch(/payment|paid/i);
   });
 });
 

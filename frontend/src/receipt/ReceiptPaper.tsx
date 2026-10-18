@@ -120,6 +120,7 @@ export function ReceiptPaper({
             {!hideAmounts && (
               <div className="receipt-faint receipt-small">
                 {formatTokens(item.tokens)} tokens
+                {item.isPaymentUnknown && ` · ${t("payment unknown")}`}
               </div>
             )}
           </div>
@@ -142,9 +143,21 @@ export function ReceiptPaper({
           </span>
         </div>
       )}
+      {!hideAmounts && receipt.unknownPaymentUsd > 0 && (
+        <div className="receipt-row receipt-faint">
+          <span>{t("Payment method unknown")}</span>
+          <span className="receipt-number">
+            −{formatUsd(receipt.unknownPaymentUsd)}
+          </span>
+        </div>
+      )}
       {!hideAmounts && (
         <div className="receipt-row receipt-strong">
-          <span>{t("Amount paid")}</span>
+          <span>
+            {receipt.unknownPaymentUsd > 0
+              ? t("Known amount paid")
+              : t("Amount paid")}
+          </span>
           <span className="receipt-number">{formatUsd(receipt.paidUsd)}</span>
         </div>
       )}

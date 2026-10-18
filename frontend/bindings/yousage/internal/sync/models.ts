@@ -78,6 +78,8 @@ export class ShareItem {
     "tokens": number;
     "costUsd"?: number | null;
     "isSubscription": boolean;
+    "isPaymentUnknown"?: boolean;
+    "unpricedRecords"?: number;
 
     /** Creates a new ShareItem instance. */
     constructor($$source: Partial<ShareItem> = {}) {
@@ -115,6 +117,7 @@ export class ShareModel {
     "tokens": number;
     "costUsd"?: number | null;
     "share": number;
+    "unpricedRecords"?: number;
 
     /** Creates a new ShareModel instance. */
     constructor($$source: Partial<ShareModel> = {}) {
@@ -267,6 +270,7 @@ export class ShareReceipt {
     "totalUsd"?: number | null;
     "subscriptionUsd"?: number | null;
     "paidUsd"?: number | null;
+    "unknownPaymentUsd"?: number | null;
     "cacheSavingsUsd"?: number | null;
     "tokens": number;
     "sessions": number;
@@ -302,10 +306,10 @@ export class ShareReceipt {
      * Creates a new ShareReceipt instance from a string or object.
      */
     static createFrom($$source: any = {}): ShareReceipt {
-        const $$createField9_0 = $$createType11;
+        const $$createField10_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField9_0($$parsedSource["items"]);
+            $$parsedSource["items"] = $$createField10_0($$parsedSource["items"]);
         }
         return new ShareReceipt($$parsedSource as Partial<ShareReceipt>);
     }
