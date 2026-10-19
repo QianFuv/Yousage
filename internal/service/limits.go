@@ -267,6 +267,9 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 				isProbeFailed := account.Limits.Unavailable != nil && account.Limits.Unavailable.Reason == "probeFailed"
 				if isProbeFailed {
 					notices[index] = target.Label + ": " + account.Limits.Unavailable.Message + " Last successful limits are retained."
+					if target.Driver == "claudeAgent" && (old.Limits == nil || old.Limits.Unavailable != nil) {
+						notices[index] = target.Label + ": " + account.Limits.Unavailable.Message + " No previous successful limits are available."
+					}
 				}
 				isFresh[index] = !isProbeFailed && account.Limits.Unavailable == nil
 				account.Limits = quota.ResolveProbe(old.Limits, account.Limits)

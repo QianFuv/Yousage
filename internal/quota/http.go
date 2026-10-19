@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+var errQuotaTrailingJSON = errors.New("invalid quota trailing JSON")
+
 type HttpOptions struct {
 	Environment    map[string]string
 	Home           string
@@ -33,6 +35,8 @@ func (options HttpOptions) userHome() string {
 	}
 	return options.Home
 }
+
+// request preserves HTTP status and decoder/transport errors for safe caller-specific diagnostics.
 func (options HttpOptions) request(ctx context.Context, method, endpoint, token string, headers map[string]string) (json.RawMessage, int, error) {
 	var input io.Reader
 	if method == http.MethodPost {
@@ -58,6 +62,9 @@ func (options HttpOptions) request(ctx context.Context, method, endpoint, token 
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		if response != nil {
+			return nil, response.StatusCode, err
+		}
 		return nil, 0, err
 	}
 	defer response.Body.Close()
@@ -66,12 +73,15 @@ func (options HttpOptions) request(ctx context.Context, method, endpoint, token 
 	}
 	var data json.RawMessage
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 2<<20))
-	if decoder.Decode(&data) != nil {
-		return nil, response.StatusCode, errors.New("invalid quota JSON")
+	if err := decoder.Decode(&data); err != nil {
+		return nil, response.StatusCode, err
 	}
 	var extra any
-	if decoder.Decode(&extra) != io.EOF {
-		return nil, response.StatusCode, errors.New("invalid quota trailing JSON")
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			err = errQuotaTrailingJSON
+		}
+		return nil, response.StatusCode, err
 	}
 	return data, response.StatusCode, nil
 }

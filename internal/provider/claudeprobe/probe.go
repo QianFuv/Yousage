@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -46,9 +45,9 @@ type Failure struct {
 	Cause error
 }
 
-// Error describes the failed control stage without discarding its wrapped cause.
+// Error describes the safe control stage and classification without exposing the wrapped cause.
 func (failure *Failure) Error() string {
-	return fmt.Sprintf("%s: %v", failure.Stage, failure.Cause)
+	return "Claude control " + failure.Stage + " failed (" + failure.Kind + ")."
 }
 
 // Unwrap preserves cancellation/deadline matching for callers.
@@ -95,7 +94,7 @@ func Probe(ctx context.Context, options Options) (Result, error) {
 	}
 	managed, err := startProcess(options)
 	if err != nil {
-		return Result{}, fmt.Errorf("start Claude control process: %w", err)
+		return Result{}, &Failure{Stage: "initialize", Kind: "transport", Cause: err}
 	}
 	readContext, cancelRead := context.WithCancel(ctx)
 	frames := make(chan frame, 16)
@@ -135,20 +134,21 @@ func Probe(ctx context.Context, options Options) (Result, error) {
 		usage, err = request(usageContext, encoder, frames, "usage-3", map[string]any{"subtype": "get_usage"})
 	}
 	if err != nil {
-		result.Failure = err.Error()
 		result.FailureKind = failureKind(err)
+		result.Failure = (&Failure{Stage: "get_usage", Kind: result.FailureKind}).Error()
 		return result, nil
 	}
 	state, err := validateUsage(usage)
 	if err != nil {
-		result.Failure = err.Error()
 		result.FailureKind = "protocol"
+		result.Failure = (&Failure{Stage: "get_usage", Kind: result.FailureKind}).Error()
 		return result, nil
 	}
 	result.Usage, result.State = usage, state
 	return result, nil
 }
 
+// failureKind preserves typed protocol evidence and recognizes explicit CLI capability rejections.
 func failureKind(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "timeout"
@@ -156,16 +156,23 @@ func failureKind(err error) string {
 	if errors.Is(err, context.Canceled) {
 		return "cancelled"
 	}
+	var failure *Failure
+	if errors.As(err, &failure) {
+		return failure.Kind
+	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "authentication") || strings.Contains(message, "unauthorized") || strings.Contains(message, "login required") {
 		return "authentication"
 	}
-	if strings.Contains(message, "unknown") && strings.Contains(message, "get_usage") {
-		return "unsupported_method"
+	for _, rejection := range []string{"unknown control method get_usage", "unknown method get_usage", "unsupported control method get_usage", "unsupported method get_usage"} {
+		if strings.HasPrefix(message, rejection) {
+			return "unsupported_method"
+		}
 	}
 	return "transport"
 }
 
+// request correlates control responses and marks malformed envelopes as protocol failures.
 func request(ctx context.Context, encoder *json.Encoder, frames <-chan frame, identity string, body map[string]any) (json.RawMessage, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -189,13 +196,14 @@ func request(ctx context.Context, encoder *json.Encoder, frames <-chan frame, id
 				return nil, errors.New(message.Response.Error)
 			}
 			if message.Response.Subtype != "success" || len(message.Response.Response) == 0 {
-				return nil, errors.New("invalid correlated control response")
+				return nil, &Failure{Stage: "control", Kind: "protocol", Cause: errors.New("invalid correlated control response")}
 			}
 			return message.Response.Response, nil
 		}
 	}
 }
 
+// readFrames tolerates startup noise while bounding and validating control output.
 func readFrames(ctx context.Context, output io.Reader, frames chan<- frame) {
 	scanner := bufio.NewScanner(output)
 	scanner.Buffer(make([]byte, 4096), maximumFrameBytes)
@@ -204,7 +212,7 @@ func readFrames(ctx context.Context, output io.Reader, frames chan<- frame) {
 		data := scanner.Bytes()
 		total += len(data)
 		if total > 16*maximumFrameBytes || !utf8.Valid(data) {
-			publishFrame(ctx, frames, frame{failure: errors.New("control output exceeds limits or is not UTF-8")})
+			publishFrame(ctx, frames, frame{failure: &Failure{Stage: "control", Kind: "protocol", Cause: errors.New("control output exceeds limits or is not UTF-8")}})
 			return
 		}
 		var message response
@@ -218,6 +226,8 @@ func readFrames(ctx context.Context, output io.Reader, frames chan<- frame) {
 	failure := scanner.Err()
 	if failure == nil {
 		failure = io.EOF
+	} else if errors.Is(failure, bufio.ErrTooLong) {
+		failure = &Failure{Stage: "control", Kind: "protocol", Cause: failure}
 	}
 	publishFrame(ctx, frames, frame{failure: failure})
 }
@@ -258,7 +268,7 @@ func validateUsage(data json.RawMessage) (string, error) {
 			Utilization *float64 `json:"utilization"`
 			ResetsAt    string   `json:"resets_at"`
 		}
-		if json.Unmarshal(data, &window) != nil {
+		if json.Unmarshal(data, &window) != nil || window.Utilization == nil {
 			return "", errors.New("invalid usage window")
 		}
 	}

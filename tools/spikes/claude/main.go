@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// main serves synthetic control responses selected solely by fixture environment variables.
 func main() {
 	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "--hold-") {
 		recordProcess()
@@ -31,6 +32,7 @@ func main() {
 		os.Exit(21)
 	}
 	scenario := os.Getenv("YOUSAGE_FIXTURE_SCENARIO")
+	secret := os.Getenv("YOUSAGE_FIXTURE_SECRET")
 	if scenario == "early-exit" {
 		os.Exit(3)
 	}
@@ -58,7 +60,11 @@ func main() {
 				time.Sleep(5 * time.Minute)
 			}
 			if scenario == "init-error" {
-				send(message.RequestId, nil, "authentication required", false)
+				send(message.RequestId, nil, "authentication required "+secret, false)
+				continue
+			}
+			if scenario == "init-protocol" {
+				send(message.RequestId, []any{}, "", false)
 				continue
 			}
 			if scenario == "large" {
@@ -88,7 +94,19 @@ func main() {
 			continue
 		}
 		if scenario == "usage-error" || scenario == "unknown-method" {
-			send(message.RequestId, nil, "unknown control method get_usage", false)
+			send(message.RequestId, nil, "unknown control method get_usage "+secret, false)
+			continue
+		}
+		if scenario == "usage-auth" {
+			send(message.RequestId, nil, "unauthorized "+secret, false)
+			continue
+		}
+		if scenario == "usage-network-error" {
+			send(message.RequestId, nil, "network unknown failure for get_usage "+secret, false)
+			continue
+		}
+		if scenario == "usage-protocol" {
+			fmt.Printf("{\"type\":\"control_response\",\"response\":{\"subtype\":\"invalid\",\"request_id\":%q,\"error\":%q}}\n", message.RequestId, secret)
 			continue
 		}
 		available := scenario != "unsupported"
@@ -100,7 +118,10 @@ func main() {
 		if scenario == "model-scoped" {
 			limits["model_scoped"] = []any{map[string]any{"display_name": "Fable 5.1", "utilization": 40, "resets_at": "2026-10-10T12:00:00Z"}}
 		}
-		if !available {
+		if scenario == "missing-utilization" {
+			limits["five_hour"] = map[string]any{"resets_at": "2026-10-06T12:00:00Z"}
+		}
+		if !available || scenario == "null-limits" {
 			limits = nil
 		}
 		send(message.RequestId, map[string]any{"session": map[string]any{}, "subscription_type": "pro", "rate_limits_available": available, "rate_limits": limits, "behaviors": nil}, "", scenario == "fragmented")

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,18 +36,23 @@ func ReadClaudeLogin(ctx context.Context, options HttpOptions, configDirectory s
 	if err != nil {
 		return unavailable(checkedAt, "probeFailed", "Claude Code login could not be read.")
 	}
-	var credentials struct {
+	var credentials *struct {
 		Login *struct {
 			AccessToken string `json:"accessToken"`
 			ExpiresAt   int64  `json:"expiresAt"`
 		} `json:"claudeAiOauth"`
 	}
-	if json.Unmarshal(data, &credentials) != nil || credentials.Login == nil || credentials.Login.AccessToken == "" {
+	if json.Unmarshal(data, &credentials) != nil || credentials == nil {
+		return unavailable(checkedAt, "probeFailed", "Claude Code stored credentials are malformed.")
+	}
+	if credentials.Login == nil {
 		return unavailable(checkedAt, "unsupported", "")
 	}
-	expired := unavailable(checkedAt, "probeFailed", "Claude Code login has expired. Open Claude Code to renew it.")
+	if strings.TrimSpace(credentials.Login.AccessToken) == "" {
+		return unavailable(checkedAt, "probeFailed", "Claude Code stored credentials are malformed.")
+	}
 	if credentials.Login.ExpiresAt > 0 && time.UnixMilli(credentials.Login.ExpiresAt).Before(time.Now()) {
-		return expired
+		return unavailable(checkedAt, "probeFailed", "Claude Code stored access token has expired; usage limits could not be read.")
 	}
 	endpoint := claudeUsageEndpoint
 	if options.ClaudeEndpoint != "" {
@@ -54,17 +61,46 @@ func ReadClaudeLogin(ctx context.Context, options HttpOptions, configDirectory s
 	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	body, status, err := options.request(deadline, http.MethodGet, endpoint, credentials.Login.AccessToken, map[string]string{"anthropic-beta": "oauth-2025-04-20", "Accept": "application/json"})
-	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return expired
-	}
 	if err != nil {
-		return unavailable(checkedAt, "probeFailed", "Claude could not read usage limits.")
+		return unavailable(checkedAt, "probeFailed", claudeUsageFailure(status, err))
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil || (fields["five_hour"] == nil && fields["seven_day"] == nil && fields["limits"] == nil) {
+		return unavailable(checkedAt, "probeFailed", "Claude returned invalid usage limits.")
 	}
 	limits, err := mapHubClaude(body, checkedAt)
 	if err != nil {
 		return unavailable(checkedAt, "probeFailed", "Claude returned invalid usage limits.")
 	}
 	return limits
+}
+
+// claudeUsageFailure describes only evidence from the quota request, never the CLI's overall login state.
+func claudeUsageFailure(status int, err error) string {
+	switch {
+	case status == http.StatusUnauthorized:
+		return "Claude usage API rejected the stored credential (HTTP 401)."
+	case status == http.StatusForbidden:
+		return "Claude usage API denied access to usage limits (HTTP 403)."
+	case status == http.StatusTooManyRequests:
+		return "Claude usage API rate limit reached (HTTP 429). Try again later."
+	case status >= 500 && status <= 599:
+		return "Claude usage API is temporarily unavailable (HTTP 5xx). Try again later."
+	case status != 0 && (status < 200 || status >= 300):
+		return "Claude usage API returned an unexpected HTTP status."
+	}
+	var networkError net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkError) && networkError.Timeout()) {
+		return "Claude usage API request timed out."
+	}
+	if errors.Is(err, context.Canceled) {
+		return "Claude usage API request was cancelled."
+	}
+	var syntaxError *json.SyntaxError
+	if errors.As(err, &syntaxError) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, errQuotaTrailingJSON) {
+		return "Claude usage API returned invalid JSON."
+	}
+	return "Claude usage API could not be reached or read because of a network error."
 }
 
 // ReadClaudeOrganization names the organization the local Claude Code login is signed in to.

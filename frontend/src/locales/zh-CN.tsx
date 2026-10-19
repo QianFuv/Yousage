@@ -94,9 +94,37 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Claude Code login could not be read.": "无法读取 Claude Code 登录信息。",
   "Claude Code login has expired. Open Claude Code to renew it.":
     "Claude Code 登录已过期，请打开 Claude Code 续期。",
+  "Claude Code rejected authentication for the usage probe.":
+    "Claude Code 在用量探测时拒绝了身份验证。",
+  "Claude Code returned an invalid usage probe response.":
+    "Claude Code 返回了无效的用量探测响应。",
+  "Claude Code stored access token has expired; usage limits could not be read.":
+    "Claude Code 存储的访问令牌已过期，无法读取用量额度。",
+  "Claude Code stored credentials are malformed.":
+    "Claude Code 存储的凭据格式无效。",
+  "Claude Code usage probe could not communicate with the CLI.":
+    "Claude Code 用量探测无法与 CLI 通信。",
+  "Claude Code usage probe timed out.": "Claude Code 用量探测超时。",
+  "Claude Code usage probe was cancelled.": "Claude Code 用量探测已取消。",
   "Claude could not initialize its usage probe.": "Claude 用量探测初始化失败。",
   "Claude could not read usage limits.": "Claude 无法读取用量额度。",
   "Claude returned invalid usage limits.": "Claude 返回了无效的用量额度。",
+  "Claude usage API could not be reached or read because of a network error.":
+    "由于网络错误，无法连接或读取 Claude 用量 API。",
+  "Claude usage API denied access to usage limits (HTTP 403).":
+    "Claude 用量 API 拒绝访问用量额度（HTTP 403）。",
+  "Claude usage API is temporarily unavailable (HTTP 5xx). Try again later.":
+    "Claude 用量 API 暂时不可用（HTTP 5xx），请稍后重试。",
+  "Claude usage API rate limit reached (HTTP 429). Try again later.":
+    "Claude 用量 API 已达到请求频率限制（HTTP 429），请稍后重试。",
+  "Claude usage API rejected the stored credential (HTTP 401).":
+    "Claude 用量 API 拒绝了存储的凭据（HTTP 401）。",
+  "Claude usage API request timed out.": "Claude 用量 API 请求超时。",
+  "Claude usage API request was cancelled.": "Claude 用量 API 请求已取消。",
+  "Claude usage API returned an unexpected HTTP status.":
+    "Claude 用量 API 返回了意外的 HTTP 状态码。",
+  "Claude usage API returned invalid JSON.":
+    "Claude 用量 API 返回了无效的 JSON。",
   "Clear mix": "清除混搭",
   "Click to hide email": "点击隐藏邮箱",
   "Click to reveal email": "点击显示邮箱",
@@ -234,6 +262,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
   "Last 24 hours": "最近 24 小时",
+  "Last successful limits are retained.": "已保留上次成功读取的额度。",
   "Last updated": "最近更新",
   "Last upload": "上次上传",
   "Last {days} days": "最近 {days} 天",
@@ -292,6 +321,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "No environments selected": "未选择环境",
   "No history location detected yet": "尚未检测到历史记录位置",
   "No matches.": "没有匹配项。",
+  "No previous successful limits are available.":
+    "没有上次成功读取的额度可用。",
   "No provider on the selected environments reports subscription limits.":
     "所选环境中没有可报告订阅额度的 Provider。",
   "No reset credit left.": "没有剩余的重置券。",

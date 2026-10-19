@@ -75,6 +75,84 @@ describe("translations", () => {
   });
 });
 
+describe("Claude limit failure messages", () => {
+  const CLAUDE_FAILURES = [
+    "Claude Code stored credentials are malformed.",
+    "Claude Code stored access token has expired; usage limits could not be read.",
+    "Claude usage API rejected the stored credential (HTTP 401).",
+    "Claude usage API denied access to usage limits (HTTP 403).",
+    "Claude usage API rate limit reached (HTTP 429). Try again later.",
+    "Claude usage API is temporarily unavailable (HTTP 5xx). Try again later.",
+    "Claude usage API returned an unexpected HTTP status.",
+    "Claude usage API request timed out.",
+    "Claude usage API request was cancelled.",
+    "Claude usage API returned invalid JSON.",
+    "Claude usage API could not be reached or read because of a network error.",
+    "Claude Code rejected authentication for the usage probe.",
+    "Claude Code usage probe timed out.",
+    "Claude Code usage probe was cancelled.",
+    "Claude Code returned an invalid usage probe response.",
+    "Claude Code usage probe could not communicate with the CLI.",
+    "Claude Code login could not be read.",
+    "Claude returned invalid usage limits.",
+  ];
+  const RETENTION_NOTES = [
+    "Last successful limits are retained.",
+    "No previous successful limits are available.",
+  ];
+  const LEGACY_MESSAGES = [
+    "Claude Code login has expired. Open Claude Code to renew it.",
+    "Claude could not read usage limits.",
+    "Claude could not initialize its usage probe.",
+  ];
+
+  /** Translate every message into Chinese. */
+  function translateAll(messages: readonly string[]): string[] {
+    setLanguage("zh-CN");
+    return messages.map((message) => t(message));
+  }
+
+  it("translates every backend failure, retention note and legacy message", () => {
+    const messages = [
+      ...CLAUDE_FAILURES,
+      ...RETENTION_NOTES,
+      ...LEGACY_MESSAGES,
+    ];
+    const translations = translateAll(messages);
+    const untranslated = messages.filter(
+      (_message, index) => !/[一-鿿]/.test(translations[index]),
+    );
+    expect(untranslated).toEqual([]);
+  });
+
+  it("keeps each failure cause distinguishable in Chinese", () => {
+    const messages = [...CLAUDE_FAILURES, ...LEGACY_MESSAGES];
+    expect(new Set(translateAll(messages)).size).toBe(messages.length);
+    const [retained, missing] = translateAll(RETENTION_NOTES);
+    expect(retained).not.toBe(missing);
+  });
+
+  it("keeps HTTP status codes in usage API translations", () => {
+    const withStatus = CLAUDE_FAILURES.filter((message) =>
+      /HTTP \w+\)/.test(message),
+    );
+    const translations = translateAll(withStatus);
+    expect(withStatus).toHaveLength(4);
+    withStatus.forEach((message, index) =>
+      expect(translations[index]).toContain(/HTTP \w+/.exec(message)?.[0]),
+    );
+  });
+
+  it("does not advise renewing the login for non-login failures", () => {
+    const legacyAdvice = translateAll(LEGACY_MESSAGES)[0];
+    expect(legacyAdvice).toContain("续期");
+    const advising = translateAll(CLAUDE_FAILURES).filter((translation) =>
+      /续期|重新登录|打开 Claude Code/.test(translation),
+    );
+    expect(advising).toEqual([]);
+  });
+});
+
 describe("language selection", () => {
   it("follows the system locale unless a language is chosen", () => {
     expect(resolveLanguage("system", "zh-CN")).toBe("zh-CN");

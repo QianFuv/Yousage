@@ -230,7 +230,16 @@ func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled boo
 	}
 	result, err := claudeprobe.Probe(ctx, options)
 	if err != nil {
-		account.Limits = unavailable(checkedAt, "probeFailed", "Claude could not initialize its usage probe.")
+		kind := "transport"
+		var failure *claudeprobe.Failure
+		if errors.As(err, &failure) {
+			kind = failure.Kind
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			kind = "timeout"
+		} else if errors.Is(err, context.Canceled) {
+			kind = "cancelled"
+		}
+		account.Limits = unavailable(checkedAt, "probeFailed", claudeProbeFailure(kind))
 		return account
 	}
 	var identity struct {
@@ -243,7 +252,9 @@ func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled boo
 		account.Email, account.Plan = identity.Account.Email, identity.Account.Plan
 	}
 	if result.State == "failed" {
-		account.Limits = unavailable(checkedAt, "probeFailed", "Claude could not read usage limits.")
+		if result.FailureKind != "unsupported_method" {
+			account.Limits = unavailable(checkedAt, "probeFailed", claudeProbeFailure(result.FailureKind))
+		}
 		return account
 	}
 	limits, _, err := MapClaude(result.Usage, checkedAt)
@@ -253,4 +264,20 @@ func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled boo
 	}
 	account.Limits = limits
 	return account
+}
+
+// claudeProbeFailure maps known control-protocol evidence without exposing CLI output or paths.
+func claudeProbeFailure(kind string) string {
+	switch kind {
+	case "authentication":
+		return "Claude Code rejected authentication for the usage probe."
+	case "timeout":
+		return "Claude Code usage probe timed out."
+	case "cancelled":
+		return "Claude Code usage probe was cancelled."
+	case "protocol":
+		return "Claude Code returned an invalid usage probe response."
+	default:
+		return "Claude Code usage probe could not communicate with the CLI."
+	}
 }
