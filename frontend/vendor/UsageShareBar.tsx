@@ -30,7 +30,7 @@ export function UsageShareBar({
 
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-sm font-medium text-foreground">{label}</h3>
         {aside}
       </div>
@@ -57,14 +57,14 @@ export function UsageShareBar({
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {visible.map((segment) => (
-          <span key={segment.label} className="flex items-center gap-1.5">
+          <span key={segment.label} className="flex min-w-0 items-center gap-1.5">
             <span
               aria-hidden
-              className="size-2 rounded-xs"
+              className="size-2 shrink-0 rounded-xs"
               style={{ backgroundColor: segment.color }}
             />
             <span className="text-muted-foreground">{segment.label}</span>
-            <span className="text-foreground tabular-nums">{format(segment.value)}</span>
+            <span className="wrap-anywhere text-foreground tabular-nums">{format(segment.value)}</span>
           </span>
         ))}
       </div>

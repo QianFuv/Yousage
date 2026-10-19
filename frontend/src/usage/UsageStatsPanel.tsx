@@ -362,21 +362,24 @@ export function UsageStatsPanel({
                         <td className="py-2.5 text-left whitespace-normal">
                           <button
                             type="button"
+                            aria-haspopup="dialog"
                             onClick={() =>
                               setSelectedModelKey(
                                 `${model.provider}:${model.model}`,
                               )
                             }
-                            className="flex items-center gap-2 text-left text-foreground outline-none after:absolute after:inset-0"
+                            className="flex min-w-0 items-center gap-2 text-left text-foreground outline-none after:absolute after:inset-0"
                           >
                             <ProviderMark
                               provider={model.provider}
                               className="size-3.5"
                             />
-                            {model.model}
+                            <span className="min-w-0 wrap-anywhere">
+                              {model.model}
+                            </span>
                             <ChevronRightIcon
                               aria-hidden
-                              className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                              className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100 pointer-coarse:opacity-100"
                             />
                           </button>
                           <div aria-hidden className="mt-1.5 h-0.5 max-w-48">

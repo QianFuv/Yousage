@@ -8,13 +8,19 @@ import {
   type ModelTotals,
 } from "@t3tools/shared/usageMerge";
 import { useMemo } from "react";
-import { t } from "../src/i18n";
+import { t, useI18n } from "../src/i18n";
 import { useIsReadOnly } from "../src/web/readOnly";
 
 import {
   mergeAnsweredUsage,
   type EnvironmentUsageStatus,
 } from "../src/usage/data";
+import {
+  environmentComparisonRows,
+  ModelDetailStats,
+  ModelEnvironmentComparison,
+  modelDetailStats,
+} from "../src/usage/modelDetails";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
@@ -32,8 +38,6 @@ import {
 } from "./UsageProviderChart";
 import { UsageShareBar } from "./UsageShareBar";
 import {
-  cacheHitRate,
-  costPerMillionTokens,
   costTypeSegments,
   speedCostSegments,
   tokenTypeSegments,
@@ -69,6 +73,7 @@ export function UsageModelDialog({
   readonly onClose: () => void;
 }) {
   const isReadOnly = useIsReadOnly();
+  const { language } = useI18n();
   const usage = useMemo(
     () =>
       mergeAnsweredUsage(
@@ -79,37 +84,12 @@ export function UsageModelDialog({
     [environments, model.provider, model.model],
   );
   const comparisons = useMemo(
-    () =>
-      environments.map((environment) => ({
-        id: environment.environmentId,
-        label: environment.label,
-        hasSummary: environment.summary !== null,
-        usage: mergeAnsweredUsage(
-          [environment],
-          (bucket) =>
-            bucket.provider === model.provider && bucket.model === model.model,
-        ),
-      })),
-    [environments, model.provider, model.model],
+    () => environmentComparisonRows(environments, model.provider, model.model),
+    [environments, model.provider, model.model, language],
   );
   const providers = useMemo(() => [model.provider], [model.provider]);
   const presentation = providerPresentation(model.provider);
   const costUnknown = isModelCostUnknown(model);
-  const hitRate = cacheHitRate(model);
-  const perMillion = costPerMillionTokens(model);
-  const stats = [
-    {
-      label: t("Cost"),
-      value: costUnknown ? t("Unpriced") : formatUsd(model.costUsd),
-    },
-    { label: t("Tokens"), value: formatTokens(model.totalTokens) },
-    perMillion === null
-      ? null
-      : { label: t("Per 1M tokens"), value: formatUsd(perMillion) },
-    hitRate === null
-      ? null
-      : { label: t("Cache hit"), value: formatPercent(hitRate) },
-  ].filter((stat) => stat !== null);
 
   return (
     <Dialog
@@ -120,15 +100,18 @@ export function UsageModelDialog({
     >
       <DialogPopup className="max-w-3xl max-sm:rounded-t-2xl">
         <DialogHeader className="max-sm:px-4 max-sm:pt-5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2 pe-8">
             <ProviderInstanceIcon
               driverKind={presentation.driverKind}
               displayName={presentation.label}
+              className="mt-0.5"
               iconClassName="size-5"
             />
-            <DialogTitle>{model.model}</DialogTitle>
+            <DialogTitle className="min-w-0 leading-tight">
+              {model.model}
+            </DialogTitle>
           </div>
-          <DialogDescription>
+          <DialogDescription className="wrap-anywhere">
             {presentation.label}
             {costUnknown
               ? ""
@@ -137,18 +120,7 @@ export function UsageModelDialog({
         </DialogHeader>
         <DialogPanel className="max-sm:px-4">
           <div className="flex flex-col gap-6 sm:gap-8">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-              {stats.map((stat) => (
-                <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-xs text-muted-foreground">
-                    {stat.label}
-                  </span>
-                  <span className="text-xl font-semibold text-foreground sm:text-2xl">
-                    {stat.value}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ModelDetailStats stats={modelDetailStats(model)} />
 
             {/* Unpriced cost is unknown, not zero, so its trend shows tokens. */}
             <UsageProviderChart
@@ -163,53 +135,7 @@ export function UsageModelDialog({
               timeZone={chartWindow.timeZone}
             />
 
-            <section className="model-environment-comparison">
-              <h3 className="text-sm font-medium">
-                {t("Environment comparison")}
-              </h3>
-              <div className="usage-table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{t("Environment")}</th>
-                      <th>{t("Cost")}</th>
-                      <th>{t("Tokens")}</th>
-                      <th>{t("Cached input")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {comparisons.map((row) => (
-                      <tr key={row.id}>
-                        <td>{t(row.label)}</td>
-                        <td>
-                          {!row.hasSummary
-                            ? t("Unavailable")
-                            : row.usage.costQuality.unpricedShare > 0 &&
-                                row.usage.costUsd === 0
-                              ? t("Unpriced")
-                              : formatUsd(row.usage.costUsd)}
-                        </td>
-                        <td>
-                          {row.hasSummary
-                            ? formatTokens(row.usage.totalTokens)
-                            : "—"}
-                        </td>
-                        <td>
-                          {row.hasSummary
-                            ? formatTokens(row.usage.cachedInputTokens)
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {comparisons.length > 1 && (
-                <p className="text-xs text-muted-foreground">
-                  {t("Environment values can overlap when they share history.")}
-                </p>
-              )}
-            </section>
+            <ModelEnvironmentComparison rows={comparisons} />
             <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2 sm:gap-y-8">
               {costUnknown ? null : (
                 <UsageShareBar
@@ -237,9 +163,9 @@ export function UsageModelDialog({
         {model.unpricedTokens > 0 ? (
           <DialogFooter
             variant="bare"
-            className="items-center sm:justify-between"
+            className="items-center sm:justify-between max-sm:flex-col max-sm:items-stretch max-sm:px-4 max-sm:pb-[calc(1rem+env(safe-area-inset-bottom))]"
           >
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs wrap-anywhere text-muted-foreground">
               {t("{tokens} tokens have no known price", {
                 tokens: formatTokens(model.unpricedTokens),
               })}

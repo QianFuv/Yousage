@@ -361,7 +361,7 @@ export function UsageProviderChart({
           {ticks.map((tick) => (
             <span
               key={tick}
-              className="absolute right-0 -translate-y-1/2 text-3xs text-muted-foreground tabular-nums"
+              className="absolute right-0 -translate-y-1/2 text-3xs whitespace-nowrap text-muted-foreground tabular-nums"
               style={{ top: `${(toY(tick) / VIEW_HEIGHT) * 100}%` }}
             >
               {tick === 0 ? "0" : format(tick)}
