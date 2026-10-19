@@ -139,7 +139,7 @@ describe("Pi provider presentation", () => {
     ).toEqual(["codex", "pi"]);
   });
 
-  it("keeps Pi report rows in provider order and renders its name", () => {
+  it("keeps Pi report rows in provider order, before unknown kinds, and renders its name", () => {
     const rows = orderProviders(
       [
         { provider: "pi", events: 1 },
@@ -148,7 +148,7 @@ describe("Pi provider presentation", () => {
       ],
       (row) => row.events > 0,
     );
-    expect(rows.map((row) => row.provider)).toEqual(["codex", "pi"]);
+    expect(rows.map((row) => row.provider)).toEqual(["codex", "pi", "unknown"]);
     const markup = renderToStaticMarkup(
       <ProviderSummaryRow provider="pi" count="1" value="—" detail="detail" />,
     );

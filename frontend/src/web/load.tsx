@@ -1,8 +1,9 @@
 /** Download, decrypt and validate the object a relay page points at. */
-import { msg } from "../i18n";
+import { msg, t } from "../i18n";
 import { EnvelopeError, openEnvelope } from "./envelope";
 import { PAYLOAD_FORMAT_VERSION, payloadVersion } from "./payloads";
 import { associatedData, readRelayObject, type RelayAddress } from "./relay";
+import { SnapshotRejectedError } from "./snapshotSession";
 
 /** A failure explained to the person who opened the link. */
 export type RelayProblemText = { title: string; detail: string };
@@ -35,7 +36,33 @@ export const PROBLEMS = {
     title: msg("The relay cannot be reached"),
     detail: msg("Check your connection and try again."),
   },
+  data: {
+    title: msg("The received data cannot be shown"),
+    detail: msg(
+      "It is incomplete or not supported by this version of Yousage. Try again after the desktop app syncs, or update the apps so both match.",
+    ),
+  },
+  display: {
+    title: msg("This page cannot be shown"),
+    detail: msg(
+      "Something went wrong while showing the data. Try again; your link and saved data are kept.",
+    ),
+  },
 } as const satisfies Record<string, RelayProblemText>;
+
+/**
+ * The error a viewer refresh reports for a problem.
+ *
+ * @param problem - Why the newer snapshot could not be opened.
+ * @returns An error whose message is the problem's title; data and version problems persist
+ * until the desktop sends another snapshot, so even quiet refreshes report them.
+ */
+export function refreshError(problem: keyof typeof PROBLEMS): Error {
+  const message = t(PROBLEMS[problem].title);
+  return problem === "data" || problem === "version"
+    ? new SnapshotRejectedError(message)
+    : new Error(message);
+}
 
 /** A loaded payload with its entity tag, or the problem that stopped it. */
 export type LoadResult<T> =
@@ -93,7 +120,8 @@ export async function loadRelayPayload<T>(
  * @param value - Parsed payload JSON.
  * @param isValid - Shape check for the expected payload kind.
  * @param etag - Entity tag the payload was served with.
- * @returns The payload, or a version or decrypt problem.
+ * @returns The payload, a version problem for another format version, or a data problem
+ * for an opened payload missing what the page reads.
  */
 export function checkPayload<T>(
   value: unknown,
@@ -104,9 +132,7 @@ export function checkPayload<T>(
     return {
       status: "problem",
       problem:
-        payloadVersion(value) !== PAYLOAD_FORMAT_VERSION
-          ? "version"
-          : "decrypt",
+        payloadVersion(value) !== PAYLOAD_FORMAT_VERSION ? "version" : "data",
     };
   return { status: "ok", payload: value, etag };
 }

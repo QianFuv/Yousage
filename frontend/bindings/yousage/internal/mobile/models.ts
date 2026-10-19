@@ -41,6 +41,7 @@ export class SnapshotResult {
     "problem": string;
     "payload": string;
     "etag": string;
+    "candidateId": string;
 
     /** Creates a new SnapshotResult instance. */
     constructor($$source: Partial<SnapshotResult> = {}) {
@@ -55,6 +56,9 @@ export class SnapshotResult {
         }
         if (!("etag" in $$source)) {
             this["etag"] = "";
+        }
+        if (!("candidateId" in $$source)) {
+            this["candidateId"] = "";
         }
 
         Object.assign(this, $$source);

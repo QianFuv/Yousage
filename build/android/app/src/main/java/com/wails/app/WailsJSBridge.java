@@ -22,10 +22,21 @@ public class WailsJSBridge {
 
     private final WailsBridge bridge;
     private final WebView webView;
+    private volatile boolean isAttached = true;
 
     public WailsJSBridge(WailsBridge bridge, WebView webView) {
         this.bridge = bridge;
         this.webView = webView;
+    }
+
+    /** Reject calls and replies belonging to a document that has been disposed. */
+    void detach() {
+        isAttached = false;
+    }
+
+    /** Check both interface lifetime and current native attachment before invoking Go. */
+    private boolean canInvoke() {
+        return isAttached && bridge.isCurrentWebView(webView);
     }
 
     /**
@@ -37,6 +48,7 @@ public class WailsJSBridge {
      */
     @JavascriptInterface
     public String invoke(String message) {
+        if (!canInvoke()) return "{\"error\":\"Viewer detached\"}";
         if (DEBUG) Log.d(TAG, "Invoke called: " + message);
         return bridge.handleMessage(message);
     }
@@ -51,10 +63,12 @@ public class WailsJSBridge {
      */
     @JavascriptInterface
     public void invokeAsync(final String callbackId, final String payload) {
+        if (!canInvoke()) return;
         if (DEBUG) Log.d(TAG, "InvokeAsync called: " + payload);
 
         // Handle off the JS thread so we don't block the WebView.
         executor.execute(() -> {
+            if (!canInvoke()) return;
             try {
                 String response = bridge.handleRuntimeCall(payload);
                 sendCallback(callbackId, response, null);
@@ -119,6 +133,7 @@ public class WailsJSBridge {
      * Send a callback response to JavaScript
      */
     private void sendCallback(String callbackId, String result, String error) {
+        if (!canInvoke()) return;
         final String js;
         if (error != null) {
             js = String.format(
@@ -134,7 +149,7 @@ public class WailsJSBridge {
             );
         }
 
-        webView.post(() -> webView.evaluateJavascript(js, null));
+        bridge.executeJavaScript(webView, js);
     }
 
     private String escapeJsString(String str) {

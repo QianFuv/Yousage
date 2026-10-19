@@ -2,6 +2,7 @@
 package mobile
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -33,10 +34,11 @@ type Pairing struct {
 
 // SnapshotResult carries decrypted JSON or a recoverable relay outcome.
 type SnapshotResult struct {
-	Status  string `json:"status"`
-	Problem string `json:"problem"`
-	Payload string `json:"payload"`
-	ETag    string `json:"etag"`
+	Status      string `json:"status"`
+	Problem     string `json:"problem"`
+	Payload     string `json:"payload"`
+	ETag        string `json:"etag"`
+	CandidateId string `json:"candidateId"`
 }
 
 // storedPairing holds credentials exclusively in private native storage.
@@ -53,12 +55,23 @@ type cachedSnapshot struct {
 	Envelope []byte `json:"envelope"`
 }
 
+// snapshotCandidate retains only one bounded encrypted envelope until viewer acceptance.
+type snapshotCandidate struct {
+	id         string
+	pairing    storedPairing
+	generation uint64
+	cached     cachedSnapshot
+}
+
 // Service binds pairing, relay reads, and external navigation to the frontend.
 type Service struct {
-	mutex     sync.Mutex
-	directory string
-	client    *http.Client
-	openURL   func(string) error
+	mutex             sync.Mutex
+	directory         string
+	client            *http.Client
+	openURL           func(string) error
+	candidate         *snapshotCandidate
+	generation        uint64
+	requestGeneration uint64
 }
 
 // newService configures private persistence and bounded relay requests.
@@ -134,6 +147,9 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	if err != nil {
 		return Pairing{}, err
 	}
+	service.mutex.Lock()
+	generation := service.generation
+	service.mutex.Unlock()
 	snapshot, envelope, err := service.loadSnapshot(pairing, "")
 	if err != nil {
 		return Pairing{}, err
@@ -144,11 +160,27 @@ func (service *Service) Pair(link string) (Pairing, error) {
 	data, _ := json.Marshal(pairing)
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
-	if err = service.writePrivate(pairingFile, data); err != nil {
-		return Pairing{}, err
+	if service.generation != generation {
+		return Pairing{}, errors.New("pairing changed; retry the phone link")
 	}
 	cached, _ := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: snapshot.ETag, Envelope: envelope})
-	_ = service.writePrivate(snapshotFile, cached)
+	previous, readError := os.ReadFile(filepath.Join(service.directory, snapshotFile))
+	if readError != nil && !errors.Is(readError, os.ErrNotExist) {
+		return Pairing{}, errors.New("could not save the phone snapshot")
+	}
+	if err = service.writePrivate(snapshotFile, cached); err != nil {
+		return Pairing{}, errors.New("could not save the phone snapshot")
+	}
+	if err = service.writePrivate(pairingFile, data); err != nil {
+		if readError == nil {
+			if service.writePrivate(snapshotFile, previous) != nil {
+				return Pairing{}, errors.New("could not restore the saved phone snapshot")
+			}
+		}
+		return Pairing{}, errors.New("could not save the phone link")
+	}
+	service.generation++
+	service.candidate = nil
 	return Pairing{IsPaired: true, RelayOrigin: pairing.Origin}, nil
 }
 
@@ -188,15 +220,18 @@ func (service *Service) removePrivate(name string) error {
 func (service *Service) Unpair() error {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
+	service.generation++
+	service.candidate = nil
 	if err := service.removePrivate(snapshotFile); err != nil {
 		return err
 	}
 	return service.removePrivate(pairingFile)
 }
 
-// CachedSnapshot opens the last snapshot read from the relay, so a cold start shows it at once.
+// CachedSnapshot opens only the accepted last-good snapshot, without exposing a candidate ID.
 //
-// It reports "empty" when nothing usable is cached for the current pairing.
+// Invalid saved data reports a problem or empty result with no ETag, allowing an
+// unconditional refetch while preserving the saved file and pairing.
 func (service *Service) CachedSnapshot() (SnapshotResult, error) {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
@@ -213,26 +248,46 @@ func (service *Service) CachedSnapshot() (SnapshotResult, error) {
 		return SnapshotResult{Status: "empty"}, nil
 	}
 	payload, err := datasync.Open(cached.Envelope, pairing.Key, "space:"+pairing.ID)
-	if err != nil || !json.Valid(payload) {
+	if err != nil {
 		return SnapshotResult{Status: "empty"}, nil
+	}
+	if problem := snapshotProblem(payload); problem != "" {
+		return SnapshotResult{Status: "problem", Problem: problem}, nil
 	}
 	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: cached.ETag}, nil
 }
 
-// cacheSnapshot keeps an authenticated envelope unless the pairing changed during the read.
-func (service *Service) cacheSnapshot(pairing storedPairing, etag string, envelope []byte) {
-	data, _ := json.Marshal(cachedSnapshot{ID: pairing.ID, ETag: etag, Envelope: envelope})
+// CommitSnapshot persists exactly the current candidate after successful viewer application.
+// A failed write leaves it retryable and never advances the accepted envelope or ETag.
+func (service *Service) CommitSnapshot(candidateId string) error {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
-	if current, err := service.readPairing(); err == nil && current == pairing {
-		_ = service.writePrivate(snapshotFile, data)
+	candidate := service.candidate
+	if candidateId == "" || candidate == nil || candidate.id != candidateId {
+		return errors.New("snapshot candidate is no longer available")
 	}
+	current, err := service.readPairing()
+	if err != nil || current != candidate.pairing || candidate.generation != service.generation {
+		service.candidate = nil
+		return errors.New("pairing changed; reload the phone snapshot")
+	}
+	data, _ := json.Marshal(candidate.cached)
+	if service.writePrivate(snapshotFile, data) != nil {
+		return errors.New("could not save the phone snapshot")
+	}
+	service.candidate = nil
+	return nil
 }
 
-// LoadSnapshot conditionally fetches, authenticates, and decompresses the snapshot.
+// LoadSnapshot validates and stages one candidate without changing the accepted cache.
+// Every new request supersedes the previous candidate, independently of relay ETags.
 func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
 	service.mutex.Lock()
 	pairing, err := service.readPairing()
+	service.requestGeneration++
+	requestGeneration := service.requestGeneration
+	generation := service.generation
+	service.candidate = nil
 	service.mutex.Unlock()
 	if err != nil {
 		return SnapshotResult{}, err
@@ -241,10 +296,28 @@ func (service *Service) LoadSnapshot(etag string) (SnapshotResult, error) {
 		return SnapshotResult{Status: "unpaired"}, nil
 	}
 	result, envelope, err := service.loadSnapshot(pairing, etag)
-	if err == nil && result.Status == "ok" {
-		service.cacheSnapshot(pairing, result.ETag, envelope)
+	if err != nil {
+		return result, err
 	}
-	return result, err
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	current, readError := service.readPairing()
+	if readError != nil || current != pairing || service.generation != generation || service.requestGeneration != requestGeneration {
+		return SnapshotResult{Status: "problem", Problem: "stale"}, nil
+	}
+	if result.Status != "ok" {
+		return result, nil
+	}
+	var identity [16]byte
+	if _, err := rand.Read(identity[:]); err != nil {
+		return SnapshotResult{}, errors.New("could not stage the phone snapshot")
+	}
+	result.CandidateId = base64.RawURLEncoding.EncodeToString(identity[:])
+	service.candidate = &snapshotCandidate{
+		id: result.CandidateId, pairing: pairing, generation: generation,
+		cached: cachedSnapshot{ID: pairing.ID, ETag: result.ETag, Envelope: envelope},
+	}
+	return result, nil
 }
 
 // loadSnapshot authenticates a specific candidate without changing saved credentials or cache.
@@ -282,8 +355,11 @@ func (service *Service) loadSnapshot(pairing storedPairing, etag string) (Snapsh
 	if errors.Is(err, datasync.ErrEnvelopeVersion) {
 		return SnapshotResult{Status: "problem", Problem: "version"}, nil, nil
 	}
-	if err != nil || !json.Valid(payload) {
+	if err != nil {
 		return SnapshotResult{Status: "problem", Problem: "decrypt"}, nil, nil
+	}
+	if problem := snapshotProblem(payload); problem != "" {
+		return SnapshotResult{Status: "problem", Problem: problem}, nil, nil
 	}
 	etag = response.Header.Get("ETag")
 	return SnapshotResult{Status: "ok", Payload: string(payload), ETag: etag}, envelope, nil

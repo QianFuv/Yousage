@@ -1,4 +1,12 @@
 /** Decrypted relay payloads: the private dashboard snapshot and a public receipt share. */
+import { SavedDisplay } from "../../bindings/yousage/internal/preferences/models";
+import {
+  LossReport,
+  Receipt,
+  Snapshot,
+  SpeedReport,
+} from "../../bindings/yousage/internal/service/models";
+import { LibrarySnapshot } from "../../bindings/yousage/internal/theme/models";
 
 /** Format version understood by this build for both payload kinds. */
 export const PAYLOAD_FORMAT_VERSION = 1;
@@ -94,26 +102,92 @@ export type SharePayload = {
 };
 
 /**
- * Check the minimal shape of a decrypted private snapshot.
+ * Generated binding models the viewer's pages build from each report of a period.
+ * They tolerate omitted fields and `null` collections, which older desktops and empty
+ * reports produce, but throw where a nested report is `null` or not an object.
+ */
+const REPORT_MODELS = {
+  usage: Snapshot.createFrom,
+  loss: LossReport.createFrom,
+  speed: SpeedReport.createFrom,
+  receipt: Receipt.createFrom,
+} satisfies Record<keyof SnapshotPeriod, (source: unknown) => unknown>;
+
+/**
+ * Whether a value is a JSON object rather than `null`, an array or a scalar.
  *
  * @param value - Parsed JSON.
- * @returns Whether every period and setting the viewer reads is present.
+ * @returns Whether its fields can be read.
+ */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Whether a value is non-blank text.
+ *
+ * @param value - Parsed JSON.
+ * @returns Whether it is a string with visible characters.
+ */
+function isText(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * Whether a generated binding model can be built from a value, as the pages will build it.
+ *
+ * @param create - The model's `createFrom`, which rewrites what it receives.
+ * @param value - Parsed JSON, left unchanged.
+ * @returns Whether building the model succeeded.
+ */
+function isModelReadable(
+  create: (source: unknown) => unknown,
+  value: unknown,
+): boolean {
+  try {
+    create(structuredClone(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check that a decrypted private snapshot has everything the viewer reads.
+ *
+ * Fields that older desktops omit and collections that are `null` stay acceptable,
+ * as do provider kinds this build does not know.
+ *
+ * @param value - Parsed JSON.
+ * @returns Whether its metadata is valid and every period, report and setting the viewer
+ * reads is an object the generated binding models accept.
  */
 export function isPrivateSnapshot(value: unknown): value is PrivateSnapshot {
-  const snapshot = value as PrivateSnapshot | null;
+  if (!isObject(value) || value.formatVersion !== PAYLOAD_FORMAT_VERSION)
+    return false;
+  const { periods, display, appearance, bootstrap } = value;
   return (
-    typeof snapshot === "object" &&
-    snapshot !== null &&
-    snapshot.formatVersion === PAYLOAD_FORMAT_VERSION &&
-    typeof snapshot.periods === "object" &&
-    snapshot.periods !== null &&
-    SNAPSHOT_PERIODS.every(
-      (period) => snapshot.periods[period] !== undefined,
-    ) &&
-    typeof snapshot.display === "object" &&
-    snapshot.display !== null &&
-    typeof snapshot.bootstrap === "object" &&
-    snapshot.bootstrap !== null
+    isText(value.generatedAt) &&
+    !Number.isNaN(Date.parse(value.generatedAt)) &&
+    isText(value.appVersion) &&
+    isText(value.timeZone) &&
+    isObject(periods) &&
+    SNAPSHOT_PERIODS.every((days) => {
+      const period = periods[days];
+      return (
+        isObject(period) &&
+        Object.entries(REPORT_MODELS).every(
+          ([report, create]) =>
+            isObject(period[report]) && isModelReadable(create, period[report]),
+        )
+      );
+    }) &&
+    isObject(display) &&
+    isObject(display.value) &&
+    isModelReadable(SavedDisplay.createFrom, display) &&
+    isObject(appearance) &&
+    isModelReadable(LibrarySnapshot.createFrom, appearance) &&
+    isObject(bootstrap)
   );
 }
 

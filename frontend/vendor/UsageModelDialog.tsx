@@ -38,7 +38,7 @@ import {
   speedCostSegments,
   tokenTypeSegments,
 } from "./usageBreakdown";
-import { PROVIDER_PRESENTATION } from "./usageProviders";
+import { providerPresentation } from "./usageProviders";
 
 export interface UsageChartWindow {
   readonly days: readonly string[];
@@ -93,7 +93,7 @@ export function UsageModelDialog({
     [environments, model.provider, model.model],
   );
   const providers = useMemo(() => [model.provider], [model.provider]);
-  const presentation = PROVIDER_PRESENTATION[model.provider];
+  const presentation = providerPresentation(model.provider);
   const costUnknown = isModelCostUnknown(model);
   const hitRate = cacheHitRate(model);
   const perMillion = costPerMillionTokens(model);

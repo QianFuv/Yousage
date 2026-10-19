@@ -574,6 +574,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "The part after # is the key. It stays on this phone and is never sent to the relay.":
     "# 后面的部分是密钥，只保存在这台手机上，不会发送给 relay。",
   "The relay cannot be reached": "无法连接 relay",
+  "The received data cannot be shown": "无法显示收到的数据",
+  "It is incomplete or not supported by this version of Yousage. Try again after the desktop app syncs, or update the apps so both match.":
+    "数据不完整，或当前版本的 Yousage 不支持。请在桌面端同步后重试，或将两端更新到相同版本。",
+  "The received data could not be saved on this device":
+    "收到的数据无法保存到这台设备",
+  "This page cannot be shown": "无法显示此页面",
+  "Something went wrong while showing the data. Try again; your link and saved data are kept.":
+    "显示数据时出错。请重试，你的链接和已保存的数据都会保留。",
   "The relay is reachable and accepts the token.": "relay 可以连接，令牌有效。",
   "The reset outcome is unknown. Refresh limits before deciding to retry explicitly.":
     "重置结果未知。请先刷新额度，再决定是否重试。",

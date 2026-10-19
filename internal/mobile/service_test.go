@@ -67,7 +67,7 @@ func TestPairingPersistence(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	envelope, err := datasync.Seal([]byte(`{"formatVersion":1}`), key, "space:"+strings.Repeat("A", 22))
+	envelope, err := datasync.Seal([]byte(snapshotFixture(test, "test")), key, "space:"+strings.Repeat("A", 22))
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestLoadSnapshot(test *testing.T) {
 	key, _ := datasync.NewKey()
 	wrongKey, _ := datasync.NewKey()
 	identifier := strings.Repeat("A", 22)
-	payload := `{"schemaVersion":1,"usage":[]}`
+	payload := snapshotFixture(test, "test")
 	envelope, err := datasync.Seal([]byte(payload), key, "space:"+identifier)
 	if err != nil {
 		test.Fatal(err)
@@ -147,7 +147,7 @@ func TestLoadSnapshot(test *testing.T) {
 		{"version", "problem", "version", 200, version, key},
 		{"truncated", "problem", "decrypt", 200, envelope[:12], key},
 		{"empty", "problem", "decrypt", 200, nil, key},
-		{"invalid json", "problem", "decrypt", 200, invalidJSON, key},
+		{"invalid json", "problem", "data", 200, invalidJSON, key},
 		{"oversized", "problem", "decrypt", 200, make([]byte, maxEnvelopeBytes+1), key},
 		{"server failure", "problem", "network", 500, nil, key},
 		{"redirect", "problem", "network", 302, nil, key},
@@ -196,7 +196,7 @@ func TestLoadSnapshot(test *testing.T) {
 func TestCachedSnapshot(test *testing.T) {
 	key, _ := datasync.NewKey()
 	identifier := strings.Repeat("A", 22)
-	payload := `{"schemaVersion":1,"usage":[]}`
+	payload := snapshotFixture(test, "test")
 	envelope, err := datasync.Seal([]byte(payload), key, "space:"+identifier)
 	if err != nil {
 		test.Fatal(err)
@@ -225,6 +225,8 @@ func TestCachedSnapshot(test *testing.T) {
 	}
 	if result, err := service.LoadSnapshot(""); err != nil || result.Status != "ok" {
 		test.Fatalf("load = %+v, error = %v", result, err)
+	} else if err := service.CommitSnapshot(result.CandidateId); err != nil {
+		test.Fatal(err)
 	}
 	isChanged = false
 	if result, err := service.LoadSnapshot(`"current"`); err != nil || result.Status != "unchanged" {
@@ -235,7 +237,7 @@ func TestCachedSnapshot(test *testing.T) {
 		test.Fatalf("reopened cache = %+v, error = %v", cached, err)
 	}
 	stored, err := os.ReadFile(filepath.Join(directory, snapshotFile))
-	if err != nil || strings.Contains(string(stored), "schemaVersion") {
+	if err != nil || strings.Contains(string(stored), "formatVersion") {
 		test.Fatal("cached snapshot is not kept encrypted")
 	}
 	if err = os.WriteFile(filepath.Join(directory, snapshotFile), []byte("{"), 0600); err != nil {

@@ -24,11 +24,44 @@ function snapshotJson(formatVersion = 1): string {
 }
 
 describe("interpretSnapshot", () => {
-  it("accepts a valid snapshot with its entity tag", () => {
+  it("accepts a valid snapshot with its entity tag, text and candidate ID", () => {
+    const payload = snapshotJson();
     const read = interpretSnapshot(
-      new SnapshotResult({ status: "ok", payload: snapshotJson(), etag: "e1" }),
+      new SnapshotResult({
+        status: "ok",
+        payload,
+        etag: "e1",
+        candidateId: "c1",
+      }),
     );
-    expect(read).toMatchObject({ status: "ok", etag: "e1" });
+    expect(read).toMatchObject({
+      status: "ok",
+      etag: "e1",
+      text: payload,
+      candidateId: "c1",
+    });
+  });
+
+  it("rejects an opened snapshot missing what the viewer reads as a data problem", () => {
+    const snapshot = JSON.parse(snapshotJson());
+    snapshot.display.value = null;
+    const read = interpretSnapshot(
+      new SnapshotResult({ status: "ok", payload: JSON.stringify(snapshot) }),
+    );
+    expect(read).toEqual({ status: "problem", problem: "data" });
+  });
+
+  it("passes through data problems and marks reads a newer read replaced", () => {
+    expect(
+      interpretSnapshot(
+        new SnapshotResult({ status: "problem", problem: "data" }),
+      ),
+    ).toEqual({ status: "problem", problem: "data" });
+    expect(
+      interpretSnapshot(
+        new SnapshotResult({ status: "problem", problem: "stale" }),
+      ),
+    ).toEqual({ status: "stale" });
   });
 
   it("reports a newer payload format as a version problem", () => {
@@ -38,11 +71,11 @@ describe("interpretSnapshot", () => {
     expect(read).toEqual({ status: "problem", problem: "version" });
   });
 
-  it("treats unreadable JSON as a decrypt problem", () => {
+  it("treats unreadable JSON as a data problem, not a key mismatch", () => {
     const read = interpretSnapshot(
       new SnapshotResult({ status: "ok", payload: "{" }),
     );
-    expect(read).toEqual({ status: "problem", problem: "decrypt" });
+    expect(read).toEqual({ status: "problem", problem: "data" });
   });
 
   it("passes through unpaired, empty, unchanged and known problems", () => {
@@ -63,10 +96,9 @@ describe("interpretSnapshot", () => {
   });
 
   it("falls back to a network problem for unknown outcomes", () => {
-    expect(
-      interpretSnapshot(
-        new SnapshotResult({ status: "problem", problem: "teapot" }),
-      ),
-    ).toEqual({ status: "problem", problem: "network" });
+    for (const problem of ["teapot", "toString", "__proto__"])
+      expect(
+        interpretSnapshot(new SnapshotResult({ status: "problem", problem })),
+      ).toEqual({ status: "problem", problem: "network" });
   });
 });

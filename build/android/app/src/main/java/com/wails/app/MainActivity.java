@@ -22,11 +22,16 @@ import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -53,9 +58,14 @@ public class MainActivity extends AppCompatActivity {
     private static final boolean DEBUG = BuildConfig.DEBUG;
     private static final String WAILS_SCHEME = "https";
     private static final String WAILS_HOST = "wails.localhost";
+    private static final String APPLICATION_URL = WAILS_SCHEME + "://" + WAILS_HOST + "/";
     private static final int FILE_PICKER_REQUEST = 7001;
 
-    private WebView webView;
+    private volatile WebView webView;
+    private WailsJSBridge javascriptBridge;
+    private View recoveryPanel;
+    private boolean hasAttemptedRendererRecovery;
+    private boolean isDestroying;
     private WailsBridge bridge;
     // Battery: system-event receivers are registered only while the activity is
     // in the foreground (onStart) and torn down in onStop, so background battery/
@@ -85,6 +95,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         applySystemInsets();
+        recoveryPanel = findViewById(R.id.viewer_recovery);
+        findViewById(R.id.viewer_retry).setOnClickListener(view -> retryApplication());
 
         // Initialize the native Go library
         bridge = new WailsBridge(this);
@@ -110,9 +122,17 @@ public class MainActivity extends AppCompatActivity {
         androidx.core.view.ViewCompat.requestApplyInsets(container);
     }
 
+    /** Configure a fresh view with the existing local origin and native bridge. */
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
         webView = findViewById(R.id.webview);
+        if (webView == null) {
+            webView = new WebView(this);
+            webView.setId(R.id.webview);
+            FrameLayout container = findViewById(R.id.main_container);
+            container.addView(webView, 0, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
         bridge.setWebView(webView);
         webView.setBackgroundColor(android.graphics.Color.rgb(10, 10, 10));
 
@@ -142,18 +162,22 @@ public class MainActivity extends AppCompatActivity {
             /** Keep remote pages outside the WebView that hosts the native service bridge. */
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return openExternalNavigation(request.getUrl());
+                return view != webView || openExternalNavigation(request.getUrl());
             }
 
             /** Handle navigation on Android versions before the request-based callback. */
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return openExternalNavigation(Uri.parse(url));
+                return view != webView || openExternalNavigation(Uri.parse(url));
             }
 
             @Nullable
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (view != webView) {
+                    return new WebResourceResponse("text/plain", "UTF-8",
+                            new java.io.ByteArrayInputStream(new byte[0]));
+                }
                 // Handle wails.localhost requests
                 if (request.getUrl().getHost() != null &&
                         request.getUrl().getHost().equals(WAILS_HOST)) {
@@ -213,17 +237,52 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (view != webView || isDestroying) return;
                 super.onPageFinished(view, url);
-                if (DEBUG) Log.d(TAG, "Page loaded: " + url);
                 bridge.onPageFinished(url);
                 // Now that JS listeners are mounted, push a snapshot of the
                 // current battery / network / theme so the UI starts populated.
                 emitSystemSnapshot();
             }
+
+            /** Replace a lost renderer once; further losses require explicit retry. */
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                if (view != webView || isDestroying) return true;
+                disposeWebView();
+                if (!hasAttemptedRendererRecovery) {
+                    hasAttemptedRendererRecovery = true;
+                    setupWebView();
+                    loadApplication();
+                } else {
+                    recoveryPanel.setVisibility(View.VISIBLE);
+                }
+                return true;
+            }
+
+            /** Surface document failures without replacing the page for subresource failures. */
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) showLoadFailure(view);
+            }
+
+            /** Older Android versions report only document failures through this callback. */
+            @Override
+            @SuppressWarnings("deprecation")
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) showLoadFailure(view);
+            }
+
+            /** HTTP failures of the document also need a native retry control. */
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame()) showLoadFailure(view);
+            }
         });
 
         // Add JavaScript interface for Go communication
-        webView.addJavascriptInterface(new WailsJSBridge(bridge, webView), "wails");
+        javascriptBridge = new WailsJSBridge(bridge, webView);
+        webView.addJavascriptInterface(javascriptBridge, "wails");
     }
 
     /** Open external HTTPS destinations in the system browser and block other schemes. */
@@ -238,10 +297,41 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    /** Load only the bundled application's trusted root during startup or recovery. */
     private void loadApplication() {
-        String url = WAILS_SCHEME + "://" + WAILS_HOST + "/";
-        if (DEBUG) Log.d(TAG, "Loading URL: " + url);
-        webView.loadUrl(url);
+        webView.loadUrl(APPLICATION_URL);
+    }
+
+    /** Show recovery only for a failure belonging to the currently attached document. */
+    private void showLoadFailure(WebView failedView) {
+        if (failedView != webView || isDestroying) return;
+        disposeWebView();
+        recoveryPanel.setVisibility(View.VISIBLE);
+    }
+
+    /** Retry by creating a fresh document without resetting the automatic recovery budget. */
+    private void retryApplication() {
+        if (isDestroying || webView != null) return;
+        recoveryPanel.setVisibility(View.GONE);
+        setupWebView();
+        loadApplication();
+    }
+
+    /** Invalidate callbacks before removing and destroying the current view. */
+    private void disposeWebView() {
+        WebView disposedView = webView;
+        webView = null;
+        bridge.setWebView(null);
+        if (javascriptBridge != null) {
+            javascriptBridge.detach();
+            javascriptBridge = null;
+        }
+        if (disposedView != null) {
+            disposedView.removeJavascriptInterface("wails");
+            ViewGroup parent = (ViewGroup) disposedView.getParent();
+            if (parent != null) parent.removeView(disposedView);
+            disposedView.destroy();
+        }
     }
 
     /**
@@ -566,11 +656,7 @@ public class MainActivity extends AppCompatActivity {
      * Execute JavaScript in the WebView from the Go side
      */
     public void executeJavaScript(final String js) {
-        runOnUiThread(() -> {
-            if (webView != null) {
-                webView.evaluateJavascript(js, null);
-            }
-        });
+        if (bridge != null) bridge.executeJavaScript(js);
     }
 
     // ---- System events ---------------------------------------------------
@@ -839,14 +925,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+        isDestroying = true;
         unregisterSystemEventReceivers();
         if (bridge != null) {
+            disposeWebView();
             bridge.shutdown();
         }
-        if (webView != null) {
-            webView.destroy();
-        }
+        super.onDestroy();
     }
 
     @Override

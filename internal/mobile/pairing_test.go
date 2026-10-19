@@ -13,12 +13,18 @@ import (
 
 // TestPairVerifiesReplacementBeforeSaving preserves the last usable pairing until its replacement connects.
 func TestPairVerifiesReplacementBeforeSaving(t *testing.T) {
-	for _, scenario := range []string{"missing", "wrong-key", "offline", "success"} {
+	for _, scenario := range []string{"missing", "wrong-key", "offline", "unsupported", "incomplete", "success"} {
 		t.Run(scenario, func(t *testing.T) {
 			key, _ := datasync.NewKey()
 			otherKey, _ := datasync.NewKey()
 			oldId, newId := strings.Repeat("A", 22), strings.Repeat("B", 22)
-			oldPayload, newPayload := `{"formatVersion":1,"label":"old"}`, `{"formatVersion":1,"label":"new"}`
+			oldPayload, newPayload := snapshotFixture(t, "old"), snapshotFixture(t, "new")
+			if scenario == "unsupported" {
+				newPayload = changedSnapshot(t, newPayload, func(value map[string]any) { value["formatVersion"] = 99 })
+			}
+			if scenario == "incomplete" {
+				newPayload = changedSnapshot(t, newPayload, func(value map[string]any) { value["periods"] = nil })
+			}
 			oldEnvelope, _ := datasync.Seal([]byte(oldPayload), key, "space:"+oldId)
 			newEnvelope, _ := datasync.Seal([]byte(newPayload), key, "space:"+newId)
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

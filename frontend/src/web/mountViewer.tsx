@@ -1,21 +1,55 @@
 /** Mount the read-only usage pages over a snapshot-backed transport. */
 import type { Root } from "react-dom/client";
-import { setTransport, type RuntimeTransport } from "@wailsio/runtime";
+import {
+  objectNames,
+  setTransport,
+  type RuntimeTransport,
+} from "@wailsio/runtime";
+import { RefreshCwIcon } from "lucide-react";
+import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { DataProvider } from "../usage/controller";
 import { AppearanceProvider, applySavedAppearance } from "../theme/appearance";
-import { resolveLanguage, setLanguage } from "../i18n";
+import { msg, resolveLanguage, setLanguage, t } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
 import type { PrivateSnapshot } from "./payloads";
 import { captureMethodIds, createSnapshotTransport } from "./snapshotTransport";
-import { followSnapshots, type FollowStatus } from "./follow";
+import {
+  followSnapshots,
+  type FollowStatus,
+  type SnapshotFollower,
+} from "./follow";
 import { DISPLAY_CHANGES_EVENT, displayChanges } from "./displaySync";
 import { ReadOnlyContext } from "./readOnly";
-import { WebViewer } from "./WebViewer";
+import { RelayProblem, WebViewer } from "./WebViewer";
 import type { ViewerConnection } from "./ViewerSettings";
+import { PROBLEMS } from "./load";
+import {
+  createSnapshotSession,
+  type SnapshotCandidate,
+} from "./snapshotSession";
+import { ViewerBoundary } from "./ViewerBoundary";
+import {
+  createRenderAcknowledger,
+  VIEWER_COMMIT_CONTEXT,
+} from "./renderAcknowledgment";
 import { clearNotifications, Toaster } from "../notify";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Bindings that read a shown snapshot's reports, which its pages render once answered. */
+const REPORT_READS = new Set([
+  "GetUsage",
+  "GetLossReport",
+  "GetSpeedReport",
+  "GetReceipt",
+]);
+
+/** Why a downloaded snapshot was not kept, as shown over the snapshot kept instead. */
+const REJECTION_MESSAGES = {
+  render: PROBLEMS.data.title,
+  save: msg("The received data could not be saved on this device"),
+} as const;
 
 /**
  * Deliver an event to runtime listeners as if the native side had sent it.
@@ -37,12 +71,16 @@ function dispatchEvent(name: string, data: unknown) {
 export type ViewerHost = {
   /** React root the viewer renders into. */
   root: Root;
-  /** The first snapshot to show. */
-  initial: PrivateSnapshot;
-  /** The first snapshot was saved on this device earlier, so refresh it at once with visible progress. */
+  /** The first snapshot: one kept earlier, or a download kept only once it shows. */
+  initial: SnapshotCandidate<PrivateSnapshot>;
+  /** The first snapshot was kept on this device earlier, so refresh it at once with visible progress. */
   isSaved?: boolean;
-  /** Download a newer snapshot; `null` when unchanged, an error with a message on failure. */
-  fetchNewer: () => Promise<PrivateSnapshot | null>;
+  /** Download a snapshot newer than the entity tag; `null` when unchanged, an error with a message on failure. */
+  download: (
+    etag: string,
+  ) => Promise<SnapshotCandidate<PrivateSnapshot> | null>;
+  /** Start over with a fresh download after the viewer could not show anything. */
+  recover: () => void;
   /** Open a destination chosen by the user. */
   open: (url: string) => void;
   /** Viewing device locale. */
@@ -56,90 +94,167 @@ export type ViewerHost = {
 /**
  * Route binding calls to the snapshot and render the viewer.
  *
+ * A newer snapshot replaces the shown one only after the active page rendered its answered
+ * reports without failing and the host saved it; otherwise the kept snapshot is shown again.
+ *
  * @param host - Snapshot source and page integration.
  * @returns A function that stops following the relay and device color scheme and restores the fallback transport.
+ * @throws When the viewer cannot be mounted; the fallback transport is restored and nothing keeps running.
  */
 export async function mountViewer(host: ViewerHost): Promise<() => void> {
   const fallback = host.fallback ?? null;
-  let snapshot = host.initial;
-  const names = await captureMethodIds(setTransport, fallback);
-  const darkQuery = matchMedia(DARK_QUERY);
+  let snapshot = host.initial.payload;
+  let isMounted = true;
+  /** Counts shown snapshots, so failures and boundaries belong to one of them. */
+  let generation = 0;
   let status: FollowStatus = { state: "current" };
   /** Render the shell again so it shows the latest snapshot time and refresh status. */
   let render: () => void = () => {};
-  /** Hand each newer snapshot's theme and reports to the mounted pages. */
-  const follower = followSnapshots(
-    host.fetchNewer,
-    (next) => {
-      const changes = displayChanges(
-        snapshot.display.value,
-        next.display.value,
-      );
-      snapshot = next;
-      render();
-      dispatchEvent("appearance-snapshot", snapshot.appearance);
-      if (Object.keys(changes).length)
-        dispatchEvent(DISPLAY_CHANGES_EVENT, changes);
-      dispatchEvent("usage-invalidated", null);
-    },
-    (next) => {
-      status = next;
-      render();
-    },
-  );
-  /** Refresh with visible progress; failures stay in the status. */
-  const refreshShown = () => void follower.refetch(true).catch(() => {});
-  setTransport(
-    createSnapshotTransport(names, {
-      current: () => snapshot,
-      /** A failure the status already shows is not reported again by the pages. */
-      refetch: () =>
-        follower.refetch().catch((cause: unknown) => {
-          if (status.state !== "failed") throw cause;
-        }),
-      device: { isDark: () => darkQuery.matches, locale: host.locale },
-      open: host.open,
-      fallback,
-    }),
-  );
+  const acknowledger = createRenderAcknowledger(() => render());
+  let follower: SnapshotFollower | null = null;
+  const darkQuery = matchMedia(DARK_QUERY);
   /** Tell the theme controller that the device color scheme changed. */
   const onSchemeChange = (event: MediaQueryListEvent) =>
     dispatchEvent("system-appearance", event.matches);
-  darkQuery.addEventListener("change", onSchemeChange);
-  const [bootstrap, appearance, display] = await Promise.all([
-    nativeApi.GetBootstrap(),
-    nativeApi.GetAppearance(),
-    nativeApi.GetDisplay(),
-  ]);
-  setLanguage(resolveLanguage(display.value.language, host.locale));
-  configureTimestampLocale(host.locale);
-  applySavedAppearance(appearance, bootstrap.isSystemDark);
-  render = () =>
-    host.root.render(
-      <ReadOnlyContext.Provider value>
-        <AppearanceProvider
-          initial={appearance}
-          isSystemDark={bootstrap.isSystemDark}
-        >
-          <DataProvider initial={display}>
-            <WebViewer
-              generatedAt={snapshot.generatedAt}
-              appVersion={snapshot.appVersion}
-              locale={host.locale}
-              connection={host.connection}
-              refresh={{ status, onRetry: refreshShown }}
-            />
-          </DataProvider>
-          <Toaster />
-        </AppearanceProvider>
-      </ReadOnlyContext.Provider>,
-    );
-  render();
-  if (host.isSaved) refreshShown();
-  return () => {
-    follower.stop();
+  const unmount = () => {
+    if (!isMounted) return;
+    isMounted = false;
+    follower?.stop();
+    acknowledger.cancel();
     clearNotifications();
     darkQuery.removeEventListener("change", onSchemeChange);
     setTransport(fallback);
   };
+  /** Render another snapshot and tell the mounted pages about its theme and reports. */
+  const present = (next: PrivateSnapshot) => {
+    if (!isMounted || next === snapshot) return;
+    const changes = displayChanges(snapshot.display.value, next.display.value);
+    snapshot = next;
+    generation++;
+    render();
+    dispatchEvent("appearance-snapshot", snapshot.appearance);
+    if (Object.keys(changes).length)
+      dispatchEvent(DISPLAY_CHANGES_EVENT, changes);
+    dispatchEvent("usage-invalidated", null);
+  };
+  /** Candidates the first refresh applies before downloading anything newer. */
+  let pendingInitial = host.isSaved ? null : host.initial;
+  const session = createSnapshotSession<PrivateSnapshot>({
+    accepted: host.isSaved ? host.initial : null,
+    download: host.download,
+    async show(next) {
+      present(next);
+      if (!isMounted) throw new Error("The viewer was closed.");
+      await acknowledger.wait(generation);
+    },
+    restore: present,
+    describe: (reason) => t(REJECTION_MESSAGES[reason]),
+  });
+  /** Refresh with visible progress; failures stay in the status. */
+  const refreshShown = (isRetry = false) =>
+    void follower?.refetch(true, isRetry).catch(() => {});
+  try {
+    const names = await captureMethodIds(setTransport, fallback);
+    const transport = createSnapshotTransport(names, {
+      current: () => snapshot,
+      /** A failure the status already shows is not reported again by the pages. */
+      refetch: async () => {
+        await follower?.refetch().catch((cause: unknown) => {
+          if (status.state !== "failed") throw cause;
+        });
+      },
+      device: { isDark: () => darkQuery.matches, locale: host.locale },
+      open: host.open,
+      fallback,
+    });
+    setTransport({
+      /** Report reads count toward the shown snapshot's acknowledgment. */
+      call(objectID, method, windowName, args) {
+        const read = transport.call(objectID, method, windowName, args);
+        const name =
+          objectID === objectNames.Call
+            ? names.get((args as { methodID: number }).methodID)
+            : undefined;
+        return name && REPORT_READS.has(name)
+          ? acknowledger.track(generation, read)
+          : read;
+      },
+    });
+    darkQuery.addEventListener("change", onSchemeChange);
+    const [bootstrap, appearance, display] = await Promise.all([
+      nativeApi.GetBootstrap(),
+      nativeApi.GetAppearance(),
+      nativeApi.GetDisplay(),
+    ]);
+    setLanguage(resolveLanguage(display.value.language, host.locale));
+    configureTimestampLocale(host.locale);
+    applySavedAppearance(appearance, bootstrap.isSystemDark);
+    follower = followSnapshots(
+      async (isRetry) => {
+        const initial = pendingInitial;
+        pendingInitial = null;
+        return initial ?? session.fetch(isRetry);
+      },
+      session.accept,
+      (next) => {
+        status = next;
+        render();
+      },
+    );
+    /** Acknowledge commits of the active page while a shown snapshot waits for one. */
+    const onCommit = (token: number) => acknowledger.committed(token);
+    render = () => {
+      const rendered = generation;
+      /** A failure belongs to the snapshot this render showed, even when reported later. */
+      const onRenderError = () => acknowledger.failed(rendered);
+      host.root.render(
+        <ViewerBoundary
+          resetKey={rendered}
+          onError={onRenderError}
+          fallback={() => (
+            <RelayProblem
+              title={t(PROBLEMS.display.title)}
+              detail={t(PROBLEMS.display.detail)}
+            >
+              <Button onClick={host.recover}>
+                <RefreshCwIcon aria-hidden />
+                {t("Try again")}
+              </Button>
+            </RelayProblem>
+          )}
+        >
+          <VIEWER_COMMIT_CONTEXT.Provider
+            value={{ token: acknowledger.token(), onCommit }}
+          >
+            <ReadOnlyContext.Provider value>
+              <AppearanceProvider
+                initial={appearance}
+                isSystemDark={bootstrap.isSystemDark}
+              >
+                <DataProvider initial={display}>
+                  <WebViewer
+                    generatedAt={snapshot.generatedAt}
+                    appVersion={snapshot.appVersion}
+                    locale={host.locale}
+                    connection={host.connection}
+                    refresh={{ status, onRetry: () => refreshShown(true) }}
+                    renderKey={rendered}
+                    onRenderError={onRenderError}
+                  />
+                </DataProvider>
+                <Toaster />
+              </AppearanceProvider>
+            </ReadOnlyContext.Provider>
+          </VIEWER_COMMIT_CONTEXT.Provider>
+        </ViewerBoundary>,
+      );
+    };
+    render();
+  } catch (cause) {
+    unmount();
+    throw cause;
+  }
+  if (host.isSaved) refreshShown();
+  else void follower.refetch().catch(() => {});
+  return unmount;
 }

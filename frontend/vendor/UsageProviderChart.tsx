@@ -13,7 +13,7 @@ import {
   msg,
   t,
 } from "../src/i18n";
-import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
+import { orderProviderKinds, PROVIDER_ORDER, providerPresentation } from "./usageProviders";
 
 const VIEW_WIDTH = 960;
 const VIEW_HEIGHT = 260;
@@ -62,10 +62,12 @@ export function buildPeriodColumns(
   periods: readonly string[],
   byPeriod: ReadonlyMap<string, DailyTotals | HourlyTotals>,
   metric: UsageChartMetric,
+  providers: readonly UsageProviderKind[] = PROVIDER_ORDER,
 ): readonly DayColumn[] {
+  const bandProviders = orderProviderKinds([...PROVIDER_ORDER, ...providers]);
   return periods.map((period) => {
     const entry = byPeriod.get(period);
-    const bands = PROVIDER_ORDER.map((provider) => ({
+    const bands = bandProviders.map((provider) => ({
       provider,
       value: valueFor(entry, provider, metric),
     }));
@@ -220,7 +222,7 @@ export function UsageProviderChart({
       };
     }
 
-    const columns = buildPeriodColumns(periods, byPeriod, metric);
+    const columns = buildPeriodColumns(periods, byPeriod, metric, providers);
     // The scale tops out at the largest single provider-period, not the sum:
     // layered series each measure from zero, so a combined peak would leave
     // the plot permanently half empty.
@@ -239,7 +241,9 @@ export function UsageProviderChart({
         : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
 
     const built = providers.map((provider) => {
-      const providerIndex = PROVIDER_ORDER.indexOf(provider);
+      const providerIndex = columns[0]?.bands.findIndex(
+        (band) => band.provider === provider,
+      ) ?? -1;
       const line = curvePath(
         smoothCurve(
           columns.map((column, periodIndex) => ({
@@ -411,7 +415,7 @@ export function UsageProviderChart({
               <path
                 key={provider}
                 d={area}
-                fill={PROVIDER_PRESENTATION[provider].color}
+                fill={providerPresentation(provider).color}
                 fillOpacity={0.12}
               />
             ))}
@@ -420,7 +424,7 @@ export function UsageProviderChart({
                 key={provider}
                 d={line}
                 fill="none"
-                stroke={PROVIDER_PRESENTATION[provider].color}
+                stroke={providerPresentation(provider).color}
                 strokeWidth={2}
                 vectorEffect="non-scaling-stroke"
               />
@@ -453,7 +457,7 @@ export function UsageProviderChart({
                 {formatTooltipPeriod(hoveredPeriod)}
               </div>
               {providers.map((provider) => {
-                const { label, driverKind } = PROVIDER_PRESENTATION[provider];
+                const { label, driverKind } = providerPresentation(provider);
                 return (
                   <div
                     key={provider}

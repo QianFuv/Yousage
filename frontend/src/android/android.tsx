@@ -6,20 +6,36 @@ import { Button } from "../../../tools/parity/upstream/apps/web/src/components/u
 import * as mobileApi from "../../bindings/yousage/internal/mobile/service";
 import { resolveLanguage, setLanguage, t } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
-import { PROBLEMS } from "../web/load";
+import { PROBLEMS, refreshError } from "../web/load";
 import { mountViewer } from "../web/mountViewer";
+import type { PrivateSnapshot } from "../web/payloads";
+import type { SnapshotCandidate } from "../web/snapshotSession";
 import { RelayProblem } from "../web/WebViewer";
-import { interpretSnapshot } from "./snapshot";
+import { interpretSnapshot, type DeviceRead } from "./snapshot";
 import { PairScreen } from "./PairScreen";
 import "../style.css";
 import "../web/web.css";
 import "./android.css";
 
-const root: Root = createRoot(document.getElementById("root")!);
+/** Whether the last-resort problem screen is up, so a failure while showing it is not handled again. */
+let isShowingFatal = false;
+
+const root: Root = createRoot(document.getElementById("root")!, {
+  /** Replace a blank page after a failure no boundary caught, without looping on the problem screen. */
+  onUncaughtError() {
+    if (isShowingFatal) return;
+    isShowingFatal = true;
+    setTimeout(() => showProblem("display", true));
+  },
+});
 const locale = navigator.language || "en";
 const nativeTransport = getTransport();
 /** Undo the mounted viewer's transport and listeners, if one is shown. */
 let unmountViewer: (() => void) | null = null;
+/** Counts requests to open the snapshot, so an earlier one that finishes late changes nothing. */
+let openGeneration = 0;
+/** Opens run one after another, so two viewers never swap transports concurrently. */
+let openQueue = Promise.resolve();
 
 /** Leave the viewer, if one is mounted, so native calls reach Go directly again. */
 function leaveViewer() {
@@ -41,6 +57,7 @@ let isChangingLink = false;
 
 /** Ask for another link while keeping the saved one until a new link connects. */
 function changeLink() {
+  openGeneration++;
   if (!isChangingLink) {
     history.pushState(null, "");
     isChangingLink = true;
@@ -51,7 +68,7 @@ function changeLink() {
 /** Leave the change-link screen, or open the newly saved link on first pairing. */
 function finishPairing() {
   if (isChangingLink) history.back();
-  else void openSnapshot().catch(() => showProblem("network"));
+  else void openSnapshot();
 }
 
 /**
@@ -73,15 +90,16 @@ function showPairing(canKeepLink = false) {
 addEventListener("popstate", () => {
   if (!isChangingLink) return;
   isChangingLink = false;
-  void openSnapshot().catch(() => showProblem("network"));
+  void openSnapshot();
 });
 
 /**
  * Explain why the snapshot cannot be shown, with ways forward.
  *
  * @param problem - Which failure occurred.
+ * @param shouldDownload - Trying again downloads the snapshot instead of opening the saved one.
  */
-function showProblem(problem: keyof typeof PROBLEMS) {
+function showProblem(problem: keyof typeof PROBLEMS, shouldDownload = false) {
   leaveViewer();
   applyDeviceLook();
   root.render(
@@ -90,7 +108,7 @@ function showProblem(problem: keyof typeof PROBLEMS) {
       detail={t(PROBLEMS[problem].detail)}
     >
       <div className="android-problem-actions">
-        <Button onClick={() => void openSnapshot()}>
+        <Button onClick={() => void openSnapshot(shouldDownload)}>
           <RefreshCwIcon aria-hidden />
           {t("Try again")}
         </Button>
@@ -119,42 +137,99 @@ function showLoading() {
   );
 }
 
-/** Show the snapshot saved on this device at once, or download the first one, and mount the viewer. */
-async function openSnapshot() {
+/**
+ * A snapshot opened on the device, kept by the viewer only once it shows.
+ *
+ * @param read - The opened snapshot.
+ * @returns The candidate; downloads carry the ID that saves them on the device.
+ */
+function toCandidate(
+  read: Extract<DeviceRead, { status: "ok" }>,
+): SnapshotCandidate<PrivateSnapshot> {
+  return {
+    payload: read.payload,
+    etag: read.etag,
+    identity: read.text,
+    commit: read.candidateId
+      ? () => mobileApi.CommitSnapshot(read.candidateId)
+      : undefined,
+  };
+}
+
+/**
+ * Show the snapshot saved on this device at once, or download one, and mount the viewer.
+ *
+ * Saved data this version cannot show is downloaded again without deleting it or the link.
+ *
+ * @param generation - This request's place among requests to open the snapshot.
+ * @param shouldDownload - Download the snapshot instead of opening the saved one.
+ */
+async function showSnapshot(generation: number, shouldDownload: boolean) {
+  const isCurrent = () => generation === openGeneration;
   leaveViewer();
-  let first = interpretSnapshot(await mobileApi.CachedSnapshot());
+  let first: DeviceRead = shouldDownload
+    ? { status: "empty" }
+    : interpretSnapshot(await mobileApi.CachedSnapshot());
+  if (!isCurrent()) return;
   const isSaved = first.status === "ok";
-  if (first.status === "empty") {
+  if (first.status === "empty" || first.status === "problem") {
     showLoading();
     first = interpretSnapshot(await mobileApi.LoadSnapshot(""));
+    if (!isCurrent()) return;
   }
   if (first.status === "unpaired") return showPairing();
   if (first.status !== "ok")
     return showProblem(first.status === "problem" ? first.problem : "network");
-  let etag = first.etag;
   const pairing = await mobileApi.GetPairing().catch(() => null);
-  unmountViewer = await mountViewer({
-    root,
-    initial: first.payload,
-    isSaved,
-    locale,
-    fallback: nativeTransport,
-    async fetchNewer() {
-      const next = interpretSnapshot(await mobileApi.LoadSnapshot(etag));
-      if (next.status === "problem")
-        throw new Error(t(PROBLEMS[next.problem].title));
-      if (next.status !== "ok") return null;
-      etag = next.etag;
-      return next.payload;
-    },
-    open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
-    connection: {
-      relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",
-      onChangeLink: changeLink,
-    },
-  });
+  if (!isCurrent()) return;
+  let unmount: () => void;
+  try {
+    unmount = await mountViewer({
+      root,
+      initial: toCandidate(first),
+      isSaved,
+      locale,
+      fallback: nativeTransport,
+      async download(etag) {
+        const next = interpretSnapshot(await mobileApi.LoadSnapshot(etag));
+        if (next.status === "problem") throw refreshError(next.problem);
+        return next.status === "ok" ? toCandidate(next) : null;
+      },
+      recover: () => void openSnapshot(true),
+      open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
+      connection: {
+        relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",
+        onChangeLink: changeLink,
+      },
+    });
+  } catch {
+    if (isCurrent()) showProblem("display", true);
+    return;
+  }
+  if (!isCurrent()) return unmount();
+  unmountViewer = unmount;
+}
+
+/**
+ * Open the snapshot after any earlier request finishes; a later request supersedes this one.
+ *
+ * @param shouldDownload - Download the snapshot instead of opening the saved one.
+ * @returns Settles once this request is done; never rejects.
+ */
+function openSnapshot(shouldDownload = false): Promise<void> {
+  const generation = ++openGeneration;
+  isShowingFatal = false;
+  openQueue = openQueue
+    .then(() => {
+      if (generation === openGeneration)
+        return showSnapshot(generation, shouldDownload);
+    })
+    .catch(() => {
+      if (generation === openGeneration) showProblem("network");
+    });
+  return openQueue;
 }
 
 applyDeviceLook();
 configureTimestampLocale(locale);
-void openSnapshot().catch(() => showProblem("network"));
+void openSnapshot();

@@ -10,8 +10,13 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+var androidStartup startupClaim
+
 // Run starts one Android webview backed exclusively by the mobile service.
 func Run(assets fs.FS) {
+	if !androidStartup.tryClaim() {
+		return
+	}
 	frontend, err := fs.Sub(assets, "frontend/dist-android")
 	if err != nil {
 		log.Fatal(err)

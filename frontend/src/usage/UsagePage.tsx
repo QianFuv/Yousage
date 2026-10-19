@@ -33,6 +33,7 @@ import { t } from "../i18n";
 import { useData } from "./controller";
 import { PeriodToggle } from "./PeriodToggle";
 import { useIsReadOnly } from "../web/readOnly";
+import { ViewerCommitMarker } from "../web/renderAcknowledgment";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 
 /** Preserve null All and explicit empty selection while exposing coverage inside the environment filter. */
@@ -47,6 +48,8 @@ export function UsagePage({
 }) {
   const data = useData();
   const isReadOnly = useIsReadOnly();
+  /** Tells a relay viewer that this page rendered its loaded data, in place of loading fallbacks. */
+  const commitMarker = isActive && data.snapshot && <ViewerCommitMarker />;
   const metric =
     view === "limits"
       ? "limits"
@@ -221,6 +224,7 @@ export function UsagePage({
               now={limitsNow}
               cycleValues={indexCycleValues(selected)}
             />
+            {commitMarker}
           </Suspense>
         ) : (
           usageWindow && (
@@ -260,15 +264,18 @@ export function UsagePage({
                 </div>
               )}
               {answered === 0 ? (
-                <EmptyState>
-                  {selected.length === 0
-                    ? t("Select an environment to view usage.")
-                    : stillReporting > 0
-                      ? t("Waiting for usage reports…")
-                      : t(
-                          "No usage report is available. Refresh or review the selected environments.",
-                        )}
-                </EmptyState>
+                <>
+                  <EmptyState>
+                    {selected.length === 0
+                      ? t("Select an environment to view usage.")
+                      : stillReporting > 0
+                        ? t("Waiting for usage reports…")
+                        : t(
+                            "No usage report is available. Refresh or review the selected environments.",
+                          )}
+                  </EmptyState>
+                  {commitMarker}
+                </>
               ) : (
                 <Suspense
                   fallback={
@@ -307,6 +314,7 @@ export function UsagePage({
                     }}
                     onSetPrice={(model) => onSettings("pricing", model)}
                   />
+                  {commitMarker}
                 </Suspense>
               )}
             </>

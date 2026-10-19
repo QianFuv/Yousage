@@ -31,7 +31,7 @@ import {
   tokenTypeSegments,
 } from "../../vendor/usageBreakdown";
 import {
-  PROVIDER_PRESENTATION,
+  providerPresentation,
   providersWithUsage,
 } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
@@ -57,7 +57,7 @@ function ProviderMark({
   provider: UsageProviderKind;
   className: string;
 }) {
-  const value = PROVIDER_PRESENTATION[provider];
+  const value = providerPresentation(provider);
   return (
     <ProviderInstanceIcon
       driverKind={value.driverKind}
@@ -188,12 +188,12 @@ export function UsageStatsPanel({
                       aria-hidden
                       className="size-2 shrink-0 rounded-full"
                       style={{
-                        backgroundColor: PROVIDER_PRESENTATION[provider].color,
+                        backgroundColor: providerPresentation(provider).color,
                       }}
                     />
                     <ProviderMark provider={provider} className="size-4" />
                     <span className="flex min-w-0 flex-wrap items-baseline gap-1.5">
-                      <span>{PROVIDER_PRESENTATION[provider].label}</span>
+                      <span>{providerPresentation(provider).label}</span>
                       <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
                         {t(
                           totals.sessions === 1
@@ -387,8 +387,9 @@ export function UsageStatsPanel({
                                   value > 0 && peak > 0
                                     ? `max(0.5rem, ${(value / peak) * 100}%)`
                                     : 0,
-                                backgroundColor:
-                                  PROVIDER_PRESENTATION[model.provider].color,
+                                backgroundColor: providerPresentation(
+                                  model.provider,
+                                ).color,
                               }}
                             />
                           </div>
@@ -426,7 +427,7 @@ export function UsageStatsPanel({
                       key={provider}
                       className="py-2 pl-6 text-right font-normal"
                     >
-                      {PROVIDER_PRESENTATION[provider].label}
+                      {providerPresentation(provider).label}
                     </th>
                   ))}
                   <th className="py-2 pl-6 text-right font-normal">

@@ -15,14 +15,23 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
- * CachedSnapshot opens the last snapshot read from the relay, so a cold start shows it at once.
+ * CachedSnapshot opens only the accepted last-good snapshot, without exposing a candidate ID.
  * 
- * It reports "empty" when nothing usable is cached for the current pairing.
+ * Invalid saved data reports a problem or empty result with no ETag, allowing an
+ * unconditional refetch while preserving the saved file and pairing.
  */
 export function CachedSnapshot(): $CancellablePromise<$models.SnapshotResult> {
     return $Call.ByID(3627769306).then(($result: any) => {
         return $$createType0($result);
     });
+}
+
+/**
+ * CommitSnapshot persists exactly the current candidate after successful viewer application.
+ * A failed write leaves it retryable and never advances the accepted envelope or ETag.
+ */
+export function CommitSnapshot(candidateId: string): $CancellablePromise<void> {
+    return $Call.ByID(1805782921, candidateId);
 }
 
 /**
@@ -35,7 +44,8 @@ export function GetPairing(): $CancellablePromise<$models.Pairing> {
 }
 
 /**
- * LoadSnapshot conditionally fetches, authenticates, and decompresses the snapshot.
+ * LoadSnapshot validates and stages one candidate without changing the accepted cache.
+ * Every new request supersedes the previous candidate, independently of relay ETags.
  */
 export function LoadSnapshot(etag: string): $CancellablePromise<$models.SnapshotResult> {
     return $Call.ByID(1471563460, etag).then(($result: any) => {

@@ -83,7 +83,7 @@ public class WailsBridge {
 
     private final Activity activity;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private WebView webView;
+    private volatile WebViewBinding webViewBinding;
     private volatile boolean initialized = false;
     private SharedPreferences cachedSecurePrefs;
     private boolean securePrefsResolved = false;
@@ -101,6 +101,15 @@ public class WailsBridge {
     private boolean proximityWanted = false;
     private boolean torchOn = false;
     private boolean pendingLocationRequest = false;
+
+    /** Identify one attachment so callbacks queued before a rebind cannot reach another document. */
+    private static final class WebViewBinding {
+        final WebView view;
+
+        WebViewBinding(WebView view) {
+            this.view = view;
+        }
+    }
 
     // Native methods - implemented in Go
     private static native void nativeInit(WailsBridge bridge);
@@ -146,6 +155,7 @@ public class WailsBridge {
      * Shutdown the native Go library
      */
     public void shutdown() {
+        setWebView(null);
         if (!initialized) {
             return;
         }
@@ -158,11 +168,17 @@ public class WailsBridge {
     }
 
     /**
-     * The WebView used for JavaScript execution. Must be set before the page
-     * loads.
+     * Attach the view before loading, or detach with null before destroying it.
+     * Called on the UI thread; every attachment invalidates previously queued JavaScript.
      */
     public void setWebView(WebView webView) {
-        this.webView = webView;
+        webViewBinding = webView == null ? null : new WebViewBinding(webView);
+    }
+
+    /** Check whether a JavaScript interface still belongs to the attached document. */
+    boolean isCurrentWebView(WebView view) {
+        WebViewBinding binding = webViewBinding;
+        return binding != null && binding.view == view;
     }
 
     // Lifecycle forwarding
@@ -282,12 +298,21 @@ public class WailsBridge {
      * Execute JavaScript in the WebView. Called from Go via JNI (any thread).
      */
     public void executeJavaScript(final String js) {
-        final WebView view = webView;
-        if (view == null) {
-            Log.w(TAG, "executeJavaScript: no WebView attached");
-            return;
-        }
-        mainHandler.post(() -> view.evaluateJavascript(js, null));
+        postJavaScript(webViewBinding, js);
+    }
+
+    /** Deliver an asynchronous reply only to the view that originated its call. */
+    void executeJavaScript(WebView sourceView, String js) {
+        WebViewBinding binding = webViewBinding;
+        if (binding != null && binding.view == sourceView) postJavaScript(binding, js);
+    }
+
+    /** Discard queued work if its attachment was replaced or detached before execution. */
+    private void postJavaScript(WebViewBinding binding, String js) {
+        if (binding == null) return;
+        mainHandler.post(() -> {
+            if (webViewBinding == binding) binding.view.evaluateJavascript(js, null);
+        });
     }
 
     // Facilities called from Go via JNI

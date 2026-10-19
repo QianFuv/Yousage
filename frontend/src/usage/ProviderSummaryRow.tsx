@@ -1,13 +1,14 @@
 /** Provider rows of a summary column, matching the provider rows of the Usage statistics. */
 import {
-  PROVIDER_ORDER,
-  PROVIDER_PRESENTATION,
+  orderProviderKinds,
+  providerPresentation,
 } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import type { UsageProviderKind } from "./contracts";
 
 /**
- * Keep the active rows of known providers, in the Usage page's provider order.
+ * Keep the active rows in the Usage page's provider order, with providers this build
+ * does not know after the known ones.
  *
  * @param rows - Report rows, one per provider.
  * @param isActive - Whether a row has anything to show.
@@ -17,11 +18,11 @@ export function orderProviders<Row extends { provider: string }>(
   rows: readonly Row[],
   isActive: (row: Row) => boolean,
 ): (Row & { provider: UsageProviderKind })[] {
-  return PROVIDER_ORDER.flatMap((provider) =>
-    rows.filter(
-      (row): row is Row & { provider: UsageProviderKind } =>
-        row.provider === provider && isActive(row),
-    ),
+  const active = rows.filter(isActive) as (Row & {
+    provider: UsageProviderKind;
+  })[];
+  return orderProviderKinds(active.map((row) => row.provider)).flatMap(
+    (provider) => active.filter((row) => row.provider === provider),
   );
 }
 
@@ -42,7 +43,7 @@ export function ProviderSummaryRow({
   value: string;
   detail: string;
 }) {
-  const presentation = PROVIDER_PRESENTATION[provider];
+  const presentation = providerPresentation(provider);
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-4">

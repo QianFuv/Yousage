@@ -11,33 +11,14 @@ import { ReceiptPaper } from "../receipt/ReceiptPaper";
 import { SeriesChart } from "../usage/SeriesChart";
 import { bucketLabels } from "../usage/chartAxis";
 import {
-  PROVIDER_ORDER,
-  PROVIDER_PRESENTATION,
+  orderProviderKinds,
+  providerPresentation,
 } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import type { Receipt } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
 import type { ShareModel, SharePayload } from "./payloads";
 import "./web.css";
-
-/** Fallback color for a provider this build does not present. */
-const OTHER_COLOR = "var(--muted-foreground)";
-
-/**
- * Presentation of a provider kind, tolerating kinds from newer desktops.
- *
- * @param provider - Provider kind from the payload.
- * @returns Label, color and icon driver.
- */
-function providerPresentation(provider: string) {
-  return (
-    PROVIDER_PRESENTATION[provider as keyof typeof PROVIDER_PRESENTATION] ?? {
-      label: provider,
-      color: OTHER_COLOR,
-      driverKind: provider,
-    }
-  );
-}
 
 /**
  * The calendar day of an instant in a time zone, as `YYYY-MM-DD`.
@@ -68,14 +49,11 @@ export function shareChart(payload: SharePayload) {
       ? new Date(bucket.startMs).toISOString()
       : localDay(bucket.startMs, payload.timeZone),
   );
-  const providers = PROVIDER_ORDER.filter((provider) =>
-    payload.series.some((bucket) =>
-      bucket.values.some((value) => value.provider === provider),
+  const providers = orderProviderKinds(
+    payload.series.flatMap((bucket) =>
+      bucket.values.map((value) => value.provider),
     ),
-  ) as string[];
-  for (const bucket of payload.series)
-    for (const value of bucket.values)
-      if (!providers.includes(value.provider)) providers.push(value.provider);
+  );
   const series = providers.map((provider) => ({
     id: provider,
     color: providerPresentation(provider).color,

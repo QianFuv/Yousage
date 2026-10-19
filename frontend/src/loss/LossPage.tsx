@@ -10,7 +10,7 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
+import { providerPresentation } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { formatDateTimeShort, formatDuration, msg, t } from "../i18n";
@@ -229,7 +229,7 @@ function LossChart({
     () =>
       providers.map(({ provider }) => ({
         id: provider,
-        color: PROVIDER_PRESENTATION[provider].color,
+        color: providerPresentation(provider).color,
         values: days.map((day) => providerDay(day, provider).costUsd),
       })),
     [days, providers],
@@ -250,8 +250,8 @@ function LossChart({
           return (
             <TooltipRow
               key={provider}
-              color={PROVIDER_PRESENTATION[provider].color}
-              label={`${PROVIDER_PRESENTATION[provider].label} · ${rewriteCount(entry.count)}`}
+              color={providerPresentation(provider).color}
+              label={`${providerPresentation(provider).label} · ${rewriteCount(entry.count)}`}
               value={formatUsd(entry.costUsd)}
             />
           );
@@ -344,8 +344,7 @@ function LossEvents({
               </tr>
             ) : (
               shown.map((event, index) => {
-                const provider = event.provider as UsageProviderKind;
-                const presentation = PROVIDER_PRESENTATION[provider];
+                const presentation = providerPresentation(event.provider);
                 const gap = event.idleMs;
                 return (
                   <tr
@@ -360,13 +359,11 @@ function LossEvents({
                     </td>
                     <td className="py-2.5 text-left text-foreground">
                       <span className="flex items-center gap-2">
-                        {presentation && (
-                          <ProviderInstanceIcon
-                            driverKind={presentation.driverKind}
-                            displayName={presentation.label}
-                            iconClassName="size-3.5"
-                          />
-                        )}
+                        <ProviderInstanceIcon
+                          driverKind={presentation.driverKind}
+                          displayName={presentation.label}
+                          iconClassName="size-3.5"
+                        />
                         {event.model || t("Unknown model")}
                       </span>
                     </td>

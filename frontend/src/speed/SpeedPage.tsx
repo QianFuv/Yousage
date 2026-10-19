@@ -9,7 +9,7 @@ import {
 } from "@t3tools/shared/usageFormat";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-import { PROVIDER_PRESENTATION } from "../../vendor/usageProviders";
+import { providerPresentation } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { msg, t } from "../i18n";
@@ -33,9 +33,6 @@ import type {
   SpeedStats,
 } from "../../bindings/yousage/internal/service/models";
 import type { Window } from "../../bindings/yousage/internal/accounting/models";
-
-/** Color of models without a provider color in the speed bars. */
-const LINE_COLOR = "var(--foreground)";
 
 /** Labels of the faster billing tiers; standard rows carry no badge. */
 const TIER_LABELS: Record<string, string> = {
@@ -337,18 +334,15 @@ function LatencyMetrics({ stats }: { stats: SpeedStats }) {
  * @returns The inline name elements.
  */
 function ModelName({ model }: { model: SpeedModel }) {
-  const presentation =
-    PROVIDER_PRESENTATION[model.provider as UsageProviderKind];
+  const presentation = providerPresentation(model.provider);
   const tier = TIER_LABELS[model.speed];
   return (
     <>
-      {presentation && (
-        <ProviderInstanceIcon
-          driverKind={presentation.driverKind}
-          displayName={presentation.label}
-          iconClassName="size-3.5"
-        />
-      )}
+      <ProviderInstanceIcon
+        driverKind={presentation.driverKind}
+        displayName={presentation.label}
+        iconClassName="size-3.5"
+      />
       <span className="truncate">{model.model || t("Unknown model")}</span>
       {tier && (
         <span className="shrink-0 rounded-sm border border-border px-1 text-3xs text-muted-foreground uppercase">
@@ -390,7 +384,7 @@ function SpeedChart({
     () =>
       providers.map(({ provider }, index) => ({
         id: provider,
-        color: PROVIDER_PRESENTATION[provider].color,
+        color: providerPresentation(provider).color,
         values: entries.map((row) => row[index]?.tokensPerSecond ?? 0),
       })),
     [entries, providers],
@@ -414,8 +408,8 @@ function SpeedChart({
         return providers.map(({ provider }, position) => (
           <TooltipRow
             key={provider}
-            color={PROVIDER_PRESENTATION[provider].color}
-            label={PROVIDER_PRESENTATION[provider].label}
+            color={providerPresentation(provider).color}
+            label={providerPresentation(provider).label}
             value={formatSpeed(row[position]?.tokensPerSecond ?? 0)}
           />
         ));
@@ -524,10 +518,8 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                             isMeasured && fastest > 0
                               ? `max(0.5rem, ${(model.tokensPerSecond / fastest) * 100}%)`
                               : 0,
-                          backgroundColor:
-                            PROVIDER_PRESENTATION[
-                              model.provider as UsageProviderKind
-                            ]?.color ?? LINE_COLOR,
+                          backgroundColor: providerPresentation(model.provider)
+                            .color,
                         }}
                       />
                     </div>

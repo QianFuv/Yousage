@@ -1,6 +1,7 @@
 /** A mounted viewer keeps up with the relay on screen, and stays quiet in the background. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FOLLOW_INTERVAL_MS, followSnapshots } from "./follow";
+import { SnapshotRejectedError } from "./snapshotSession";
 
 /** A stand-in page whose visibility the test controls. */
 class FakeDocument extends EventTarget {
@@ -136,6 +137,108 @@ describe("followSnapshots", () => {
     expect(statuses.at(-1)?.state).toBe("failed");
     await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
     expect(statuses.at(-1)).toEqual({ state: "current" });
+    follower.stop();
+  });
+
+  it("waits for a newer snapshot to apply and shows a failed application", async () => {
+    const statuses: { state: string; problem?: string }[] = [];
+    const onNewer = vi
+      .fn<(next: string) => Promise<void>>()
+      .mockRejectedValueOnce(new SnapshotRejectedError("cannot be shown"))
+      .mockResolvedValue();
+    const follower = followSnapshots(
+      async () => "newer",
+      onNewer,
+      (status) => statuses.push(status),
+    );
+    await expect(follower.refetch()).rejects.toThrow("cannot be shown");
+    expect(statuses).toEqual([{ state: "failed", problem: "cannot be shown" }]);
+    await follower.refetch();
+    expect(statuses.at(-1)).toEqual({ state: "current" });
+    follower.stop();
+  });
+
+  it("shows rejected snapshots found by quiet polls without unhandled rejections", async () => {
+    const statuses: string[] = [];
+    const onNewer = vi.fn(() => {
+      throw new SnapshotRejectedError("cannot be shown");
+    });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const follower = followSnapshots(
+      async () => "newer",
+      onNewer,
+      (status) => statuses.push(status.state),
+    );
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(0);
+    process.off("unhandledRejection", unhandled);
+    expect(statuses).toEqual(["failed"]);
+    expect(unhandled).not.toHaveBeenCalled();
+    follower.stop();
+  });
+
+  it("tells the download whether the person asked to try again", async () => {
+    const fetchNewer = vi.fn<(isRetry: boolean) => Promise<null>>(
+      async () => null,
+    );
+    const follower = followSnapshots(fetchNewer, () => {});
+    await follower.refetch(true, true);
+    await follower.refetch(true);
+    expect(fetchNewer.mock.calls).toEqual([[true], [false]]);
+    follower.stop();
+  });
+
+  it("tries a rejected snapshot again when a retry joins a quiet poll that rejects it, once", async () => {
+    const statuses: { state: string; problem?: string }[] = [];
+    let finishPoll: (value: string) => void = () => {};
+    const fetchNewer = vi
+      .fn<(isRetry: boolean) => Promise<string | null>>()
+      .mockImplementationOnce(
+        () => new Promise<string>((resolve) => (finishPoll = resolve)),
+      )
+      .mockResolvedValue("bad");
+    const onNewer = vi.fn(async () => {
+      throw new SnapshotRejectedError("cannot be shown");
+    });
+    const follower = followSnapshots(fetchNewer, onNewer, (status) =>
+      statuses.push(status),
+    );
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
+    const retry = follower.refetch(true, true);
+    finishPoll("bad");
+    await expect(retry).rejects.toThrow("cannot be shown");
+    expect(fetchNewer.mock.calls).toEqual([[false], [true]]);
+    expect(onNewer).toHaveBeenCalledTimes(2);
+    expect(statuses).toEqual([
+      { state: "refreshing" },
+      { state: "failed", problem: "cannot be shown" },
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchNewer).toHaveBeenCalledTimes(2);
+    follower.stop();
+  });
+
+  it("does not repeat a retry that joined a quiet poll which applied a newer snapshot", async () => {
+    const statuses: string[] = [];
+    let finishPoll: (value: string) => void = () => {};
+    const fetchNewer = vi
+      .fn<(isRetry: boolean) => Promise<string | null>>()
+      .mockImplementationOnce(
+        () => new Promise<string>((resolve) => (finishPoll = resolve)),
+      )
+      .mockResolvedValue(null);
+    const onNewer = vi.fn();
+    const follower = followSnapshots(fetchNewer, onNewer, (status) =>
+      statuses.push(status.state),
+    );
+    await vi.advanceTimersByTimeAsync(FOLLOW_INTERVAL_MS);
+    const retry = follower.refetch(true, true);
+    finishPoll("good");
+    await retry;
+    expect(onNewer).toHaveBeenCalledWith("good");
+    expect(fetchNewer.mock.calls).toEqual([[false]]);
+    expect(statuses).toEqual(["refreshing", "current"]);
     follower.stop();
   });
 

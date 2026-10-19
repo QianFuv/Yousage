@@ -11,9 +11,11 @@ import {
   ChartNoAxesCombinedIcon,
   FlameIcon,
   GaugeIcon,
+  RefreshCwIcon,
   Settings2Icon,
   TimerIcon,
 } from "lucide-react";
+import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { useData } from "../usage/controller";
 import { UsagePage } from "../usage/UsagePage";
 import { NavItem } from "../NavItem";
@@ -23,23 +25,59 @@ import { ViewerSettings, type ViewerConnection } from "./ViewerSettings";
 import { RefreshStatus } from "./RefreshStatus";
 import type { FollowStatus } from "./follow";
 import { DISPLAY_CHANGES_EVENT } from "./displaySync";
+import { PROBLEMS } from "./load";
+import { ViewerBoundary } from "./ViewerBoundary";
+import { ViewerCommitMarker } from "./renderAcknowledgment";
 
-const LossPage = lazy(() =>
-  import("../loss/LossPage").then((module) => ({ default: module.LossPage })),
-);
-const SpeedPage = lazy(() =>
-  import("../speed/SpeedPage").then((module) => ({
-    default: module.SpeedPage,
-  })),
-);
+/**
+ * Pages loaded only once visited. A failed load stays failed in its lazy component,
+ * so retrying after a failure loads them again through new ones.
+ *
+ * @returns The lazily loaded pages.
+ */
+function lazyPages() {
+  return {
+    LossPage: lazy(() =>
+      import("../loss/LossPage").then((module) => ({
+        default: module.LossPage,
+      })),
+    ),
+    SpeedPage: lazy(() =>
+      import("../speed/SpeedPage").then((module) => ({
+        default: module.SpeedPage,
+      })),
+    ),
+  };
+}
 
 /** Pages offered by the viewer, in navigation order. */
 type ViewerRoute = "statistics" | "quota" | "loss" | "speed" | "settings";
 
 /**
+ * Explain that a page failed to render, with a way to render it again.
+ *
+ * @param props - The retry action.
+ * @returns The message in place of the page.
+ */
+function PageProblem({ onRetry }: { onRetry: () => void }) {
+  return (
+    <RelayProblem
+      title={t(PROBLEMS.display.title)}
+      detail={t(PROBLEMS.display.detail)}
+    >
+      <Button onClick={onRetry}>
+        <RefreshCwIcon aria-hidden />
+        {t("Try again")}
+      </Button>
+    </RelayProblem>
+  );
+}
+
+/**
  * Read-only pages rendered from the latest relay snapshot.
  *
- * @param props - Snapshot time and version, the viewing device locale, the relay connection and refresh status.
+ * @param props - Snapshot time and version, the viewing device locale, the relay connection,
+ * refresh status, the shown snapshot's render key and a listener for pages that fail to render.
  * @returns The viewer layout.
  */
 export function WebViewer({
@@ -48,17 +86,22 @@ export function WebViewer({
   locale,
   connection,
   refresh,
+  renderKey = 0,
+  onRenderError,
 }: {
   generatedAt: string;
   appVersion: string;
   locale: string;
   connection?: ViewerConnection;
   refresh?: { status: FollowStatus; onRetry: () => void };
+  renderKey?: number;
+  onRenderError?: (error: unknown) => void;
 }) {
   useI18n();
   const data = useData();
   const [route, setRoute] = useState<ViewerRoute>("statistics");
   const [visited, setVisited] = useState<Set<ViewerRoute>>(() => new Set());
+  const [{ LossPage, SpeedPage }, setPages] = useState(lazyPages);
   useLayoutEffect(
     () => setLanguage(resolveLanguage(data.display.value.language, locale)),
     [data.display.value.language, locale],
@@ -133,25 +176,46 @@ export function WebViewer({
             onSettings={() => {}}
           />
         </div>
-        <Suspense fallback={null}>
-          {visited.has("loss") && (
-            <div hidden={route !== "loss"}>
-              <LossPage isActive={route === "loss"} />
-            </div>
-          )}
-          {visited.has("speed") && (
-            <div hidden={route !== "speed"}>
-              <SpeedPage isActive={route === "speed"} />
-            </div>
-          )}
-        </Suspense>
+        {visited.has("loss") && (
+          <div hidden={route !== "loss"}>
+            <ViewerBoundary
+              resetKey={renderKey}
+              onError={onRenderError}
+              onRetry={() => setPages(lazyPages())}
+              fallback={(retry) => <PageProblem onRetry={retry} />}
+            >
+              <Suspense fallback={null}>
+                <LossPage isActive={route === "loss"} />
+                {route === "loss" && <ViewerCommitMarker />}
+              </Suspense>
+            </ViewerBoundary>
+          </div>
+        )}
+        {visited.has("speed") && (
+          <div hidden={route !== "speed"}>
+            <ViewerBoundary
+              resetKey={renderKey}
+              onError={onRenderError}
+              onRetry={() => setPages(lazyPages())}
+              fallback={(retry) => <PageProblem onRetry={retry} />}
+            >
+              <Suspense fallback={null}>
+                <SpeedPage isActive={route === "speed"} />
+                {route === "speed" && <ViewerCommitMarker />}
+              </Suspense>
+            </ViewerBoundary>
+          </div>
+        )}
         {route === "settings" && (
-          <ViewerSettings
-            generatedAt={generatedAt}
-            appVersion={appVersion}
-            locale={locale}
-            connection={connection}
-          />
+          <>
+            <ViewerSettings
+              generatedAt={generatedAt}
+              appVersion={appVersion}
+              locale={locale}
+              connection={connection}
+            />
+            <ViewerCommitMarker />
+          </>
         )}
       </main>
       {refresh && (
