@@ -1,4 +1,6 @@
-/** Receipts never present usage with an unknown payment method as money actually paid. */
+/** Receipts never present usage with an unknown payment method as money actually paid, and show full item names. */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Receipt } from "../../bindings/yousage/internal/service/models";
@@ -101,5 +103,41 @@ describe("receipt payments", () => {
     const text = receiptText(piReceipt(), true);
     expect(text).not.toContain("$");
     expect(text).not.toContain("unknown");
+  });
+});
+
+describe("receipt item names", () => {
+  const LONG_MODEL =
+    "fixture-backend/an-extremely-long-model-identifier-without-natural-breaks-2026-10-20";
+
+  it("renders the complete model name as text", () => {
+    const text = receiptText(
+      piReceipt({
+        items: [{ provider: "pi", model: LONG_MODEL, tokens: 1, costUsd: 1 }],
+      }),
+    );
+    expect(text).toContain(`${LONG_MODEL} $1.00`);
+  });
+
+  it("wraps item names instead of cutting them off, on screen and in the copied image", () => {
+    const css = readFileSync(join(__dirname, "receipt.css"), "utf8");
+    const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((match) => ({
+      selector: match[1].trim(),
+      body: match[2],
+    }));
+    const ellipsis = rules.findIndex(
+      (rule) => rule.selector === ".receipt-row > :first-child",
+    );
+    const name = rules.findIndex(
+      (rule) => rule.selector === ".receipt-row > .receipt-item-name",
+    );
+    expect(name).toBeGreaterThan(ellipsis);
+    for (const declaration of [
+      "overflow: visible;",
+      "text-overflow: clip;",
+      "white-space: normal;",
+      "overflow-wrap: anywhere;",
+    ])
+      expect(rules[name].body).toContain(declaration);
   });
 });

@@ -117,7 +117,7 @@ export function LossPage({ isActive }: { isActive: boolean }) {
  * @param props - The loss report.
  * @returns The page content.
  */
-function LossContent({ report }: { report: LossReport }) {
+export function LossContent({ report }: { report: LossReport }) {
   const totalUsd = report.cacheExpiry.costUsd;
   const totalEvents = report.cacheExpiry.events;
   const providers = orderProviders(
@@ -309,6 +309,9 @@ function LossEvents({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const shown = isExpanded ? events : events.slice(0, COLLAPSED_EVENTS);
+  const isEstimateShown = shown.some(
+    (event) => event.costUsd > 0 && event.precision === "estimated",
+  );
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -345,7 +348,10 @@ function LossEvents({
             ) : (
               shown.map((event, index) => {
                 const presentation = providerPresentation(event.provider);
-                const gap = event.idleMs;
+                const gap =
+                  event.idleMs > 0 ? formatDuration(event.idleMs) : "—";
+                const tokens =
+                  event.tokens > 0 ? formatTokens(event.tokens) : "—";
                 return (
                   <tr
                     key={`${event.sessionId}:${event.atMs}:${event.kind}:${index}`}
@@ -364,14 +370,17 @@ function LossEvents({
                           displayName={presentation.label}
                           iconClassName="size-3.5"
                         />
-                        {event.model || t("Unknown model")}
+                        <span className="min-w-0 whitespace-normal wrap-anywhere">
+                          {event.model || t("Unknown model")}
+                        </span>
                       </span>
+                      <div className="mt-1 text-xs whitespace-normal text-muted-foreground md:hidden">
+                        {t("Gap")} {gap} · {t("Tokens")} {tokens}
+                      </div>
                     </td>
+                    <td className="hidden py-2.5 pl-6 md:table-cell">{gap}</td>
                     <td className="hidden py-2.5 pl-6 md:table-cell">
-                      {gap > 0 ? formatDuration(gap) : "—"}
-                    </td>
-                    <td className="hidden py-2.5 pl-6 md:table-cell">
-                      {event.tokens > 0 ? formatTokens(event.tokens) : "—"}
+                      {tokens}
                     </td>
                     <td className="py-2.5 pl-6 text-foreground">
                       {event.costUsd > 0 ? (
@@ -397,6 +406,11 @@ function LossEvents({
           </tbody>
         </table>
       </div>
+      {isEstimateShown && (
+        <p className="text-xs text-muted-foreground">
+          ≈ {t("Estimated from cache hit rates")}
+        </p>
+      )}
       {events.length > COLLAPSED_EVENTS && (
         <div>
           <Button

@@ -119,6 +119,7 @@ export function UsageStatsPanel({
   const selectedModel = merged.models.find(
     (model) => `${model.provider}:${model.model}` === selectedModelKey,
   );
+  if (selectedModelKey !== null && !selectedModel) setSelectedModelKey(null);
   return (
     <div className="usage-statistics flex flex-col gap-10">
       <section className="grid gap-x-12 gap-y-8 md:grid-cols-[18rem_minmax(0,1fr)]">
@@ -395,6 +396,10 @@ export function UsageStatsPanel({
                                 ).color,
                               }}
                             />
+                          </div>
+                          <div className="mt-1 text-xs md:hidden">
+                            {t("Share")}{" "}
+                            {share === null ? "—" : formatPercent(share)}
                           </div>
                         </td>
                         <td className="py-2.5 pl-6 text-foreground">

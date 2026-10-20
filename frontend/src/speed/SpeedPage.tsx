@@ -1,5 +1,12 @@
 /** Output speed per model, in tokens per second, measured from local history timings. */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Events } from "@wailsio/runtime";
 import { RefreshCwIcon } from "lucide-react";
 import {
@@ -209,7 +216,7 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
  * @param props - The speed report.
  * @returns The page content.
  */
-function SpeedContent({ report }: { report: SpeedReport }) {
+export function SpeedContent({ report }: { report: SpeedReport }) {
   const labels = bucketLabels(report.window);
   const providers = orderProviders(
     report.providers,
@@ -343,7 +350,9 @@ function ModelName({ model }: { model: SpeedModel }) {
         displayName={presentation.label}
         iconClassName="size-3.5"
       />
-      <span className="truncate">{model.model || t("Unknown model")}</span>
+      <span className="min-w-0 whitespace-normal wrap-anywhere">
+        {model.model || t("Unknown model")}
+      </span>
       {tier && (
         <span className="shrink-0 rounded-sm border border-border px-1 text-3xs text-muted-foreground uppercase">
           {t(tier)}
@@ -449,6 +458,32 @@ function TooltipRow({
 }
 
 /**
+ * One labelled figure of a model row on phones, kept on a single line so wrapping
+ * never separates a label from its value.
+ *
+ * @param props - The label, the formatted value and whether it is a headline figure.
+ * @returns The inline label and value.
+ */
+function PhoneMetric({
+  label,
+  isPrimary = false,
+  children,
+}: {
+  label: string;
+  isPrimary?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span>
+      {label}{" "}
+      <span className={isPrimary ? "text-foreground" : undefined}>
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/**
  * Per-model rates, first-token time, latency and cache use ranked like the Usage breakdown,
  * with a provider-colored bar of relative speed.
  *
@@ -468,11 +503,13 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
           <tr className="border-b border-border text-right text-xs text-muted-foreground">
             <th className="py-2 pr-3 text-left font-normal">#</th>
             <th className="w-full py-2 text-left font-normal">{t("Model")}</th>
-            <th className="py-2 pl-4 font-normal">{t("Output speed")}</th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">
+              {t("Output speed")}
+            </th>
             <th className="hidden py-2 pl-4 font-normal md:table-cell">
               {t("Generation speed")}
             </th>
-            <th className="py-2 pl-4 font-normal">TTFT</th>
+            <th className="hidden py-2 pl-4 font-normal md:table-cell">TTFT</th>
             <th className="hidden py-2 pl-4 font-normal md:table-cell">
               {t("Latency")}
             </th>
@@ -500,6 +537,34 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
           ) : (
             models.map((model, index) => {
               const isMeasured = model.requests > 0;
+              const speed = formatSpeed(model.tokensPerSecond);
+              const ttft = formatLatency(model.medianTtftMs);
+              const generation = formatSpeed(model.decodeTokensPerSecond);
+              const latency = formatLatency(model.medianLatencyMs);
+              const cacheHit =
+                model.inputTokens > 0 ? formatPercent(model.cacheHitRate) : "—";
+              const requests = formatCount(model.requests);
+              const unmeasured =
+                model.unmeasuredRequests > 0
+                  ? `+${formatCount(model.unmeasuredRequests)}`
+                  : "";
+              const tokens = formatTokens(model.totalTokens);
+              const explanation = [
+                isMeasured
+                  ? t("Median {median} · P10–P90 {low}–{high}", {
+                      median: formatSpeed(model.medianTokensPerSecond),
+                      low: formatRate(model.p10TokensPerSecond),
+                      high: formatRate(model.p90TokensPerSecond),
+                    })
+                  : "",
+                model.unmeasuredRequests > 0
+                  ? t("{count} without timing", {
+                      count: formatCount(model.unmeasuredRequests),
+                    })
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <tr
                   key={rowKey(model)}
@@ -507,7 +572,7 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                 >
                   <td className="py-2.5 pr-3 text-left text-xs">{index + 1}</td>
                   <td className="py-2.5 text-left text-foreground">
-                    <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex min-w-0 items-center gap-2 md:min-w-48">
                       <ModelName model={model} />
                     </span>
                     <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
@@ -523,51 +588,54 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                         }}
                       />
                     </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground md:hidden">
+                      <PhoneMetric label={t("Output speed")} isPrimary>
+                        {speed}
+                      </PhoneMetric>
+                      <PhoneMetric label="TTFT" isPrimary>
+                        {ttft}
+                      </PhoneMetric>
+                      <PhoneMetric label={t("Generation speed")}>
+                        {generation}
+                      </PhoneMetric>
+                      <PhoneMetric label={t("Latency")}>{latency}</PhoneMetric>
+                      <PhoneMetric label={t("Cache hit")}>
+                        {cacheHit}
+                      </PhoneMetric>
+                      <PhoneMetric label={t("Requests")}>
+                        {requests}
+                        {unmeasured && ` ${unmeasured}`}
+                      </PhoneMetric>
+                      <PhoneMetric label={t("Tokens")}>{tokens}</PhoneMetric>
+                    </div>
+                    {explanation && (
+                      <div className="mt-0.5 text-xs whitespace-normal text-muted-foreground">
+                        {explanation}
+                      </div>
+                    )}
                   </td>
-                  <td
-                    className="py-2.5 pl-4 text-foreground"
-                    title={
-                      isMeasured
-                        ? t("Median {median} · P10–P90 {low}–{high}", {
-                            median: formatSpeed(model.medianTokensPerSecond),
-                            low: formatRate(model.p10TokensPerSecond),
-                            high: formatRate(model.p90TokensPerSecond),
-                          })
-                        : undefined
-                    }
-                  >
-                    {formatSpeed(model.tokensPerSecond)}
+                  <td className="hidden py-2.5 pl-4 text-foreground md:table-cell">
+                    {speed}
                   </td>
                   <td className="hidden py-2.5 pl-4 md:table-cell">
-                    {formatSpeed(model.decodeTokensPerSecond)}
+                    {generation}
                   </td>
-                  <td className="py-2.5 pl-4">
-                    {formatLatency(model.medianTtftMs)}
+                  <td className="hidden py-2.5 pl-4 md:table-cell">{ttft}</td>
+                  <td className="hidden py-2.5 pl-4 md:table-cell">
+                    {latency}
                   </td>
                   <td className="hidden py-2.5 pl-4 md:table-cell">
-                    {formatLatency(model.medianLatencyMs)}
+                    {cacheHit}
                   </td>
                   <td className="hidden py-2.5 pl-4 md:table-cell">
-                    {model.inputTokens > 0
-                      ? formatPercent(model.cacheHitRate)
-                      : "—"}
-                  </td>
-                  <td className="hidden py-2.5 pl-4 md:table-cell">
-                    {formatCount(model.requests)}
-                    {model.unmeasuredRequests > 0 && (
-                      <span
-                        className="ms-1 text-muted-foreground/70"
-                        title={t("{count} without timing", {
-                          count: formatCount(model.unmeasuredRequests),
-                        })}
-                      >
-                        +{formatCount(model.unmeasuredRequests)}
+                    {requests}
+                    {unmeasured && (
+                      <span className="ms-1 text-muted-foreground/70">
+                        {unmeasured}
                       </span>
                     )}
                   </td>
-                  <td className="hidden py-2.5 pl-4 md:table-cell">
-                    {formatTokens(model.totalTokens)}
-                  </td>
+                  <td className="hidden py-2.5 pl-4 md:table-cell">{tokens}</td>
                 </tr>
               );
             })

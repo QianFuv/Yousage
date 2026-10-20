@@ -190,12 +190,18 @@ function CycleValueSection({
   const timestampFormat = usePrimarySettings(
     (settings) => settings.timestampFormat,
   );
+  const isReadOnly = useIsReadOnly();
   const confidence = predictionConfidence(value);
   const basis = basisText(value);
   const earlier = value.history.slice(0, 3);
   const range = rangeText(value.valueLowUsd, value.valueHighUsd);
   const remaining = rangeText(value.remainingLowUsd, value.remainingHighUsd);
-  const notice = cycleValueNotice(value);
+  const notice =
+    isReadOnly && value.status === "noLocalUsage"
+      ? t(
+          "Quota was used, but no usage in this cycle was recorded on the source desktop.",
+        )
+      : cycleValueNotice(value);
   const isActive = value.status !== "noCycle";
   return (
     <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
@@ -246,7 +252,9 @@ function CycleValueSection({
       {notice ? <p className="text-muted-foreground">{notice}</p> : null}
       {isActive ? (
         <p className="text-muted-foreground">
-          {t("Only usage recorded on this device is counted.")}
+          {isReadOnly
+            ? t("Only usage recorded on the source desktop is counted.")
+            : t("Only usage recorded on this device is counted.")}
           {value.unpricedRecords > 0
             ? ` ${t("{count} unpriced records are excluded, so the value may be higher.", { count: value.unpricedRecords })}`
             : ""}
@@ -288,10 +296,9 @@ function SegmentPopover({
     account.environments.length > 0
       ? account.environments.map((environment) => environment.label).join(", ")
       : account.sourceLabel;
-  const credits =
-    redeem && account.limits.resetCredits?.availableCount
-      ? account.limits.resetCredits
-      : null;
+  const credits = account.limits.resetCredits?.availableCount
+    ? account.limits.resetCredits
+    : null;
   return (
     <div className="flex w-72 max-w-[calc(100vw-3rem)] flex-col gap-2.5 text-xs">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -340,21 +347,23 @@ function SegmentPopover({
         ) : null}
       </div>
       {cycleValue ? <CycleValueSection value={cycleValue} now={now} /> : null}
-      {credits && redeem ? (
+      {credits ? (
         <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
             <span className="tabular-nums">
               {resetCreditsSummary(credits, now, true)}
             </span>
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={redeem.busy}
-              className="ms-auto"
-              onClick={onRedeem}
-            >
-              {redeem.busy ? t("Using…") : t("Use reset")}
-            </Button>
+            {redeem ? (
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={redeem.busy}
+                className="ms-auto"
+                onClick={onRedeem}
+              >
+                {redeem.busy ? t("Using…") : t("Use reset")}
+              </Button>
+            ) : null}
           </span>
         </div>
       ) : null}

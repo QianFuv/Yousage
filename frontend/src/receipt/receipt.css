@@ -92,6 +92,12 @@
 .receipt-item-name {
   font-weight: 600;
 }
+.receipt-row > .receipt-item-name {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .receipt-faint {
   color: var(--receipt-faint);
 }

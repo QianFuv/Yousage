@@ -347,6 +347,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "One or more color themes in that extension could not be imported safely.":
     "该扩展中有主题无法安全导入。",
   "Only usage recorded on this device is counted.": "仅统计本设备记录的用量。",
+  "Only usage recorded on the source desktop is counted.":
+    "仅统计来源桌面端记录的用量。",
   Open: "打开",
   "Open Appearance": "打开外观设置",
   "Open VSX returned an unexpectedly large detail response.":
@@ -406,6 +408,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Quota monitoring": "额度监控",
   "Quota was used, but no usage in this cycle was recorded on this device.":
     "额度已被使用，但本设备没有记录本周期的用量。",
+  "Quota was used, but no usage in this cycle was recorded on the source desktop.":
+    "额度已被使用，但来源桌面端没有记录本周期的用量。",
   "Raised surface": "凸起背景",
   "Read-only access": "只读访问",
   "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":

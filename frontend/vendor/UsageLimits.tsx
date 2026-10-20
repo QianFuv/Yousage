@@ -30,7 +30,15 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
+import {
+  Button,
+  InlineButton,
+} from "../../tools/parity/upstream/apps/web/src/components/ui/button";
+import {
+  Popover,
+  PopoverPopup,
+  PopoverTrigger,
+} from "../../tools/parity/upstream/apps/web/src/components/ui/popover";
 import {
   Tooltip,
   TooltipPopup,
@@ -65,24 +73,22 @@ export function barColor(driver: ServerProvider["driver"]): string {
   return kind ? PROVIDER_PRESENTATION[kind].color : "var(--foreground)";
 }
 
-/** Pace as a glyph with the words on hover. */
+/** Pace as a glyph with the words on hover, tap or keyboard press. */
 export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
   const Icon = PACE[pace].icon;
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <span
-            role="img"
-            aria-label={t(PACE[pace].label)}
-            className="inline-flex text-muted-foreground"
-          />
-        }
+    <Popover>
+      <PopoverTrigger
+        openOnHover
+        render={<InlineButton tone="muted" />}
+        aria-label={t(PACE[pace].label)}
       >
         <Icon className="size-3.5" aria-hidden />
-      </TooltipTrigger>
-      <TooltipPopup side="top">{t(PACE[pace].label)}</TooltipPopup>
-    </Tooltip>
+      </PopoverTrigger>
+      <PopoverPopup side="top" tooltipStyle>
+        {t(PACE[pace].label)}
+      </PopoverPopup>
+    </Popover>
   );
 }
 

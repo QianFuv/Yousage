@@ -1,7 +1,11 @@
 import { formatPercent } from "@t3tools/shared/usageFormat";
 import type { ReactNode } from "react";
 
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../../tools/parity/upstream/apps/web/src/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipPopup,
+  TooltipTrigger,
+} from "../../tools/parity/upstream/apps/web/src/components/ui/tooltip";
 
 export interface ShareSegment {
   readonly label: string;
@@ -36,7 +40,7 @@ export function UsageShareBar({
       </div>
       <div
         role="img"
-        aria-label={`${label}: ${visible.map((segment) => `${segment.label} ${format(segment.value)}`).join(", ")}`}
+        aria-label={`${label}: ${visible.map((segment) => `${segment.label} ${format(segment.value)} ${formatPercent(segment.value / total)}`).join(", ")}`}
         className="flex h-2 gap-0.5"
       >
         {visible.map((segment) => (
@@ -45,26 +49,38 @@ export function UsageShareBar({
               render={
                 <div
                   className="h-full min-w-1 rounded-xs first:rounded-l-full last:rounded-r-full"
-                  style={{ flex: `${segment.value} 1 0`, backgroundColor: segment.color }}
+                  style={{
+                    flex: `${segment.value} 1 0`,
+                    backgroundColor: segment.color,
+                  }}
                 />
               }
             />
             <TooltipPopup>
-              {segment.label} · {format(segment.value)} · {formatPercent(segment.value / total)}
+              {segment.label} · {format(segment.value)} ·{" "}
+              {formatPercent(segment.value / total)}
             </TooltipPopup>
           </Tooltip>
         ))}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {visible.map((segment) => (
-          <span key={segment.label} className="flex min-w-0 items-center gap-1.5">
+          <span
+            key={segment.label}
+            className="flex min-w-0 items-center gap-1.5"
+          >
             <span
               aria-hidden
               className="size-2 shrink-0 rounded-xs"
               style={{ backgroundColor: segment.color }}
             />
             <span className="text-muted-foreground">{segment.label}</span>
-            <span className="wrap-anywhere text-foreground tabular-nums">{format(segment.value)}</span>
+            <span className="wrap-anywhere text-foreground tabular-nums">
+              {format(segment.value)}
+            </span>
+            <span className="text-muted-foreground tabular-nums">
+              {formatPercent(segment.value / total)}
+            </span>
           </span>
         ))}
       </div>
