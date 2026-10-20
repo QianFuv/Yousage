@@ -33,6 +33,7 @@ import {
 import type { CycleValue } from "../src/usage/data";
 
 import { ensureLocalApi } from "../src/usage/host";
+import { limitNoticeLabels, localizeQuotaNotice } from "../src/usage/notices";
 import { usePrimarySettings } from "../src/usage/host";
 import { cn } from "../../tools/parity/src/bridges/utils";
 import { formatResetDuration, formatResetsIn, t } from "../src/i18n";
@@ -818,20 +819,27 @@ export function UsageLimitsPooled({
           </Button>
         </section>
       ))}
-      <LimitNotices notices={notices} />
+      <LimitNotices notices={notices} presentations={presentations} />
     </div>
   );
 }
 
 /** Sources and providers that could not be read, so a missing bar is not mistaken for a full one. */
-function LimitNotices({ notices }: { readonly notices: readonly string[] }) {
+function LimitNotices({
+  notices,
+  presentations,
+}: {
+  readonly notices: readonly string[];
+  readonly presentations: Parameters<typeof collectLimitNotices>[0];
+}) {
   if (notices.length === 0) return null;
+  const labels = limitNoticeLabels(presentations);
   return (
     <Alert variant="warning" controlAlignment="first-line">
       <AlertTriangleIcon />
       {notices.map((notice) => (
         <AlertTitle key={notice} className="break-words">
-          {t(notice)}
+          {localizeQuotaNotice(notice, labels)}
         </AlertTitle>
       ))}
     </Alert>

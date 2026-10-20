@@ -31,6 +31,7 @@ import { mergeAnsweredUsage } from "./data";
 import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
+import { localizeEnvironmentError } from "./notices";
 import { PeriodToggle } from "./PeriodToggle";
 import { useIsReadOnly } from "../web/readOnly";
 import { ViewerCommitMarker } from "../web/renderAcknowledgment";
@@ -212,7 +213,7 @@ export function UsagePage({
               .filter((environment) => environment.error)
               .map((environment) => (
                 <Notice tone="error" key={environment.environmentId}>
-                  {environment.label}: {environment.error}
+                  {environment.label}: {localizeEnvironmentError(environment)}
                 </Notice>
               ))}
           </div>
