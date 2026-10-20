@@ -399,6 +399,12 @@ html [data-slot="input-control"].font-mono input {
   display: grid;
   gap: 12px;
 }
+/* The model detail dialog keeps its inset margins clear of cutouts and system bars. */
+[data-slot="dialog-viewport"]:has(> .usage-model-dialog) {
+  padding: max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+}
 /* Vendored price editor: page chrome is provided by the settings layout. */
 .pricing-panel {
   display: grid;

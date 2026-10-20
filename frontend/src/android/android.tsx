@@ -6,6 +6,7 @@ import { Button } from "../../../tools/parity/upstream/apps/web/src/components/u
 import * as mobileApi from "../../bindings/yousage/internal/mobile/service";
 import { resolveLanguage, setLanguage, t } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
+import { viewerHistory } from "../usage/dialogHistory";
 import {
   androidDiagnosticSink,
   androidDiagnosticsOpener,
@@ -66,15 +67,23 @@ function applyDeviceLook() {
 
 /** Whether the change-link screen added a history entry that the back button closes. */
 let isChangingLink = false;
+/** Shared with viewer dialogs, so a closing dialog's traversal never leaves the change-link screen. */
+const dialogHistory = viewerHistory();
 
-/** Ask for another link while keeping the saved one until a new link connects. */
+/**
+ * Ask for another link while keeping the saved one until a new link connects.
+ *
+ * Waits for a just-closed dialog's history traversal to land first.
+ */
 function changeLink() {
-  openGeneration++;
-  if (!isChangingLink) {
-    history.pushState(null, "");
-    isChangingLink = true;
-  }
-  showPairing(true);
+  dialogHistory.whenSettled(() => {
+    openGeneration++;
+    if (!isChangingLink) {
+      history.pushState(null, "");
+      isChangingLink = true;
+    }
+    showPairing(true);
+  });
 }
 
 /** Leave the change-link screen, or open the newly saved link on first pairing. */
@@ -99,7 +108,7 @@ function showPairing(canKeepLink = false) {
   );
 }
 
-addEventListener("popstate", () => {
+dialogHistory.listen(() => {
   if (!isChangingLink) return;
   isChangingLink = false;
   void openSnapshot();
