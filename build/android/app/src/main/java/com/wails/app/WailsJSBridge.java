@@ -16,7 +16,6 @@ import com.wails.app.BuildConfig;
  */
 public class WailsJSBridge {
     private static final String TAG = "WailsJSBridge";
-    private static final boolean DEBUG = BuildConfig.DEBUG;
     // Pooled threads avoid unbounded thread creation under high call volume.
     private static final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -49,7 +48,6 @@ public class WailsJSBridge {
     @JavascriptInterface
     public String invoke(String message) {
         if (!canInvoke()) return "{\"error\":\"Viewer detached\"}";
-        if (DEBUG) Log.d(TAG, "Invoke called: " + message);
         return bridge.handleMessage(message);
     }
 
@@ -64,7 +62,6 @@ public class WailsJSBridge {
     @JavascriptInterface
     public void invokeAsync(final String callbackId, final String payload) {
         if (!canInvoke()) return;
-        if (DEBUG) Log.d(TAG, "InvokeAsync called: " + payload);
 
         // Handle off the JS thread so we don't block the WebView.
         executor.execute(() -> {
@@ -73,38 +70,30 @@ public class WailsJSBridge {
                 String response = bridge.handleRuntimeCall(payload);
                 sendCallback(callbackId, response, null);
             } catch (Exception e) {
-                Log.e(TAG, "Error in async invoke", e);
+                Log.e(TAG, "Error in async invoke");
                 sendCallback(callbackId, null, e.getMessage());
             }
         });
     }
 
     /**
-     * Log a message from JavaScript to Android's logcat
-     * Called from JavaScript: wails.log(level, message)
-     *
-     * @param level The log level (debug, info, warn, error)
-     * @param message The message to log
+     * Retain the legacy console interface while discarding arbitrary caller content.
+     * Fixed diagnostic categories use diagnostic() instead.
      */
     @JavascriptInterface
     public void log(String level, String message) {
-        switch (level.toLowerCase()) {
-            case "debug":
-                Log.d(TAG + "/JS", message);
-                break;
-            case "info":
-                Log.i(TAG + "/JS", message);
-                break;
-            case "warn":
-                Log.w(TAG + "/JS", message);
-                break;
-            case "error":
-                Log.e(TAG + "/JS", message);
-                break;
-            default:
-                Log.v(TAG + "/JS", message);
-                break;
-        }
+    }
+
+    /** Accept a fixed render/internal category only from the currently attached document. */
+    @JavascriptInterface
+    public void diagnostic(String category) {
+        if (canInvoke()) bridge.recordFrontendDiagnostic(category);
+    }
+
+    /** Open the native diagnostics dialog from frontend settings without a Go round trip. */
+    @JavascriptInterface
+    public void showDiagnostics() {
+        if (canInvoke()) bridge.showDiagnostics();
     }
 
     /**

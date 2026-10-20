@@ -6,6 +6,12 @@ import { Button } from "../../../tools/parity/upstream/apps/web/src/components/u
 import * as mobileApi from "../../bindings/yousage/internal/mobile/service";
 import { resolveLanguage, setLanguage, t } from "../i18n";
 import { configureTimestampLocale } from "../../vendor/timestampFormat";
+import {
+  androidDiagnosticSink,
+  androidDiagnosticsOpener,
+  createDiagnosticReporter,
+  installDiagnosticListeners,
+} from "../diagnostics";
 import { PROBLEMS, refreshError } from "../web/load";
 import { mountViewer } from "../web/mountViewer";
 import type { PrivateSnapshot } from "../web/payloads";
@@ -17,12 +23,18 @@ import "../style.css";
 import "../web/web.css";
 import "./android.css";
 
+/** Fixed render/internal categories for the native diagnostics, which work without Go. */
+const reportDiagnostic = createDiagnosticReporter(androidDiagnosticSink());
+/** The early listener in `android.html` normally owns these, so this only fills in when it is missing. */
+installDiagnosticListeners(window, reportDiagnostic);
+
 /** Whether the last-resort problem screen is up, so a failure while showing it is not handled again. */
 let isShowingFatal = false;
 
 const root: Root = createRoot(document.getElementById("root")!, {
   /** Replace a blank page after a failure no boundary caught, without looping on the problem screen. */
   onUncaughtError() {
+    reportDiagnostic("render");
     if (isShowingFatal) return;
     isShowingFatal = true;
     setTimeout(() => showProblem("display", true));
@@ -196,6 +208,8 @@ async function showSnapshot(generation: number, shouldDownload: boolean) {
         return next.status === "ok" ? toCandidate(next) : null;
       },
       recover: () => void openSnapshot(true),
+      reportDiagnostic,
+      showDiagnostics: androidDiagnosticsOpener() ?? undefined,
       open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
       connection: {
         relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",

@@ -19,6 +19,11 @@ import { canvasBackground, sidebarBackground } from "./native";
 import { configureTimestampLocale } from "../vendor/timestampFormat";
 import { notifyError, Toaster } from "./notify";
 import {
+  createDiagnosticReporter,
+  installDiagnosticListeners,
+  uncaughtRenderHandler,
+} from "./diagnostics";
+import {
   formattingLocale,
   msg,
   resolveLanguage,
@@ -613,6 +618,12 @@ function applyLanguage(preference: string, systemLocale: string) {
   );
 }
 
+/** Fixed render/internal categories through the generated binding; nothing else is sent. */
+const reportDiagnostic = createDiagnosticReporter((category) =>
+  nativeApi.RecordFrontendDiagnostic(category),
+);
+installDiagnosticListeners(window, reportDiagnostic);
+
 /** Load authoritative Go state before rendering the first visible frame. */
 async function start() {
   const [bootstrap, appearance, display] = await Promise.all([
@@ -622,7 +633,9 @@ async function start() {
   ]);
   applyLanguage(display.value.language, bootstrap.systemLocale);
   applySavedAppearance(appearance, bootstrap.isSystemDark);
-  createRoot(document.getElementById("root")!).render(
+  createRoot(document.getElementById("root")!, {
+    onUncaughtError: uncaughtRenderHandler(reportDiagnostic),
+  }).render(
     <AppearanceProvider
       initial={appearance}
       isSystemDark={bootstrap.isSystemDark}
@@ -635,6 +648,7 @@ async function start() {
   );
 }
 void start().catch(async (cause) => {
+  reportDiagnostic("internal");
   document.getElementById("root")!.textContent = String(cause);
   await nativeApi.FrontendReady();
 });

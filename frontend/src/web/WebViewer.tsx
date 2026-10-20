@@ -77,7 +77,8 @@ function PageProblem({ onRetry }: { onRetry: () => void }) {
  * Read-only pages rendered from the latest relay snapshot.
  *
  * @param props - Snapshot time and version, the viewing device locale, the relay connection,
- * refresh status, the shown snapshot's render key and a listener for pages that fail to render.
+ * refresh status, the shown snapshot's render key, a listener for pages that fail to render
+ * and the host's diagnostics, if any.
  * @returns The viewer layout.
  */
 export function WebViewer({
@@ -88,6 +89,7 @@ export function WebViewer({
   refresh,
   renderKey = 0,
   onRenderError,
+  onShowDiagnostics,
 }: {
   generatedAt: string;
   appVersion: string;
@@ -96,6 +98,7 @@ export function WebViewer({
   refresh?: { status: FollowStatus; onRetry: () => void };
   renderKey?: number;
   onRenderError?: (error: unknown) => void;
+  onShowDiagnostics?: () => void;
 }) {
   useI18n();
   const data = useData();
@@ -213,6 +216,7 @@ export function WebViewer({
               appVersion={appVersion}
               locale={locale}
               connection={connection}
+              onShowDiagnostics={onShowDiagnostics}
             />
             <ViewerCommitMarker />
           </>

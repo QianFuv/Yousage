@@ -67,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean hasAttemptedRendererRecovery;
     private boolean isDestroying;
     private WailsBridge bridge;
+    private DiagnosticsStore diagnostics;
     // Battery: system-event receivers are registered only while the activity is
     // in the foreground (onStart) and torn down in onStop, so background battery/
     // network/screen broadcasts don't wake the app.
@@ -93,25 +94,57 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        File filesDirectory = null;
+        try {
+            filesDirectory = getFilesDir();
+        } catch (RuntimeException ignored) {
+        }
+        diagnostics = DiagnosticsStore.initialize(filesDirectory);
         setContentView(R.layout.activity_main);
         applySystemInsets();
         recoveryPanel = findViewById(R.id.viewer_recovery);
         findViewById(R.id.viewer_retry).setOnClickListener(view -> retryApplication());
+        findViewById(R.id.diagnostics_open).setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
+        findViewById(R.id.viewer_diagnostics).setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
 
-        // Initialize the native Go library
-        bridge = new WailsBridge(this);
-        bridge.initialize();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_CREATE, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
+        startViewer();
+    }
 
-        // Set up WebView
-        setupWebView();
+    /** Initialize Go only after diagnostics and native recovery controls are available. */
+    private void startViewer() {
+        try {
+            if (bridge == null) bridge = new WailsBridge(this);
+            bridge.initialize();
+            if (!bridge.isInitialized()) {
+                recordNative(DiagnosticsStore.Event.STARTUP, DiagnosticsStore.Outcome.FAILED, DiagnosticsStore.Failure.UNAVAILABLE);
+                recoveryPanel.setVisibility(View.VISIBLE);
+                return;
+            }
+            recordNative(DiagnosticsStore.Event.STARTUP, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
+            setupWebView();
+            loadApplication();
+        } catch (RuntimeException | LinkageError ignored) {
+            recordNative(DiagnosticsStore.Event.STARTUP, DiagnosticsStore.Outcome.FAILED, DiagnosticsStore.Failure.UNAVAILABLE);
+            try {
+                if (bridge != null) disposeWebView();
+            } catch (RuntimeException ignoredDisposal) {
+            }
+            recoveryPanel.setVisibility(View.VISIBLE);
+        }
+    }
 
-        // Load the application
-        loadApplication();
+    /** Record only fixed native metadata, keeping diagnostic failure separate from application flow. */
+    private void recordNative(DiagnosticsStore.Event event, DiagnosticsStore.Outcome outcome, DiagnosticsStore.Failure failure) {
+        if (diagnostics == null) return;
+        DiagnosticsStore.Level level = failure == DiagnosticsStore.Failure.NONE
+                ? DiagnosticsStore.Level.INFO : DiagnosticsStore.Level.ERROR;
+        diagnostics.record(new DiagnosticsStore.Entry(level, DiagnosticsStore.Source.NATIVE, event, outcome, failure));
     }
 
     /** Keep the WebView inside the system bars and display cutout on edge-to-edge Android. */
     private void applySystemInsets() {
-        android.view.View container = findViewById(R.id.main_container);
+        android.view.View container = findViewById(R.id.main_layout);
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(container, (view, insets) -> {
             androidx.core.graphics.Insets safeArea = insets.getInsets(
                     androidx.core.view.WindowInsetsCompat.Type.systemBars()
@@ -125,14 +158,10 @@ public class MainActivity extends AppCompatActivity {
     /** Configure a fresh view with the existing local origin and native bridge. */
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
-        webView = findViewById(R.id.webview);
-        if (webView == null) {
-            webView = new WebView(this);
-            webView.setId(R.id.webview);
-            FrameLayout container = findViewById(R.id.main_container);
-            container.addView(webView, 0, new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
+        webView = new WebView(this);
+        FrameLayout container = findViewById(R.id.main_container);
+        container.addView(webView, 0, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         bridge.setWebView(webView);
         webView.setBackgroundColor(android.graphics.Color.rgb(10, 10, 10));
 
@@ -192,7 +221,6 @@ public class MainActivity extends AppCompatActivity {
                         if (query != null && !query.isEmpty()) {
                             fullPath = path + "?" + query;
                         }
-                        if (DEBUG) Log.d(TAG, "Wails API call: " + fullPath);
 
                         byte[] data = bridge.serveAsset(fullPath, request.getMethod(), "{}");
                         if (data != null && data.length > 0) {
@@ -239,6 +267,7 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 if (view != webView || isDestroying) return;
                 super.onPageFinished(view, url);
+                recordNative(DiagnosticsStore.Event.RENDERER, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
                 bridge.onPageFinished(url);
                 // Now that JS listeners are mounted, push a snapshot of the
                 // current battery / network / theme so the UI starts populated.
@@ -249,11 +278,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 if (view != webView || isDestroying) return true;
+                recordNative(DiagnosticsStore.Event.RENDERER, DiagnosticsStore.Outcome.FAILED, DiagnosticsStore.Failure.RENDER);
                 disposeWebView();
                 if (!hasAttemptedRendererRecovery) {
                     hasAttemptedRendererRecovery = true;
-                    setupWebView();
-                    loadApplication();
+                    recordNative(DiagnosticsStore.Event.RENDERER, DiagnosticsStore.Outcome.STARTED, DiagnosticsStore.Failure.NONE);
+                    startViewer();
                 } else {
                     recoveryPanel.setVisibility(View.VISIBLE);
                 }
@@ -263,20 +293,20 @@ public class MainActivity extends AppCompatActivity {
             /** Surface document failures without replacing the page for subresource failures. */
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showLoadFailure(view);
+                if (request.isForMainFrame()) showLoadFailure(view, DiagnosticsStore.Failure.NETWORK);
             }
 
             /** Older Android versions report only document failures through this callback. */
             @Override
             @SuppressWarnings("deprecation")
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) showLoadFailure(view);
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) showLoadFailure(view, DiagnosticsStore.Failure.NETWORK);
             }
 
             /** HTTP failures of the document also need a native retry control. */
             @Override
             public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-                if (request.isForMainFrame()) showLoadFailure(view);
+                if (request.isForMainFrame()) showLoadFailure(view, DiagnosticsStore.Failure.HTTP);
             }
         });
 
@@ -303,8 +333,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /** Show recovery only for a failure belonging to the currently attached document. */
-    private void showLoadFailure(WebView failedView) {
+    private void showLoadFailure(WebView failedView, DiagnosticsStore.Failure failure) {
         if (failedView != webView || isDestroying) return;
+        recordNative(DiagnosticsStore.Event.RENDERER, DiagnosticsStore.Outcome.FAILED, failure);
         disposeWebView();
         recoveryPanel.setVisibility(View.VISIBLE);
     }
@@ -313,8 +344,8 @@ public class MainActivity extends AppCompatActivity {
     private void retryApplication() {
         if (isDestroying || webView != null) return;
         recoveryPanel.setVisibility(View.GONE);
-        setupWebView();
-        loadApplication();
+        recordNative(DiagnosticsStore.Event.RENDERER, DiagnosticsStore.Outcome.STARTED, DiagnosticsStore.Failure.NONE);
+        startViewer();
     }
 
     /** Invalidate callbacks before removing and destroying the current view. */
@@ -361,7 +392,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (android.content.ActivityNotFoundException e) {
             bridge.emitEvent("common:capture", "{\"error\":\"no camera app available\"}");
         } catch (Exception e) {
-            Log.e(TAG, "launchCameraCapture failed", e);
+            Log.e(TAG, "launchCameraCapture failed");
             bridge.emitEvent("common:capture", "{\"error\":\"capture failed\"}");
         }
     }
@@ -417,7 +448,7 @@ public class MainActivity extends AppCompatActivity {
                 o.put("streamUrl", captureStreamUrl(f));
                 bridge.emitEvent("common:capture", o.toString());
             } catch (Exception e) {
-                Log.e(TAG, "handleCaptureResult failed", e);
+                Log.e(TAG, "handleCaptureResult failed");
                 bridge.emitEvent("common:capture", "{\"error\":\"result processing failed\"}");
             }
         }).start();
@@ -518,7 +549,7 @@ public class MainActivity extends AppCompatActivity {
             return new WebResourceResponse(mime, null, 200, "OK", headers,
                     new java.io.FileInputStream(file));
         } catch (Exception e) {
-            Log.e(TAG, "serveCaptureFile failed", e);
+            Log.e(TAG, "serveCaptureFile failed");
             return new WebResourceResponse("text/plain", "UTF-8", 500, "Error",
                     new java.util.HashMap<>(), new java.io.ByteArrayInputStream(new byte[0]));
         }
@@ -567,7 +598,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             startActivityForResult(intent, FILE_PICKER_REQUEST);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to launch file picker", e);
+            Log.e(TAG, "Failed to launch file picker");
             pendingFilePickerCallbackID = -1;
             bridge.filePickerDone(callbackID);
         }
@@ -647,7 +678,7 @@ public class MainActivity extends AppCompatActivity {
             }
             return out.getAbsolutePath();
         } catch (Exception e) {
-            Log.e(TAG, "Failed to copy picked document", e);
+            Log.e(TAG, "Failed to copy picked document");
             return null;
         }
     }
@@ -713,7 +744,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 connectivityManager.registerDefaultNetworkCallback(networkCallback);
             } catch (Exception e) {
-                Log.e(TAG, "registerDefaultNetworkCallback failed", e);
+                Log.e(TAG, "registerDefaultNetworkCallback failed");
             }
         }
     }
@@ -792,7 +823,7 @@ public class MainActivity extends AppCompatActivity {
             o.put("lowPowerMode", lowPower);
             if (bridge != null) bridge.emitSystemEvent("android:BatteryChanged", o.toString());
         } catch (Exception e) {
-            Log.e(TAG, "emitBattery failed", e);
+            Log.e(TAG, "emitBattery failed");
         }
     }
 
@@ -833,7 +864,7 @@ public class MainActivity extends AppCompatActivity {
             }
             if (bridge != null) bridge.emitSystemEvent("android:NetworkChanged", o.toString());
         } catch (Exception e) {
-            Log.e(TAG, "emitNetwork failed", e);
+            Log.e(TAG, "emitNetwork failed");
         }
     }
 
@@ -877,6 +908,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_START, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         // Battery: only monitor system events while the app is visible.
         if (!systemReceiversRegistered) {
             registerSystemEventReceivers();
@@ -890,6 +922,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_RESUME, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (bridge != null) {
             bridge.onResume();
         }
@@ -898,6 +931,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_PAUSE, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (bridge != null) {
             bridge.onPause();
         }
@@ -906,6 +940,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_STOP, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (systemReceiversRegistered) {
             unregisterSystemEventReceivers();
             systemReceiversRegistered = false;
@@ -918,6 +953,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onLowMemory() {
         super.onLowMemory();
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_LOW_MEMORY, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (bridge != null) {
             bridge.onLowMemory();
         }
@@ -926,6 +962,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         isDestroying = true;
+        recordNative(DiagnosticsStore.Event.LIFECYCLE_DESTROY, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         unregisterSystemEventReceivers();
         if (bridge != null) {
             disposeWebView();

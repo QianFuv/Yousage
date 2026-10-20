@@ -34,6 +34,7 @@ import {
   VIEWER_COMMIT_CONTEXT,
 } from "./renderAcknowledgment";
 import { clearNotifications, Toaster } from "../notify";
+import type { DiagnosticReporter } from "../diagnostics";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
@@ -89,6 +90,10 @@ export type ViewerHost = {
   fallback?: RuntimeTransport | null;
   /** The relay shown on the settings page, with an optional way to replace the link. */
   connection?: ViewerConnection;
+  /** Local diagnostics intake told about each render failure; the relay web page has none. */
+  reportDiagnostic?: DiagnosticReporter;
+  /** Open the host's local diagnostics from the settings page, when the host has them. */
+  showDiagnostics?: () => void;
 };
 
 /**
@@ -206,7 +211,14 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
     render = () => {
       const rendered = generation;
       /** A failure belongs to the snapshot this render showed, even when reported later. */
-      const onRenderError = () => acknowledger.failed(rendered);
+      const onRenderError = () => {
+        acknowledger.failed(rendered);
+        try {
+          host.reportDiagnostic?.("render");
+        } catch {
+          /* Diagnostics never change how the viewer recovers from the failure. */
+        }
+      };
       host.root.render(
         <ViewerBoundary
           resetKey={rendered}
@@ -237,6 +249,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
                     appVersion={snapshot.appVersion}
                     locale={host.locale}
                     connection={host.connection}
+                    onShowDiagnostics={host.showDiagnostics}
                     refresh={{ status, onRetry: () => refreshShown(true) }}
                     renderKey={rendered}
                     onRenderError={onRenderError}

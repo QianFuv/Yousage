@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 	"yousage/internal/accounting"
+	"yousage/internal/diagnostics"
 	"yousage/internal/domain"
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
@@ -66,6 +67,7 @@ type Snapshot struct {
 	Environments []EnvironmentState `json:"environments"`
 }
 type Service struct {
+	diagnostics       *diagnostics.Store
 	Store             *storage.Store
 	Preferences       *preferences.Service
 	Themes            *theme.Library

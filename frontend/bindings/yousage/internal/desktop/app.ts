@@ -149,7 +149,8 @@ export function GetConfiguration(): $CancellablePromise<service$0.SavedConfigura
 }
 
 /**
- * GetDiagnostics emits an explicit whitelist without credentials, URLs, account identities, paths or raw errors.
+ * GetDiagnostics returns a bounded safe report even before service startup or
+ * after a diagnostic failure. Availability is fixed metadata, never a raw error.
  */
 export function GetDiagnostics(): $CancellablePromise<string> {
     return $Call.ByID(2475500144);
@@ -280,6 +281,14 @@ export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.The
  */
 export function RecenterWindow(): $CancellablePromise<void> {
     return $Call.ByID(4244914996);
+}
+
+/**
+ * RecordFrontendDiagnostic accepts two fixed categories, with at most ten events
+ * in any rolling minute. It never records arbitrary frontend text or errors.
+ */
+export function RecordFrontendDiagnostic(category: string): $CancellablePromise<void> {
+    return $Call.ByID(1398399894, category);
 }
 
 /**

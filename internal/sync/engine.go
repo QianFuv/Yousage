@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	stdsync "sync"
 	"time"
+	"yousage/internal/diagnostics"
 	"yousage/internal/preferences"
 	"yousage/internal/secrets"
 	"yousage/internal/service"
@@ -26,6 +28,8 @@ type Timer interface{ Stop() bool }
 
 // EngineOptions supplies local persistence, builders, networking and an injectable clock.
 type EngineOptions struct {
+	// Diagnostics shares the application-owned local writer; it is never persisted.
+	Diagnostics   *diagnostics.Store `json:"-"`
 	Preferences   *preferences.Service
 	Secrets       secrets.Store
 	BuildSnapshot func(context.Context, string) (Snapshot, error)
@@ -379,6 +383,7 @@ func (engine *Engine) push(ctx context.Context, shouldBypassInterval bool) error
 	return engine.pushOwned(ctx, shouldBypassInterval)
 }
 
+// pushOwned logs only bounded phase metadata while preserving push and cache semantics.
 func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) (pushError error) {
 	engine.mutex.Lock()
 	if engine.isClosed || !engine.settings.IsEnabled {
@@ -393,6 +398,22 @@ func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) 
 	settings, token, key := engine.settings, engine.token, engine.spaceKey
 	engine.status.IsPushing = true
 	engine.mutex.Unlock()
+	operation := engine.options.Diagnostics.NewOperation()
+	started := time.Now()
+	entry := diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceSync, Event: diagnostics.EventRefresh, Outcome: diagnostics.OutcomeStarted, Operation: operation}
+	_ = engine.options.Diagnostics.Record(entry)
+	defer func() {
+		entry.DurationMs = max(0, time.Since(started).Milliseconds())
+		if pushError != nil {
+			entry.Level, entry.Outcome = diagnostics.LevelWarn, diagnostics.OutcomeFailed
+			if entry.Failure == "" {
+				entry.Failure, entry.Status = syncDiagnosticFailure(pushError)
+			}
+		} else if entry.Outcome == diagnostics.OutcomeStarted {
+			entry.Outcome = diagnostics.OutcomeSucceeded
+		}
+		_ = engine.options.Diagnostics.Record(entry)
+	}()
 	engine.emit()
 	defer func() {
 		engine.mutex.Lock()
@@ -405,6 +426,7 @@ func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) 
 		engine.emit()
 	}()
 	if token == "" || key == "" {
+		entry.Failure = diagnostics.FailureCredentialsMissing
 		return errors.New("sync credentials are unavailable")
 	}
 	owner, cancel := context.WithCancel(ctx)
@@ -413,12 +435,16 @@ func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) 
 	defer cancel()
 	snapshot, err := engine.options.BuildSnapshot(owner, settings.TimeZone)
 	if err != nil {
+		entry.Failure = diagnostics.FailureUnavailable
+		_ = engine.options.Diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelWarn, Source: diagnostics.SourceSync, Event: diagnostics.EventValidation, Outcome: diagnostics.OutcomeFailed, Failure: diagnostics.FailureUnavailable, Operation: operation})
 		return errors.New("could not build a complete dashboard snapshot")
 	}
 	data, err := json.Marshal(snapshot)
 	if err != nil {
+		entry.Failure = diagnostics.FailureProtocol
 		return errors.New("could not encode dashboard snapshot")
 	}
+	_ = engine.options.Diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceSync, Event: diagnostics.EventValidation, Outcome: diagnostics.OutcomeSucceeded, Bytes: int64(len(data)), Count: int64(len(snapshot.Periods)), Operation: operation})
 	hash := sha256.Sum256(data)
 	engine.mutex.Lock()
 	hasHash, previous, previousHash := engine.hasHash, engine.lastSnapshot, engine.lastHash
@@ -429,14 +455,20 @@ func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) 
 			return errors.New("could not encode dashboard snapshot")
 		}
 		if sha256.Sum256(comparison) == previousHash {
+			entry.Event, entry.Outcome = diagnostics.EventCache, diagnostics.OutcomeSkipped
 			return nil
 		}
 	}
 	envelope, err := Seal(data, key, "space:"+settings.SpaceId)
 	if err != nil {
+		entry.Failure = diagnostics.FailureProtocol
 		return err
 	}
+	entry.Bytes = int64(len(envelope))
+	_ = engine.options.Diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceSync, Event: diagnostics.EventStage, Outcome: diagnostics.OutcomeSucceeded, Bytes: entry.Bytes, Operation: operation})
 	if err = engine.client.put(owner, settings.RelayUrl, token, "spaces", settings.SpaceId, envelope); err != nil {
+		entry.Failure, entry.Status = syncDiagnosticFailure(err)
+		_ = engine.options.Diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelWarn, Source: diagnostics.SourceSync, Event: diagnostics.EventRollback, Outcome: diagnostics.OutcomeRetained, Failure: entry.Failure, Status: entry.Status, Operation: operation})
 		return err
 	}
 	engine.mutex.Lock()
@@ -444,7 +476,36 @@ func (engine *Engine) pushOwned(ctx context.Context, shouldBypassInterval bool) 
 	engine.lastSnapshot = snapshot
 	engine.status.LastPushAt = engine.lastUpload.UTC().Format(time.RFC3339)
 	engine.mutex.Unlock()
+	entry.Event, entry.Outcome, entry.Status = diagnostics.EventCommit, diagnostics.OutcomeSucceeded, http.StatusNoContent
 	return nil
+}
+
+// syncDiagnosticFailure maps closed client errors without exporting their text.
+func syncDiagnosticFailure(actionError error) (diagnostics.Failure, int) {
+	if errors.Is(actionError, context.Canceled) {
+		return diagnostics.FailureNone, 0
+	}
+	if errors.Is(actionError, context.DeadlineExceeded) {
+		return diagnostics.FailureTimeout, 0
+	}
+	message := actionError.Error()
+	if message == "relay request failed; check the connection and relay URL" {
+		return diagnostics.FailureNetwork, 0
+	}
+	if message == "relay returned an invalid response" {
+		return diagnostics.FailureProtocol, 0
+	}
+	const prefix = "relay returned HTTP "
+	if strings.HasPrefix(message, prefix) {
+		status, err := strconv.Atoi(strings.TrimPrefix(message, prefix))
+		if err == nil && status >= 100 && status <= 599 {
+			if status == http.StatusUnauthorized {
+				return diagnostics.FailureAuthentication, status
+			}
+			return diagnostics.FailureHttp, status
+		}
+	}
+	return diagnostics.FailureUnavailable, 0
 }
 
 // RotatePairing replaces the private identity and key, deletes the old space best effort, and pushes.

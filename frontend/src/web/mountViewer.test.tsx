@@ -178,6 +178,28 @@ function commitPage(rendered: ReactElement[], index = -1) {
 }
 
 describe("mountViewer", () => {
+  it("tells the host's diagnostics about each render failure and offers its diagnostics in settings", async () => {
+    const reportDiagnostic = vi.fn();
+    const showDiagnostics = vi.fn();
+    const { rendered } = await mount({ reportDiagnostic, showDiagnostics });
+    rendered.at(-1)!.props.onError(new Error("render failed"));
+    expect(reportDiagnostic.mock.calls).toEqual([["render"]]);
+    expect(viewerProps(rendered.at(-1))?.onShowDiagnostics).toBe(
+      showDiagnostics,
+    );
+  });
+
+  it("sends nothing to a native interface the host did not pass, as on the relay web page", async () => {
+    const diagnostic = vi.fn();
+    vi.stubGlobal("window", {
+      wails: { diagnostic, showDiagnostics: diagnostic },
+    });
+    const { rendered } = await mount({});
+    rendered.at(-1)!.props.onError(new Error("render failed"));
+    expect(diagnostic).not.toHaveBeenCalled();
+    expect(viewerProps(rendered.at(-1))?.onShowDiagnostics).toBeUndefined();
+  });
+
   it("restores the fallback transport and stops listening when mounting fails", async () => {
     const fallback: RuntimeTransport = { call: vi.fn(async () => null) };
     const broken = snapshot("2026-10-20T00:00:00Z");
@@ -326,6 +348,45 @@ describe("mountViewer", () => {
     expect(shownTime(rendered.at(-1)!)).toBe(kept.payload.generatedAt);
     await pressRefresh();
     expect(download).toHaveBeenLastCalledWith(kept.etag);
+  });
+
+  it("rolls back a failed render the same way when the host's diagnostics throw", async () => {
+    const kept = candidate(snapshot("2026-10-20T00:00:00Z"));
+    const commitNewer = vi.fn(async () => {});
+    const newer = candidate(snapshot("2026-10-20T01:00:00Z"), commitNewer);
+    const download = vi
+      .fn<ViewerHost["download"]>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(newer)
+      .mockResolvedValue(null);
+    const reportDiagnostic = vi.fn(() => {
+      throw new Error("diagnostics unavailable");
+    });
+    const { rendered } = await mount({
+      initial: kept,
+      isSaved: true,
+      download,
+      reportDiagnostic,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const refresh = pressRefresh();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(() =>
+      rendered.at(-1)!.props.onError(new Error("render failed")),
+    ).not.toThrow();
+    commitPage(rendered);
+    await refresh;
+    expect(reportDiagnostic).toHaveBeenCalledOnce();
+    expect(commitNewer).not.toHaveBeenCalled();
+    expect(shownTime(rendered.at(-1)!)).toBe(kept.payload.generatedAt);
+    expect(viewerProps(rendered.at(-1))?.refresh).toMatchObject({
+      status: { state: "failed" },
+    });
+    await pressRefresh();
+    expect(download).toHaveBeenLastCalledWith(kept.etag);
+    expect(viewerProps(rendered.at(-1))?.refresh).toMatchObject({
+      status: { state: "current" },
+    });
   });
 
   it("keeps a newer snapshot when a failure belongs to the snapshot shown before it", async () => {

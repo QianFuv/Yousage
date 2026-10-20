@@ -12,8 +12,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from run_diagnostics_regressions import STUBS as DIAGNOSTICS_STUBS
+
 
 STUBS = {
+    **DIAGNOSTICS_STUBS,
     "android/content/Context.java": "package android.content; public class Context {}",
     "android/app/Activity.java": (
         "package android.app; public class Activity extends android.content.Context {}"
@@ -40,10 +43,13 @@ public class Handler {
     "android/util/Log.java": """
 package android.util;
 public class Log {
-    public static int d(String tag, String message) { return 0; }
-    public static int w(String tag, String message) { return 0; }
-    public static int i(String tag, String message) { return 0; }
-    public static int e(String tag, String message, Throwable error) { return 0; }
+    public static final java.util.List<String> messages = new java.util.ArrayList<>();
+    public static int d(String tag, String message) { messages.add(message); return 0; }
+    public static int w(String tag, String message) { messages.add(message); return 0; }
+    public static int i(String tag, String message) { messages.add(message); return 0; }
+    public static int v(String tag, String message) { messages.add(message); return 0; }
+    public static int e(String tag, String message) { messages.add(message); return 0; }
+    public static int e(String tag, String message, Throwable error) { messages.add(message + error); return 0; }
 }
 """,
     "android/webkit/WebView.java": """
@@ -86,6 +92,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--java-home", type=Path, required=True)
     parser.add_argument("--baseline-ref")
+    parser.add_argument("--privacy-negative-control", action="store_true",
+                        help="Temporarily restore raw console passthrough; privacy regression must fail")
     arguments = parser.parse_args()
     repository = Path(__file__).resolve().parents[6]
     android_project = repository / "build/android"
@@ -104,14 +112,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix="yousage-bridge-regression-") as temporary:
         temporary_path = Path(temporary)
         production_sources = []
-        for filename in ("WailsBridge.java", "WailsJSBridge.java"):
+        for filename in ("WailsBridge.java", "WailsJSBridge.java", "WailsPathHandler.java", "DiagnosticsStore.java", "DiagnosticsUi.java"):
             relative = Path("build/android/app/src/main/java/com/wails/app") / filename
             source = (
                 subprocess.check_output(
                     ["git", "show", f"{arguments.baseline_ref}:{relative.as_posix()}"],
                     cwd=repository,
                 ).decode("utf-8")
-                if arguments.baseline_ref
+                if arguments.baseline_ref and filename not in ("DiagnosticsStore.java", "DiagnosticsUi.java")
                 else (repository / relative).read_text(encoding="utf-8")
             )
             if filename == "WailsBridge.java":
@@ -119,6 +127,11 @@ def main():
                 if source.count(loader) != 1:
                     raise ValueError("Expected exactly one native loader to disable in the disposable host copy")
                 source = source.replace(loader, "")
+            if arguments.privacy_negative_control and filename == "WailsJSBridge.java":
+                console = "public void log(String level, String message) {\n    }"
+                if source.count(console) != 1:
+                    raise ValueError("Expected one no-op legacy console method in the disposable host copy")
+                source = source.replace(console, "public void log(String level, String message) {\n        Log.e(TAG, message);\n    }")
             destination = temporary_path / "production/com/wails/app" / filename
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(source, encoding="utf-8")

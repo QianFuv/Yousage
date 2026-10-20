@@ -3,4 +3,6 @@
     <string name="app_name">Yousage</string>
     <string name="viewer_load_failed">The viewer could not load. Try again. Your saved data and pairing are kept.</string>
     <string name="viewer_retry">Retry</string>
+    <string name="diagnostics_open">Diagnostics</string>
+    <string name="viewer_diagnostics">View diagnostics</string>
 </resources>

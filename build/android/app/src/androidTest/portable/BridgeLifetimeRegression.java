@@ -2,15 +2,19 @@ package com.wails.app;
 
 import android.os.Handler;
 import android.webkit.WebView;
+import android.util.Log;
 import java.lang.reflect.Method;
 
 /** Exercise actual bridge dispatch code with synthetic calls and a deterministic host UI queue. */
 public final class BridgeLifetimeRegression {
     private static int failureCount;
+    private static final String CANARY = "PRIVATE-CANARY-token-path-payload";
 
     /** Record backend calls without initializing JNI or reading application data. */
     private static final class RecordingBridge extends WailsBridge {
         int messageCount;
+        int diagnosticCount;
+        int diagnosticsUiCount;
 
         RecordingBridge() {
             super(null);
@@ -20,6 +24,16 @@ public final class BridgeLifetimeRegression {
         public String handleMessage(String message) {
             messageCount++;
             return "synthetic-response";
+        }
+
+        /** Count diagnostic dispatch without JNI; also compiles against the pre-diagnostics baseline. */
+        public void recordFrontendDiagnostic(String category) {
+            diagnosticCount++;
+        }
+
+        /** Count native UI requests without opening a device dialog. */
+        public void showDiagnostics() {
+            diagnosticsUiCount++;
         }
     }
 
@@ -33,6 +47,10 @@ public final class BridgeLifetimeRegression {
         run("late JavaScript callback after replacement", BridgeLifetimeRegression::lateCallbackAfterReplacement);
         run("queued JavaScript callback after detach", BridgeLifetimeRegression::queuedCallbackAfterDetach);
         run("active JavaScript callback", BridgeLifetimeRegression::activeCallback);
+        run("current native diagnostics interface", BridgeLifetimeRegression::activeDiagnostics);
+        run("detached native diagnostics interface", BridgeLifetimeRegression::detachedDiagnostics);
+        run("replaced native diagnostics interface", BridgeLifetimeRegression::replacedDiagnostics);
+        run("legacy console and native logs redact caller data", BridgeLifetimeRegression::logPrivacy);
         if (failureCount != 0) throw new AssertionError(failureCount + " lifetime regressions failed");
     }
 
@@ -142,6 +160,74 @@ public final class BridgeLifetimeRegression {
         Handler.drain();
         require(view.scripts.size() == 1 && view.scripts.get(0).contains("synthetic-result"),
                 "active callback was not delivered");
+    }
+
+    /** Current settings/errors dispatch directly without relying on a running Go backend. */
+    private static void activeDiagnostics() {
+        RecordingBridge bridge = new RecordingBridge();
+        WebView view = new WebView();
+        bridge.setWebView(view);
+        WailsJSBridge javascriptBridge = new WailsJSBridge(bridge, view);
+        diagnostic(javascriptBridge, "render");
+        openDiagnostics(javascriptBridge);
+        require(bridge.diagnosticCount == 1 && bridge.diagnosticsUiCount == 1, "current diagnostic interface did not dispatch");
+    }
+
+    /** Detached interfaces must not log failures or reopen native UI after their document dies. */
+    private static void detachedDiagnostics() {
+        RecordingBridge bridge = new RecordingBridge();
+        WebView view = new WebView();
+        bridge.setWebView(view);
+        WailsJSBridge javascriptBridge = new WailsJSBridge(bridge, view);
+        javascriptBridge.detach();
+        diagnostic(javascriptBridge, "internal");
+        openDiagnostics(javascriptBridge);
+        require(bridge.diagnosticCount == 0 && bridge.diagnosticsUiCount == 0, "detached diagnostic interface dispatched");
+    }
+
+    /** A replacement document invalidates the old document's diagnostic entry points. */
+    private static void replacedDiagnostics() {
+        RecordingBridge bridge = new RecordingBridge();
+        WebView view = new WebView();
+        bridge.setWebView(view);
+        WailsJSBridge javascriptBridge = new WailsJSBridge(bridge, view);
+        bridge.setWebView(new WebView());
+        diagnostic(javascriptBridge, "render");
+        openDiagnostics(javascriptBridge);
+        require(bridge.diagnosticCount == 0 && bridge.diagnosticsUiCount == 0, "replaced diagnostic interface dispatched");
+    }
+
+    /** Caller payloads, paths and arbitrary console values must not reach logcat, even in debug. */
+    private static void logPrivacy() {
+        Log.messages.clear();
+        RecordingBridge bridge = new RecordingBridge();
+        WebView view = new WebView();
+        bridge.setWebView(view);
+        WailsJSBridge javascriptBridge = new WailsJSBridge(bridge, view);
+        javascriptBridge.invoke(CANARY);
+        javascriptBridge.log("error", CANARY);
+        bridge.serveAsset(CANARY, "GET", "{}");
+        new WailsPathHandler(bridge).handle(CANARY);
+        require(Log.messages.stream().noneMatch(value -> value.contains(CANARY)), "raw caller content reached native logs");
+        javascriptBridge.log(null, CANARY);
+    }
+
+    /** Invoke new API reflectively so regression cases can also compile against the old baseline. */
+    private static void diagnostic(WailsJSBridge javascriptBridge, String category) {
+        try {
+            WailsJSBridge.class.getMethod("diagnostic", String.class).invoke(javascriptBridge, category);
+        } catch (ReflectiveOperationException failure) {
+            throw new AssertionError("Native diagnostic API unavailable", failure);
+        }
+    }
+
+    /** Invoke the new settings entry point while keeping the before-state fixture source compatible. */
+    private static void openDiagnostics(WailsJSBridge javascriptBridge) {
+        try {
+            WailsJSBridge.class.getMethod("showDiagnostics").invoke(javascriptBridge);
+        } catch (ReflectiveOperationException failure) {
+            throw new AssertionError("Native diagnostics UI entry unavailable", failure);
+        }
     }
 
     /** Simulate async completion deterministically through the production reply method. */

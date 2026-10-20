@@ -73,7 +73,6 @@ import java.util.concurrent.Executor;
  */
 public class WailsBridge {
     private static final String TAG = "WailsBridge";
-    private static final boolean DEBUG = BuildConfig.DEBUG;
     private static final int LOCATION_PERMISSION_REQUEST = 1002;
 
     static {
@@ -82,6 +81,7 @@ public class WailsBridge {
     }
 
     private final Activity activity;
+    private final DiagnosticsStore diagnostics;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile WebViewBinding webViewBinding;
     private volatile boolean initialized = false;
@@ -133,6 +133,22 @@ public class WailsBridge {
 
     public WailsBridge(Activity activity) {
         this.activity = activity;
+        this.diagnostics = DiagnosticsStore.current();
+    }
+
+    /** Report native initialization state without invoking JNI or exposing application data. */
+    boolean isInitialized() {
+        return initialized;
+    }
+
+    /** Accept only fixed frontend failure literals; the store enforces the process-wide rate limit. */
+    public void recordFrontendDiagnostic(String category) {
+        if (diagnostics != null) diagnostics.frontendFailure(category);
+    }
+
+    /** Open the independent native diagnostic UI, including when Go has failed to initialize. */
+    public void showDiagnostics() {
+        DiagnosticsUi.show(activity, diagnostics);
     }
 
     /**
@@ -147,7 +163,7 @@ public class WailsBridge {
             initialized = true;
             Log.i(TAG, "Wails bridge initialized");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize Wails bridge", e);
+            Log.e(TAG, "Failed to initialize Wails bridge");
         }
     }
 
@@ -163,7 +179,7 @@ public class WailsBridge {
             nativeShutdown();
             initialized = false;
         } catch (Exception e) {
-            Log.e(TAG, "Error during shutdown", e);
+            Log.e(TAG, "Error during shutdown");
         }
     }
 
@@ -233,14 +249,13 @@ public class WailsBridge {
      */
     public byte[] serveAsset(String path, String method, String headers) {
         if (!initialized) {
-            Log.w(TAG, "Bridge not initialized, cannot serve asset: " + path);
+            Log.w(TAG, "Bridge not initialized, cannot serve asset");
             return null;
         }
-        if (DEBUG) Log.d(TAG, "Serving asset: " + path);
         try {
             return nativeServeAsset(path, method, headers);
         } catch (Exception e) {
-            Log.e(TAG, "Error serving asset: " + path, e);
+            Log.e(TAG, "Error serving asset");
             return null;
         }
     }
@@ -268,11 +283,10 @@ public class WailsBridge {
             Log.w(TAG, "Bridge not initialized, cannot handle message");
             return "{\"error\":\"Bridge not initialized\"}";
         }
-        if (DEBUG) Log.d(TAG, "Message from JS: " + message);
         try {
             return nativeHandleMessage(message);
         } catch (Exception e) {
-            Log.e(TAG, "Error handling message", e);
+            Log.e(TAG, "Error handling message");
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
     }
@@ -285,11 +299,10 @@ public class WailsBridge {
         if (!initialized) {
             return "{\"ok\":false,\"error\":\"Bridge not initialized\"}";
         }
-        if (DEBUG) Log.d(TAG, "Runtime call: " + payload);
         try {
             return nativeHandleRuntimeCall(payload);
         } catch (Exception e) {
-            Log.e(TAG, "Error in runtime call", e);
+            Log.e(TAG, "Error in runtime call");
             return "{\"ok\":false,\"error\":\"" + e.getMessage() + "\"}";
         }
     }
@@ -357,7 +370,7 @@ public class WailsBridge {
             result.put("insetRight", insetRight);
             return result.toString();
         } catch (Exception e) {
-            Log.e(TAG, "getScreenInfoJson failed", e);
+            Log.e(TAG, "getScreenInfoJson failed");
             return "";
         }
     }
@@ -407,7 +420,7 @@ public class WailsBridge {
             ClipboardManager cm = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("wails", text));
         } catch (Exception e) {
-            Log.e(TAG, "setClipboardText failed", e);
+            Log.e(TAG, "setClipboardText failed");
         }
     }
 
@@ -420,7 +433,7 @@ public class WailsBridge {
                 return text != null ? text.toString() : "";
             }
         } catch (Exception e) {
-            Log.e(TAG, "getClipboardText failed", e);
+            Log.e(TAG, "getClipboardText failed");
         }
         return "";
     }
@@ -441,7 +454,7 @@ public class WailsBridge {
                 vibrator.vibrate(durationMs);
             }
         } catch (Exception e) {
-            Log.e(TAG, "vibrate failed", e);
+            Log.e(TAG, "vibrate failed");
         }
     }
 
@@ -470,7 +483,7 @@ public class WailsBridge {
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 activity.startActivity(chooser);
             } catch (Exception e) {
-                Log.e(TAG, "share failed", e);
+                Log.e(TAG, "share failed");
             }
         });
     }
@@ -485,7 +498,7 @@ public class WailsBridge {
                 view.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 activity.startActivity(view);
             } catch (Exception e) {
-                Log.e(TAG, "openURL failed", e);
+                Log.e(TAG, "openURL failed");
             }
         });
     }
@@ -530,7 +543,7 @@ public class WailsBridge {
                         enabled != 0 ? "{\"on\":true,\"available\":true}"
                                      : "{\"on\":false,\"available\":true}");
             } catch (Exception e) {
-                Log.e(TAG, "setTorch failed", e);
+                Log.e(TAG, "setTorch failed");
                 emitEvent("common:torch", "{\"on\":false,\"available\":false}");
             }
         });
@@ -569,7 +582,7 @@ public class WailsBridge {
                                               : Math.max(0.01f, Math.min(1f, pct / 100f));
                 activity.getWindow().setAttributes(lp);
             } catch (Exception e) {
-                Log.e(TAG, "setBrightness failed", e);
+                Log.e(TAG, "setBrightness failed");
             }
         });
     }
@@ -673,7 +686,7 @@ public class WailsBridge {
                     activity.getWindow().getDecorView().setSystemUiVisibility(vis);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "setStatusBar failed", e);
+                Log.e(TAG, "setStatusBar failed");
             }
         });
     }
@@ -723,7 +736,7 @@ public class WailsBridge {
                         .build();
                 prompt.authenticate(info);
             } catch (Exception e) {
-                Log.e(TAG, "authenticate failed", e);
+                Log.e(TAG, "authenticate failed");
                 emitBiometric(false, "exception");
             }
         });
@@ -761,7 +774,7 @@ public class WailsBridge {
                 nm.notify((int) (System.currentTimeMillis() & 0x0fffffff), n);
                 emitEvent("common:notification", "{\"ok\":true}");
             } catch (Exception e) {
-                Log.e(TAG, "postNotification failed", e);
+                Log.e(TAG, "postNotification failed");
                 emitEvent("common:notification", "{\"ok\":false}");
             }
         });
@@ -789,7 +802,7 @@ public class WailsBridge {
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
         } catch (Exception e) {
-            Log.e(TAG, "securePrefs initialization failed", e);
+            Log.e(TAG, "securePrefs initialization failed");
         }
         return cachedSecurePrefs;
     }
@@ -902,7 +915,7 @@ public class WailsBridge {
                 vibrator.vibrate(20);
             }
         } catch (Exception e) {
-            Log.e(TAG, "haptic failed", e);
+            Log.e(TAG, "haptic failed");
         }
     }
 
@@ -985,7 +998,7 @@ public class WailsBridge {
                     @Override public void onStatusChanged(String p, int s, android.os.Bundle e) {}
                 }, Looper.getMainLooper());
             } catch (Exception e) {
-                Log.e(TAG, "getLocation failed", e);
+                Log.e(TAG, "getLocation failed");
                 emitLocationError("exception");
             }
         });
@@ -1281,7 +1294,7 @@ public class WailsBridge {
                 ContextCompat.startForegroundService(activity, i);
                 emitEvent("android:foregroundService", "{\"running\":true}");
             } catch (Exception e) {
-                Log.e(TAG, "startForegroundService failed", e);
+                Log.e(TAG, "startForegroundService failed");
                 emitEvent("android:foregroundService", "{\"running\":false,\"error\":\"failed to start\"}");
             }
         });
@@ -1294,7 +1307,7 @@ public class WailsBridge {
                 activity.stopService(new Intent(activity, WailsForegroundService.class));
                 emitEvent("android:foregroundService", "{\"running\":false}");
             } catch (Exception e) {
-                Log.e(TAG, "stopForegroundService failed", e);
+                Log.e(TAG, "stopForegroundService failed");
             }
         });
     }
@@ -1388,7 +1401,7 @@ public class WailsBridge {
 
                 builder.show();
             } catch (Exception e) {
-                Log.e(TAG, "showMessageDialog failed", e);
+                Log.e(TAG, "showMessageDialog failed");
                 dialogCallback(callbackID, -1);
             }
         });

@@ -1,5 +1,5 @@
 /** Settings page of the read-only viewer: snapshot freshness, the relay link and the app version. */
-import { RefreshCwIcon, Unlink2Icon } from "lucide-react";
+import { FileTextIcon, RefreshCwIcon, Unlink2Icon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { cn } from "../../../tools/parity/src/bridges/utils";
 import { useData } from "../usage/controller";
@@ -35,7 +35,8 @@ export function formatSnapshotTime(instant: string, locale: string): string {
 /**
  * Snapshot details and connection controls for the viewer.
  *
- * @param props - Snapshot time and version, viewing locale and the relay connection.
+ * @param props - Snapshot time and version, viewing locale, the relay connection and,
+ * when the host has local diagnostics, a way to open them.
  * @returns The settings page.
  */
 export function ViewerSettings({
@@ -43,11 +44,13 @@ export function ViewerSettings({
   appVersion,
   locale,
   connection,
+  onShowDiagnostics,
 }: {
   generatedAt: string;
   appVersion: string;
   locale: string;
   connection?: ViewerConnection;
+  onShowDiagnostics?: () => void;
 }) {
   useI18n();
   const data = useData();
@@ -108,6 +111,22 @@ export function ViewerSettings({
                     {t("Change link")}
                   </Button>
                 )
+              }
+            />
+          </SettingsSection>
+        )}
+        {onShowDiagnostics && (
+          <SettingsSection title={t("Diagnostics")}>
+            <SettingsRow
+              title={t("Diagnostics report")}
+              description={t(
+                "Recent redacted events stored on this device. Nothing is uploaded unless you share it.",
+              )}
+              control={
+                <Button variant="outline" size="sm" onClick={onShowDiagnostics}>
+                  <FileTextIcon aria-hidden />
+                  {t("View")}
+                </Button>
               }
             />
           </SettingsSection>

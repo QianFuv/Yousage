@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"yousage/internal/diagnostics"
 	"yousage/internal/domain"
 	"yousage/internal/managedprocess"
 	"yousage/internal/provider/claudeprobe"
@@ -214,6 +215,9 @@ func (service *Service) recordFollowupFailure(ctx context.Context, historyError 
 
 // scanLimits persists resolved limits and records only fresh native quota observations.
 func (service *Service) scanLimits(ctx context.Context) (bool, error) {
+	operation := service.diagnostics.NewOperation()
+	started := time.Now()
+	_ = service.diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventQuota, Outcome: diagnostics.OutcomeStarted, Operation: operation})
 	err := service.gate.WithRefresh(ctx, "local-quotas", func() error {
 		configuration, err := service.Configuration(ctx)
 		if err != nil {
@@ -253,6 +257,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					httpOptions.Environment["HOME"], httpOptions.Environment["USERPROFILE"] = target.Home, target.Home
 				}
 				var account quota.Account
+				probeStarted := time.Now()
 				switch target.Driver {
 				case "codex":
 					account = quota.ProbeCodex(ctx, options)
@@ -272,6 +277,9 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 					}
 				}
 				isFresh[index] = !isProbeFailed && account.Limits.Unavailable == nil
+				if target.Driver == "claudeAgent" {
+					service.recordClaudeProbe(account.Limits, old.Limits, operation, probeStarted)
+				}
 				account.Limits = quota.ResolveProbe(old.Limits, account.Limits)
 				if account.Email == "" && isProbeFailed {
 					account.Email = old.Auth.Email
@@ -316,6 +324,7 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 		}
 		return err
 	})
+	service.recordRefreshResult(diagnostics.EventQuota, operation, started, err)
 	return err == nil, err
 }
 

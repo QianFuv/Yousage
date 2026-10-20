@@ -186,6 +186,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Detect providers again": "重新识别 Provider",
   "Detected automatically. Account access is checked only after enabling quotas.":
     "已自动识别。启用额度监控后才会检查账户。",
+  Diagnostics: "诊断",
   "Diagnostics report": "诊断报告",
   Discard: "放弃",
   "Discard changes": "放弃更改",
@@ -413,6 +414,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "重新读取 relay 上的快照，不会让桌面端刷新。",
   "Ready to import {count} themes": "准备导入 {count} 个主题",
   "Receipt image copied.": "小票图片已复制。",
+  "Recent redacted events stored on this device. Nothing is uploaded unless you share it.":
+    "保存在本设备上的近期脱敏事件。除非你主动分享，否则不会上传。",
   Recenter: "居中",
   "Recenter window": "窗口居中",
   "Redacted report copied.": "已复制脱敏报告。",
@@ -730,6 +733,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Using…": "正在使用…",
   "Versions do not match": "版本不匹配",
   Via: "来源",
+  View: "查看",
   "View usage in ChatGPT with your connected account.":
     "使用已连接的账户在 ChatGPT 中查看用量。",
   "Wails runtime documentation": "Wails 运行时文档",

@@ -19,6 +19,7 @@ func (service *App) initializeSync(ctx context.Context) error {
 		Now: service.usage.Now,
 	}
 	engine, err := sync.NewEngine(ctx, sync.EngineOptions{
+		Diagnostics:   service.diagnostics,
 		Preferences:   service.usage.Preferences,
 		Secrets:       service.usage.Secrets,
 		BuildSnapshot: builder.Build,

@@ -126,7 +126,7 @@ func compareVersions(first, second string) int {
 }
 
 // compile uses the selected NDK's host compiler to produce one JNI shared library.
-func compile(root, sdk, mode, architecture string) error {
+func compile(root, sdk, mode, architecture string) (compileError error) {
 	ndk, err := ndkDirectory(sdk)
 	if err != nil {
 		return err
@@ -152,18 +152,25 @@ func compile(root, sdk, mode, architecture string) error {
 	if err = os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
 		return err
 	}
-	tags := "android,debug"
-	if mode == "release" {
-		tags = "android,production"
+	framework, cleanup, err := prepareAndroidFrameworkOverlay(root)
+	if err != nil {
+		return err
 	}
-	command := exec.Command("go", "build", "-buildmode=c-shared", "-tags", tags, "-trimpath", "-buildvcs=false", "-ldflags=-w -s", "-o", destination, ".")
+	defer func() { compileError = errors.Join(compileError, cleanup()) }()
+	command := exec.Command("go", androidCompileArguments(destination, framework)...)
 	command.Dir = root
-	command.Env = environment(map[string]string{
+	command.Env = offlineGoEnvironment(map[string]string{
 		"GOOS": "android", "GOARCH": architecture, "CGO_ENABLED": "1",
 		"CC":  strconv.Quote(filepath.ToSlash(compiler)),
 		"CXX": strconv.Quote(filepath.ToSlash(filepath.Join(toolchain, target+"21-clang++"+suffix))),
 	})
 	return run(command)
+}
+
+// androidCompileArguments disables framework payload logging for every APK variant.
+// Gradle still controls debug packaging; application diagnostics use the redacted store.
+func androidCompileArguments(destination string, framework androidFrameworkBuild) []string {
+	return []string{"build", "-buildmode=c-shared", "-tags", "android,production", "-trimpath", "-buildvcs=false", "-ldflags=-w -s", "-mod=readonly", "-modfile", framework.Modfile, "-overlay", framework.Overlay, "-o", destination, "."}
 }
 
 // javaMajor reads a JDK's release metadata without starting an incompatible JVM.

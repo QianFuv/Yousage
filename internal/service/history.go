@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 	"yousage/internal/accounting"
+	"yousage/internal/diagnostics"
 	"yousage/internal/domain"
 	"yousage/internal/history"
 	"yousage/internal/preferences"
@@ -73,7 +74,11 @@ func (service *Service) RefreshHistory(ctx context.Context, request refresh.Requ
 }
 
 // scanHistory persists source coverage and emits unless an enclosing refresh defers it.
-func (service *Service) scanHistory(ctx context.Context) (bool, error) {
+func (service *Service) scanHistory(ctx context.Context) (hasChanged bool, scanError error) {
+	operation := service.diagnostics.NewOperation()
+	started := time.Now()
+	_ = service.diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventRefresh, Outcome: diagnostics.OutcomeStarted, Operation: operation})
+	defer func() { service.recordRefreshResult(diagnostics.EventRefresh, operation, started, scanError) }()
 	sources, _, err := service.Preferences.Sources(ctx)
 	if err != nil {
 		return false, err
@@ -116,6 +121,7 @@ func (service *Service) scanHistory(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	_ = service.diagnostics.Record(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventCache, Outcome: diagnostics.OutcomeSucceeded, Count: int64(len(results)), Operation: operation})
 	for _, result := range results {
 		put(jsonIds[string(result.Fingerprint.Provider)+":"+result.Fingerprint.ResolvedHomePath], remote.Source{Fingerprint: result.Fingerprint, Status: result.Status, ScannedFiles: result.ScannedFiles, SkippedFiles: result.SkippedFiles, MalformedRecords: result.MalformedRecords, Message: sourceMessage(result.Notice)})
 	}

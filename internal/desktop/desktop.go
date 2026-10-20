@@ -2,14 +2,13 @@ package desktop
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"math"
 	"os"
-	"runtime"
 	"time"
+	"yousage/internal/diagnostics"
 	"yousage/internal/preferences"
 )
 
@@ -301,31 +300,6 @@ func (service *App) DiscardDraftCredentials(identities []string) error {
 	return service.usage.DiscardDraftCredentials(service.context, identities)
 }
 
-// GetDiagnostics emits an explicit whitelist without credentials, URLs, account identities, paths or raw errors.
-func (service *App) GetDiagnostics() (string, error) {
-	config, err := service.usage.Configuration(service.context)
-	if err != nil {
-		return "", err
-	}
-	sources, _, err := service.usage.Preferences.Sources(service.context)
-	if err != nil {
-		return "", err
-	}
-	value := struct {
-		Application        string `json:"application"`
-		Wails              string `json:"wails"`
-		Go                 string `json:"go"`
-		Platform           string `json:"platform"`
-		SourceCommit       string `json:"sourceCommit"`
-		HistorySources     int    `json:"historySources"`
-		RemoteEnvironments int    `json:"remoteEnvironments"`
-		QuotaTargets       int    `json:"quotaTargets"`
-		QuotaHubs          int    `json:"quotaHubs"`
-	}{"Yousage", "3.0.0-beta.30", runtime.Version(), runtime.GOOS + "/" + runtime.GOARCH, "51f7f77f87318a5329d3bab15d513fda5654200b", len(sources), len(config.Value.Connections), len(config.Value.Providers), len(config.Value.Hubs)}
-	data, err := json.MarshalIndent(value, "", "  ")
-	return string(data), err
-}
-
 // ExportDiagnostics writes only the same whitelisted report after an explicit native Save dialog.
 func (service *App) ExportDiagnostics() (bool, error) {
 	value, err := service.GetDiagnostics()
@@ -337,9 +311,15 @@ func (service *App) ExportDiagnostics() (bool, error) {
 		return false, nil
 	}
 	if err != nil || path == "" {
-		return false, err
+		if err != nil {
+			return false, diagnostics.ErrUnavailable
+		}
+		return false, nil
 	}
-	return true, os.WriteFile(path, []byte(value+"\n"), 0600)
+	if os.WriteFile(path, []byte(value+"\n"), 0600) != nil {
+		return false, diagnostics.ErrUnavailable
+	}
+	return true, nil
 }
 
 // GetLocalEnvironmentId supplies stable local selection independently of summary availability.

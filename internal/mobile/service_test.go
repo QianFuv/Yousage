@@ -106,8 +106,13 @@ func TestPairingPersistence(test *testing.T) {
 		test.Fatal("invalid replacement damaged existing credentials")
 	}
 	entries, _ := os.ReadDir(directory)
-	if len(entries) != 2 {
+	if len(entries) != 3 {
 		test.Fatalf("temporary files remain: %v", entries)
+	}
+	for _, entry := range entries {
+		if entry.Name() != pairingFile && entry.Name() != snapshotFile && !(entry.Name() == "diagnostics" && entry.IsDir()) {
+			test.Fatalf("unexpected private entry: %s", entry.Name())
+		}
 	}
 	for range 2 {
 		if err = reopened.Unpair(); err != nil {
@@ -262,8 +267,8 @@ func TestCachedSnapshot(test *testing.T) {
 	if err = service.Unpair(); err != nil {
 		test.Fatal(err)
 	}
-	if entries, _ := os.ReadDir(directory); len(entries) != 0 {
-		test.Fatalf("unpair left private files: %v", entries)
+	if entries, _ := os.ReadDir(directory); len(entries) != 1 || entries[0].Name() != "diagnostics" || !entries[0].IsDir() {
+		test.Fatalf("unpair left pairing or snapshot files: %v", entries)
 	}
 }
 

@@ -10,8 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 	"yousage/internal/appstate"
+	"yousage/internal/diagnostics"
 	"yousage/internal/domain"
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
@@ -31,31 +33,35 @@ type Bootstrap struct {
 
 // App bridges authoritative local services to the desktop interface.
 type App struct {
-	context             context.Context
-	nativeApp           *application.App
-	window              *application.WebviewWindow
-	tray                *application.SystemTray
-	logFile             *os.File
-	logMutex            sync.Mutex
-	logPath             string
-	stateDirectory      string
-	store               *storage.Store
-	themes              *theme.Library
-	themeCancel         context.CancelFunc
-	themeDone           chan struct{}
-	usage               *dataservice.Service
-	syncEngine          *datasync.Engine
-	backgroundRefresh   *backgroundRefreshController
-	backgroundOptions   backgroundRefreshOptions
-	windowMutex         sync.Mutex
-	normalBounds        preferences.WindowBounds
-	hasNormalBounds     bool
-	isShuttingDown      bool
-	isCloseBridgeActive bool
-	shouldAllowClose    bool
-	shouldCloseToTray   bool
-	isWaitingInTray     bool
-	zoom                float64
+	diagnostics             *diagnostics.Store
+	diagnosticUnavailable   atomic.Bool
+	frontendDiagnosticMutex sync.Mutex
+	frontendDiagnosticTimes []time.Time
+	context                 context.Context
+	nativeApp               *application.App
+	window                  *application.WebviewWindow
+	tray                    *application.SystemTray
+	logFile                 *os.File
+	logMutex                sync.Mutex
+	logPath                 string
+	stateDirectory          string
+	store                   *storage.Store
+	themes                  *theme.Library
+	themeCancel             context.CancelFunc
+	themeDone               chan struct{}
+	usage                   *dataservice.Service
+	syncEngine              *datasync.Engine
+	backgroundRefresh       *backgroundRefreshController
+	backgroundOptions       backgroundRefreshOptions
+	windowMutex             sync.Mutex
+	normalBounds            preferences.WindowBounds
+	hasNormalBounds         bool
+	isShuttingDown          bool
+	isCloseBridgeActive     bool
+	shouldAllowClose        bool
+	shouldCloseToTray       bool
+	isWaitingInTray         bool
+	zoom                    float64
 }
 
 // newApp opens the shared desktop state directory without falling back to another location.
@@ -93,6 +99,11 @@ func newAppInDirectory(stateDirectory string, isSmoke bool) (*App, error) {
 	if isSmoke {
 		stateDirectory = filepath.Join(directory, "isolated-state")
 	}
+	diagnosticDirectory := filepath.Join(stateDirectory, "diagnostics")
+	var diagnosticStore *diagnostics.Store
+	if diagnostics.Initialize(diagnosticDirectory) == nil {
+		diagnosticStore, _ = diagnostics.Open(diagnosticDirectory)
+	}
 	database, err := storage.Open(appstate.DatabasePath(stateDirectory))
 	if err != nil {
 		logFile.Close()
@@ -111,20 +122,24 @@ func newAppInDirectory(stateDirectory string, isSmoke bool) (*App, error) {
 			return nil, err
 		}
 	}
-	return &App{logFile: logFile, logPath: logPath, stateDirectory: stateDirectory, store: database, themes: &theme.Library{Repository: database, PublishedStore: theme.Store{Directory: stateDirectory}}}, nil
+	return &App{diagnostics: diagnosticStore, logFile: logFile, logPath: logPath, stateDirectory: stateDirectory, store: database, themes: &theme.Library{Repository: database, PublishedStore: theme.Store{Directory: stateDirectory}}}, nil
 }
 
 // ServiceStartup initializes lifecycle evidence before native windows are created.
 func (service *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	service.context = ctx
 	service.record("startup")
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventStartup, Outcome: diagnostics.OutcomeStarted})
 	usage, err := dataservice.New(ctx, service.store, service.themes)
 	if err != nil {
+		service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelError, Source: diagnostics.SourceDesktop, Event: diagnostics.EventStartup, Outcome: diagnostics.OutcomeFailed, Failure: diagnostics.FailureUnavailable})
 		return err
 	}
 	usage.Scope = []domain.Provider{domain.Codex, domain.Claude, domain.Pi}
+	usage.SetDiagnostics(service.diagnostics)
 	service.usage = usage
 	if err = service.initializeSync(ctx); err != nil {
+		service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelError, Source: diagnostics.SourceDesktop, Event: diagnostics.EventStartup, Outcome: diagnostics.OutcomeFailed, Failure: diagnostics.FailureUnavailable})
 		usage.Close()
 		return err
 	}
@@ -158,6 +173,7 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 			}
 		}
 	}()
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventStartup, Outcome: diagnostics.OutcomeSucceeded})
 	return nil
 }
 
@@ -219,7 +235,11 @@ func (service *App) GetLossReport(days int, timeZone string) (dataservice.LossRe
 }
 
 // RefreshUsage coalesces selected scans and queues sync after successful completion.
-func (service *App) RefreshUsage(days int, timeZone string, selected []string, request refresh.Request) error {
+func (service *App) RefreshUsage(days int, timeZone string, selected []string, request refresh.Request) (refreshError error) {
+	operation := service.diagnostics.NewOperation()
+	started := time.Now()
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventRefresh, Outcome: diagnostics.OutcomeStarted, Operation: operation})
+	defer func() { service.recordRefreshResult(diagnostics.EventRefresh, operation, started, refreshError) }()
 	err := service.usage.RefreshUsage(service.context, days, timeZone, selected, request)
 	if err == nil {
 		service.triggerSync()
@@ -228,7 +248,11 @@ func (service *App) RefreshUsage(days int, timeZone string, selected []string, r
 }
 
 // RefreshLimits refreshes quota observations and queues sync after successful completion.
-func (service *App) RefreshLimits(selected []string, request refresh.Request) error {
+func (service *App) RefreshLimits(selected []string, request refresh.Request) (refreshError error) {
+	operation := service.diagnostics.NewOperation()
+	started := time.Now()
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventQuota, Outcome: diagnostics.OutcomeStarted, Operation: operation})
+	defer func() { service.recordRefreshResult(diagnostics.EventQuota, operation, started, refreshError) }()
 	err := service.usage.RefreshLimits(service.context, selected, request)
 	if err == nil {
 		service.triggerSync()
@@ -415,6 +439,7 @@ func (service *App) ExportTheme(definition theme.Definition) (bool, error) {
 }
 
 func (service *App) record(event string) {
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventLifecycle, Outcome: diagnostics.OutcomeSucceeded})
 	service.logMutex.Lock()
 	defer service.logMutex.Unlock()
 	json.NewEncoder(service.logFile).Encode(map[string]any{"event": event, "pid": os.Getpid(), "at": time.Now().UTC().Format(time.RFC3339Nano)})
@@ -428,6 +453,7 @@ func (service *App) GetBootstrap() Bootstrap {
 // FrontendReady reveals the window after the frontend applies its theme, unless the launch starts minimized.
 func (service *App) FrontendReady() {
 	service.record("frontend-ready")
+	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventRenderer, Outcome: diagnostics.OutcomeSucceeded})
 	service.windowMutex.Lock()
 	isWaitingInTray := service.isWaitingInTray
 	service.windowMutex.Unlock()
