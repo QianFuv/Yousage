@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -24,13 +23,10 @@ type androidFrameworkBuild struct {
 	Modfile string
 }
 
-// moduleResolution compares selected versions and source locations, excluding
-// metadata paths that necessarily change when using a temporary modfile.
-type moduleResolution struct {
+// moduleSource identifies a locked source version without loading the module graph.
+type moduleSource struct {
 	Path    string
 	Version string
-	Dir     string
-	Replace *moduleResolution
 }
 
 // offlineGoEnvironment disables proxy bypass as well as automatic acquisition,
@@ -91,41 +87,55 @@ func redactAndroidFramework(source []byte) ([]byte, error) {
 	return []byte(text), nil
 }
 
-// readModuleResolutions captures the offline selected graph before compilation.
-func readModuleResolutions(root, modfile string) (map[string]moduleResolution, error) {
-	arguments := []string{"list", "-mod=readonly"}
-	if modfile != "" {
-		arguments = append(arguments, "-modfile", modfile)
-	}
-	arguments = append(arguments, "-m", "-json", "all")
-	output, err := offlineGoCommand(root, arguments...).Output()
-	if err != nil {
-		return nil, errors.New("offline Android module resolution unavailable; no dependencies were acquired")
-	}
-	modules := map[string]moduleResolution{}
-	decoder := json.NewDecoder(bytes.NewReader(output))
-	for {
-		var module moduleResolution
-		if err := decoder.Decode(&module); err == io.EOF {
-			break
-		} else if err != nil || module.Path == "" {
-			return nil, errors.New("invalid Android module resolution")
+// lockedModuleSources selects full source checksums, retaining every locked
+// version of a path. Metadata-only /go.mod entries cannot authorize extraction.
+func lockedModuleSources(checksums []byte) ([]moduleSource, error) {
+	var sources []moduleSource
+	seen := map[string]bool{}
+	for _, line := range strings.Split(string(checksums), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
 		}
-		if _, exists := modules[module.Path]; exists {
-			return nil, errors.New("duplicate Android module resolution")
+		if len(fields) != 3 || !strings.HasPrefix(fields[2], "h1:") {
+			return nil, errors.New("invalid locked Android module checksums")
 		}
-		modules[module.Path] = module
+		if strings.HasSuffix(fields[1], "/go.mod") {
+			continue
+		}
+		key := fields[0] + "@" + fields[1]
+		if !seen[key] {
+			sources = append(sources, moduleSource{Path: fields[0], Version: fields[1]})
+			seen[key] = true
+		}
 	}
-	if len(modules) == 0 {
-		return nil, errors.New("empty Android module resolution")
+	if len(sources) == 0 {
+		return nil, errors.New("locked Android source checksums unavailable")
 	}
-	return modules, nil
+	return sources, nil
+}
+
+// overlayModfile preserves all original bytes and adds only the reviewed,
+// version-qualified replacement. Quoting protects spaces and path characters.
+func overlayModfile(original []byte, copied string) []byte {
+	suffix := "\nreplace " + frameworkModulePath + " " + frameworkVersion + " => " + strconv.Quote(filepath.ToSlash(copied)) + "\n"
+	return append(append([]byte(nil), original...), []byte(suffix)...)
+}
+
+// verifyOverlayModuleFiles rejects any change beyond the single replacement,
+// including dependency/directive/checksum changes or a different framework graph.
+func verifyOverlayModuleFiles(originalMod, originalSum, originalFramework, temporaryMod, temporarySum, copiedFramework []byte, copied string) error {
+	if !bytes.Equal(overlayModfile(originalMod, copied), temporaryMod) ||
+		!bytes.Equal(originalSum, temporarySum) || !bytes.Equal(originalFramework, copiedFramework) {
+		return errors.New("temporary Android module inputs changed beyond the reviewed replacement")
+	}
+	return nil
 }
 
 // verifyCachedModuleSources refuses archive-only cached dependencies, which Go
 // could otherwise extract even with GOPROXY=off. Uncached archives remain
 // unavailable offline and cannot supply new source code.
-func verifyCachedModuleSources(modules map[string]moduleResolution, cache string) error {
+func verifyCachedModuleSources(modules []moduleSource, cache string) error {
 	escape := func(value string) string {
 		var escaped strings.Builder
 		for _, character := range value {
@@ -138,9 +148,6 @@ func verifyCachedModuleSources(modules map[string]moduleResolution, cache string
 		return escaped.String()
 	}
 	for _, module := range modules {
-		if module.Replace != nil {
-			module = *module.Replace
-		}
 		if module.Version == "" {
 			continue
 		}
@@ -168,34 +175,11 @@ func verifyCachedModuleSources(modules map[string]moduleResolution, cache string
 	return nil
 }
 
-// verifyModuleResolutions allows only the locked Wails source-directory change.
-func verifyModuleResolutions(before, after map[string]moduleResolution, copied string) error {
-	if len(before) != len(after) || before[frameworkModulePath].Path != frameworkModulePath {
-		return errors.New("temporary Android modfile changed module resolution")
-	}
-	for path, original := range before {
-		current, exists := after[path]
-		if !exists {
-			return errors.New("temporary Android modfile removed a selected dependency")
-		}
-		if path == frameworkModulePath {
-			if original.Version != frameworkVersion || original.Replace != nil || current.Dir != copied || current.Replace == nil || current.Replace.Path != copied || current.Replace.Dir != copied || current.Replace.Version != "" || current.Replace.Replace != nil {
-				return errors.New("temporary Android modfile changed the reviewed framework resolution")
-			}
-			current.Dir, current.Replace = original.Dir, nil
-		}
-		if !reflect.DeepEqual(original, current) {
-			return errors.New("temporary Android modfile changed another dependency resolution")
-		}
-	}
-	return nil
-}
-
 // prepareAndroidFrameworkOverlay copies only the already cached module. A
 // version-qualified temporary replacement makes Go overlays legal outside the
-// immutable module cache; an offline graph comparison rejects other changes.
+// immutable module cache; exact module-file invariants reject other changes.
 func prepareAndroidFrameworkOverlay(root string) (androidFrameworkBuild, func() error, error) {
-	_, source, err := androidFrameworkSource(root)
+	original, source, err := androidFrameworkSource(root)
 	if err != nil {
 		return androidFrameworkBuild{}, nil, err
 	}
@@ -203,7 +187,11 @@ func prepareAndroidFrameworkOverlay(root string) (androidFrameworkBuild, func() 
 	if err != nil {
 		return androidFrameworkBuild{}, nil, err
 	}
-	before, err := readModuleResolutions(root, "")
+	checksums, err := os.ReadFile(filepath.Join(root, "go.sum"))
+	if err != nil {
+		return androidFrameworkBuild{}, nil, err
+	}
+	sources, err := lockedModuleSources(checksums)
 	if err != nil {
 		return androidFrameworkBuild{}, nil, err
 	}
@@ -211,15 +199,15 @@ func prepareAndroidFrameworkOverlay(root string) (androidFrameworkBuild, func() 
 	if err != nil {
 		return androidFrameworkBuild{}, nil, errors.New("could not locate the existing Go module cache")
 	}
-	if err = verifyCachedModuleSources(before, strings.TrimSpace(string(cache))); err != nil {
+	if err = verifyCachedModuleSources(sources, strings.TrimSpace(string(cache))); err != nil {
 		return androidFrameworkBuild{}, nil, err
 	}
-	return writeAndroidFrameworkOverlay(root, source, patched, before)
+	return writeAndroidFrameworkOverlay(root, source, patched, filepath.Dir(filepath.Dir(filepath.Dir(original))))
 }
 
 // writeAndroidFrameworkOverlay publishes task-owned temporary inputs and cleans
 // the full owned tree on every preparation failure after directory creation.
-func writeAndroidFrameworkOverlay(root string, source, patched []byte, before map[string]moduleResolution) (androidFrameworkBuild, func() error, error) {
+func writeAndroidFrameworkOverlay(root string, source, patched []byte, frameworkDirectory string) (androidFrameworkBuild, func() error, error) {
 	temporaryRoot, err := filepath.Abs(os.TempDir())
 	if err != nil {
 		return androidFrameworkBuild{}, nil, err
@@ -238,20 +226,34 @@ func writeAndroidFrameworkOverlay(root string, source, patched []byte, before ma
 	overlayPath := filepath.Join(directory, "overlay.json")
 	modfile := filepath.Join(directory, "build.mod")
 	copied := filepath.Join(directory, "wails")
-	if err = os.CopyFS(copied, os.DirFS(before[frameworkModulePath].Dir)); err == nil {
-		err = copyFile(filepath.Join(root, "go.mod"), modfile)
+	err = os.CopyFS(copied, os.DirFS(frameworkDirectory))
+	var originalMod, originalSum, originalFramework []byte
+	if err == nil {
+		originalMod, err = os.ReadFile(filepath.Join(root, "go.mod"))
 	}
 	if err == nil {
-		err = copyFile(filepath.Join(root, "go.sum"), filepath.Join(directory, "build.sum"))
+		originalSum, err = os.ReadFile(filepath.Join(root, "go.sum"))
 	}
 	if err == nil {
-		err = offlineGoCommand(root, "mod", "edit", "-modfile", modfile, "-replace", frameworkModulePath+"@"+frameworkVersion+"="+copied).Run()
+		originalFramework, err = os.ReadFile(filepath.Join(frameworkDirectory, "go.mod"))
 	}
 	if err == nil {
-		var after map[string]moduleResolution
-		after, err = readModuleResolutions(root, modfile)
+		err = os.WriteFile(modfile, overlayModfile(originalMod, copied), 0600)
+	}
+	if err == nil {
+		err = os.WriteFile(filepath.Join(directory, "build.sum"), originalSum, 0600)
+	}
+	if err == nil {
+		var temporaryMod, temporarySum, copiedFramework []byte
+		temporaryMod, err = os.ReadFile(modfile)
 		if err == nil {
-			err = verifyModuleResolutions(before, after, copied)
+			temporarySum, err = os.ReadFile(filepath.Join(directory, "build.sum"))
+		}
+		if err == nil {
+			copiedFramework, err = os.ReadFile(filepath.Join(copied, "go.mod"))
+		}
+		if err == nil {
+			err = verifyOverlayModuleFiles(originalMod, originalSum, originalFramework, temporaryMod, temporarySum, copiedFramework, copied)
 		}
 	}
 	if err != nil {

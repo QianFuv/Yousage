@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -9,11 +10,101 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+// TestAndroidOverlayWithSparseCache needs only locked cached sources, not the
+// unrelated metadata queried by go list -m all on a fresh CI runner.
+func TestAndroidOverlayWithSparseCache(test *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		test.Fatal(err)
+	}
+	original, _, err := androidFrameworkSource(root)
+	if err != nil {
+		test.Fatal(err)
+	}
+	cacheOutput, err := exec.Command("go", "env", "GOMODCACHE").Output()
+	if err != nil {
+		test.Fatal(err)
+	}
+	cache := test.TempDir()
+	fixture := test.TempDir()
+	for _, name := range []string{"go.mod", "go.sum"} {
+		if err := copyFile(filepath.Join(root, name), filepath.Join(fixture, name)); err != nil {
+			test.Fatal(err)
+		}
+	}
+	module := filepath.Join("github.com", "wailsapp", "wails", "v3@"+frameworkVersion)
+	if err := os.CopyFS(filepath.Join(cache, module), os.DirFS(filepath.Dir(filepath.Dir(filepath.Dir(original))))); err != nil {
+		test.Fatal(err)
+	}
+	metadata := filepath.Join("cache", "download", "github.com", "wailsapp", "wails", "v3", "@v")
+	if err := os.MkdirAll(filepath.Join(cache, metadata), 0700); err != nil {
+		test.Fatal(err)
+	}
+	for _, suffix := range []string{".mod", ".info", ".ziphash"} {
+		name := filepath.Join(metadata, frameworkVersion+suffix)
+		if err := copyFile(filepath.Join(strings.TrimSpace(string(cacheOutput)), name), filepath.Join(cache, name)); err != nil {
+			test.Fatal(err)
+		}
+	}
+	test.Setenv("GOMODCACHE", cache)
+	beforeCache := cacheFingerprint(test, cache)
+	build, cleanup, err := prepareAndroidFrameworkOverlay(fixture)
+	if err != nil {
+		test.Fatal("locked Wails sources must not require unrelated module metadata", err)
+	}
+	defer cleanup()
+	if build.Modfile == "" || build.Overlay == "" {
+		test.Fatal("missing immutable build inputs")
+	}
+	if !reflect.DeepEqual(beforeCache, cacheFingerprint(test, cache)) {
+		test.Fatal("offline preparation changed the sparse source cache")
+	}
+	emptyCache := test.TempDir()
+	test.Setenv("GOMODCACHE", emptyCache)
+	if _, cleanup, err := prepareAndroidFrameworkOverlay(fixture); err == nil || cleanup != nil {
+		test.Fatal("empty cache must fail without acquiring sources")
+	}
+	for name := range cacheFingerprint(test, emptyCache) {
+		if strings.HasSuffix(name, ".zip") || strings.HasSuffix(name, "application_android.go") {
+			test.Fatal("empty cache acquired framework source")
+		}
+	}
+}
+
+// cacheFingerprint records task-owned cache file contents for immutability checks.
+func cacheFingerprint(test *testing.T, directory string) map[string]string {
+	test.Helper()
+	values := map[string]string{}
+	if err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		name, err := filepath.Rel(directory, path)
+		if err != nil {
+			return err
+		}
+		values[name] = fmt.Sprintf("%x", sha256.Sum256(data))
+		return nil
+	}); err != nil {
+		test.Fatal(err)
+	}
+	return values
+}
 
 // literalFrameworkLogs rejects arguments that could expose request or error data.
 func literalFrameworkLogs(source []byte) bool {
@@ -154,52 +245,60 @@ func TestAndroidFrameworkOverlayPreservesModule(test *testing.T) {
 	}
 }
 
-// TestAndroidModuleResolutionRejectsDrift allows only the intended source copy,
-// rejecting dependency additions, removals, version changes and replacements.
-func TestAndroidModuleResolutionRejectsDrift(test *testing.T) {
-	copied := filepath.Join(test.TempDir(), "wails")
-	before := map[string]moduleResolution{
-		frameworkModulePath: {Path: frameworkModulePath, Version: frameworkVersion, Dir: "original-wails"},
-		"fixture":           {Path: "fixture", Version: "v1.0.0", Dir: "original-fixture"},
+// TestAndroidModuleInputsRejectDrift protects every original byte and permits
+// exactly one replacement of the locked version, including quoted path spaces.
+func TestAndroidModuleInputsRejectDrift(test *testing.T) {
+	copied := filepath.Join(test.TempDir(), "quoted path", "wails")
+	original := []byte("module fixture\r\n\r\ngo 1.26.2\r\nrequire example.com/fixture v1.0.0")
+	checksums := []byte("example.com/fixture v1.0.0 h1:locked\n")
+	framework := []byte("module " + frameworkModulePath + "\ngo 1.25.0\n")
+	modfile := overlayModfile(original, copied)
+	if !strings.HasPrefix(string(modfile), string(original)) {
+		test.Fatal("original bytes changed")
 	}
-	newGraph := func() map[string]moduleResolution {
-		return map[string]moduleResolution{
-			frameworkModulePath: {Path: frameworkModulePath, Version: frameworkVersion, Dir: copied, Replace: &moduleResolution{Path: copied, Dir: copied}},
-			"fixture":           before["fixture"],
-		}
+	if err := verifyOverlayModuleFiles(original, checksums, framework, modfile, checksums, framework, copied); err != nil {
+		test.Fatal(err)
 	}
-	if err := verifyModuleResolutions(before, newGraph(), copied); err != nil {
-		test.Fatal("exact source-only replacement rejected", err)
-	}
-	for _, scenario := range []string{"added", "removed", "version", "source", "replacement", "framework-version", "framework-source"} {
+	for _, scenario := range []string{"requirement", "directive", "checksum", "unqualified", "version", "path", "additional", "framework"} {
 		test.Run(scenario, func(test *testing.T) {
-			after := newGraph()
-			module := after["fixture"]
+			modified, sums, copiedMod := append([]byte(nil), modfile...), checksums, framework
 			switch scenario {
-			case "added":
-				after["unexpected"] = moduleResolution{Path: "unexpected", Version: "v1.0.0"}
-			case "removed":
-				delete(after, "fixture")
+			case "requirement":
+				modified = bytes.ReplaceAll(modified, []byte("v1.0.0"), []byte("v2.0.0"))
+			case "directive":
+				modified = bytes.ReplaceAll(modified, []byte("go 1.26.2"), []byte("go 1.27.0"))
+			case "checksum":
+				sums = append(append([]byte(nil), sums...), '\n')
+			case "unqualified":
+				modified = bytes.ReplaceAll(modified, []byte(" "+frameworkVersion+" =>"), []byte(" =>"))
 			case "version":
-				module.Version = "v2.0.0"
-				after["fixture"] = module
-			case "source":
-				module.Dir = "unexpected-source"
-				after["fixture"] = module
-			case "replacement":
-				module.Replace = &moduleResolution{Path: "unexpected"}
-				after["fixture"] = module
-			case "framework-version":
-				module = after[frameworkModulePath]
-				module.Version = "v3.0.0-beta.31"
-				after[frameworkModulePath] = module
-			case "framework-source":
-				after[frameworkModulePath].Replace.Path = "unexpected"
+				modified = bytes.ReplaceAll(modified, []byte(frameworkVersion), []byte("v3.0.0-beta.31"))
+			case "path":
+				modified = overlayModfile(original, copied+"-other")
+			case "additional":
+				modified = append(modified, []byte("replace example.com/fixture => ./other\n")...)
+			case "framework":
+				copiedMod = append(append([]byte(nil), framework...), []byte("require example.com/drift v1.0.0\n")...)
 			}
-			if err := verifyModuleResolutions(before, after, copied); err == nil {
-				test.Fatal("temporary modfile accepted an unauthorized resolution change")
+			if verifyOverlayModuleFiles(original, checksums, framework, modified, sums, copiedMod, copied) == nil {
+				test.Fatal("unexpected module input drift accepted")
 			}
 		})
+	}
+}
+
+// TestAndroidLockedSources keeps checksum versions distinct and excludes
+// metadata-only records without acquiring or enumerating unrelated modules.
+func TestAndroidLockedSources(test *testing.T) {
+	input := []byte("example.com/a v1.0.0 h1:one\nexample.com/a v1.0.0/go.mod h1:metadata\nexample.com/a v1.1.0 h1:two\nexample.com/a v1.0.0 h1:one\n")
+	sources, err := lockedModuleSources(input)
+	if err != nil || !reflect.DeepEqual(sources, []moduleSource{{Path: "example.com/a", Version: "v1.0.0"}, {Path: "example.com/a", Version: "v1.1.0"}}) {
+		test.Fatal("locked source versions changed", err)
+	}
+	for _, invalid := range []string{"", "example.com/a v1.0.0/go.mod h1:metadata\n", "malformed\n", "example.com/a v1.0.0 unsupported\n"} {
+		if _, err := lockedModuleSources([]byte(invalid)); err == nil {
+			test.Fatal("invalid or absent source checksums accepted")
+		}
 	}
 }
 
@@ -207,7 +306,7 @@ func TestAndroidModuleResolutionRejectsDrift(test *testing.T) {
 // cache even when Go could unpack an already cached ZIP without using a proxy.
 func TestAndroidCachedArchiveRequiresExtractedSources(test *testing.T) {
 	cache := test.TempDir()
-	modules := map[string]moduleResolution{"fixture": {Path: "example.com/Upper/fixture", Version: "v1.0.0"}}
+	modules := []moduleSource{{Path: "example.com/Upper/fixture", Version: "v1.0.0"}}
 	if err := verifyCachedModuleSources(modules, cache); err != nil {
 		test.Fatal("offline-unavailable module must not be mistaken for an extractable archive", err)
 	}
@@ -256,8 +355,7 @@ func TestAndroidOverlayFailureCleansTemporaryCopy(test *testing.T) {
 	if err := os.WriteFile(filepath.Join(fixture, "fixture.go"), []byte("package fixture\n"), 0600); err != nil {
 		test.Fatal(err)
 	}
-	before := map[string]moduleResolution{frameworkModulePath: {Path: frameworkModulePath, Version: frameworkVersion, Dir: fixture}}
-	if build, cleanup, err := writeAndroidFrameworkOverlay(root, nil, nil, before); err == nil || cleanup != nil || build != (androidFrameworkBuild{}) {
+	if build, cleanup, err := writeAndroidFrameworkOverlay(root, nil, nil, fixture); err == nil || cleanup != nil || build != (androidFrameworkBuild{}) {
 		test.Fatal("missing root go.mod did not fail preparation")
 	}
 	entries, err := os.ReadDir(temporary)

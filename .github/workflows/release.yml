@@ -126,6 +126,8 @@ jobs:
           npm install --global pnpm@10.32.0
           pnpm --dir tools/parity install --frozen-lockfile
           pnpm --dir frontend install --frozen-lockfile
+          GOTOOLCHAIN=local go mod download
+          git diff --exit-code -- go.mod go.sum
       - name: Build Android frontend
         run: pnpm --dir frontend build:android
       - name: Restore signing key

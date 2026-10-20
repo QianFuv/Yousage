@@ -50,14 +50,22 @@ timeouts, and asset failures. The build checks the exact framework version,
 source fingerprint and original calls, and fails explicitly if they change.
 Go disallows overlays inside its module cache, so the build copies the already
 cached framework into a disposable directory and uses a temporary modfile to
-resolve only that same locked version to the copy. An offline comparison of the
-selected module versions and source locations rejects any other resolution
-change. Compilation uses read-only module mode and cannot acquire dependencies
-or toolchains. Archive-only cached modules are rejected before compilation to
-prevent Go from extracting them into the original source cache. Missing required
-cached inputs fail the build explicitly. Temporary files
-are removed on success or failure; the repository's module files, module cache,
-dependency versions and request handling remain unchanged.
+resolve only that same locked version to the copy. A byte-for-byte check of the
+temporary module files preserves the original `go.mod` bytes, appending only the
+exact version-qualified replacement. The copied `go.sum` and framework `go.mod`
+must match their originals byte for byte. This avoids querying unrelated module
+graph metadata on a fresh runner. Compilation uses read-only module mode and
+cannot acquire dependencies or toolchains. All full source checksum entries in
+`go.sum` are checked for archive-only or incomplete cache entries before
+compilation, preventing extraction into the original source cache. Missing
+required cached inputs fail the offline build explicitly.
+The Android Release dependency-install phase first runs ordinary `go mod download`
+for the modules already locked by the project, without `all` or version queries,
+and fails if `go.mod` or `go.sum` changes. This normal dependency preparation is
+separate from the immutable, offline overlay and compiler phases. Temporary files
+are removed on success or failure. The offline phases leave the repository's module
+files and module cache unchanged; dependency versions and request handling remain
+unchanged throughout.
 
 ## Storage and failure behavior
 
