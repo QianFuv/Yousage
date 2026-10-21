@@ -178,6 +178,76 @@ function commitPage(rendered: ReactElement[], index = -1) {
 }
 
 describe("mountViewer", () => {
+  it("acknowledges a committed error after accepted rendering but before native dismissal", async () => {
+    const reportViewerShown = vi.fn();
+    const reportErrorShown = vi.fn();
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      reportViewerShown,
+      reportErrorShown,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).toHaveBeenLastCalledWith(true);
+    rendered
+      .at(-1)!
+      .props.onError(
+        new Error("failure while native is still covering the page"),
+      );
+    expect(reportViewerShown).toHaveBeenLastCalledWith(false);
+    expect(reportErrorShown).not.toHaveBeenCalled();
+    const fallback = (
+      rendered.at(-1)!.props as unknown as {
+        fallback: () => ReactElement<{ children: ReactElement[] }>;
+      }
+    ).fallback();
+    const marker = fallback.props.children.at(-1)!;
+    (marker.props as { onCommit: () => void }).onCommit();
+    expect(reportErrorShown).toHaveBeenCalledOnce();
+    unmount();
+    (marker.props as { onCommit: () => void }).onCommit();
+    expect(reportErrorShown).toHaveBeenCalledOnce();
+  });
+
+  it("offers startup recovery when cached content never acknowledges", async () => {
+    const onInitialFailure = vi.fn();
+    const { unmount } = await mount({ isSaved: true, onInitialFailure });
+    await vi.advanceTimersByTimeAsync(ACKNOWLEDGE_TIMEOUT_MS);
+    expect(onInitialFailure).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it("offers startup recovery when the first rendered candidate cannot be saved", async () => {
+    const onInitialFailure = vi.fn();
+    const { rendered, unmount } = await mount({
+      onInitialFailure,
+      initial: candidate(snapshot("initial"), async () => {
+        throw new Error("save failed");
+      }),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onInitialFailure).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it("does not replace accepted content or a closed viewer with a startup error", async () => {
+    const onInitialFailure = vi.fn();
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      onInitialFailure,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    rendered.at(-1)!.props.onError(new Error("later render failure"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onInitialFailure).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it("does not report a cached commit whose render fails before acknowledgement settles", async () => {
     const reportViewerShown = vi.fn();
     const { rendered, unmount } = await mount({

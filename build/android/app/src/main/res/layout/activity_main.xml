@@ -11,6 +11,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <com.wails.app.StartupView
+            android:id="@+id/startup_loading"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/diagnostics_open"
             style="?android:attr/borderlessButtonStyle"

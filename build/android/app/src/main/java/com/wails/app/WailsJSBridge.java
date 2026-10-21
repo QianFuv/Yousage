@@ -99,6 +99,8 @@ public class WailsJSBridge {
     public void diagnostic(String category) {
         if (canInvoke() && ("render".equals(category) || "internal".equals(category))) {
             postToCurrentViewer(() -> bridge.setViewerShown(false));
+            String document = startupDocument();
+            setStartupContentReady(document, false);
             bridge.recordFrontendDiagnostic(category);
         }
     }
@@ -107,6 +109,19 @@ public class WailsJSBridge {
     @JavascriptInterface
     public void setViewerShown(boolean isShown) {
         postToCurrentViewer(() -> bridge.setViewerShown(isShown));
+    }
+
+    /** Capture a non-secret document identity once in the frontend before asynchronous startup work. */
+    @JavascriptInterface
+    public String startupDocument() {
+        return canInvoke() ? binding.document.toString() : "";
+    }
+
+    /** Reject stale documents again after queuing; visual callbacks retain this same ticket. */
+    @JavascriptInterface
+    public void setStartupContentReady(String document, boolean ready) {
+        if (!canInvoke() || document == null || !document.equals(binding.document)) return;
+        postToCurrentViewer(() -> bridge.setStartupContentReady(binding, document, ready));
     }
 
     /** Open the native diagnostics dialog from frontend settings without a Go round trip. */

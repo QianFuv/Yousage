@@ -67,6 +67,9 @@ public class MainActivity extends AppCompatActivity {
     private WailsJSBridge javascriptBridge;
     private View recoveryPanel;
     private View diagnosticsEntry;
+    private View startupLoading;
+    private final StartupHandoff startupHandoff = new StartupHandoff();
+    private boolean isResumed;
     private final ViewerDiagnosticsState viewerDiagnostics = new ViewerDiagnosticsState();
     private boolean hasAttemptedRendererRecovery;
     private boolean isDestroying;
@@ -97,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        if (Build.VERSION.SDK_INT >= 31) setTheme(R.style.Base_Theme_WailsApp);
         super.onCreate(savedInstanceState);
         File filesDirectory = null;
         try {
@@ -111,9 +115,74 @@ public class MainActivity extends AppCompatActivity {
         diagnosticsEntry = findViewById(R.id.diagnostics_open);
         diagnosticsEntry.setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
         findViewById(R.id.viewer_diagnostics).setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
+        startupLoading = findViewById(R.id.startup_loading);
+        if (Build.VERSION.SDK_INT >= 31) prepareStartupFrame();
+        else startupHandoff.cancel();
 
         recordNative(DiagnosticsStore.Event.LIFECYCLE_CREATE, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         startViewer();
+    }
+
+    /** Submit opaque custom content before converting the manifest's translucent launch window. */
+    @android.annotation.TargetApi(31)
+    private void prepareStartupFrame() {
+        startupLoading.setVisibility(View.VISIBLE);
+        startupLoading.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                startupLoading.getViewTreeObserver().removeOnPreDrawListener(this);
+                startupLoading.getViewTreeObserver().registerFrameCommitCallback(() -> startupLoading.post(() -> {
+                    if (isDestroying || isFinishing() || isDestroyed()) return;
+                    try {
+                        boolean changed = setTranslucent(false);
+                        if (DEBUG && changed) Log.d(TAG, "Startup window converted to opaque");
+                        else if (DEBUG) Log.d(TAG, "Startup window opacity unchanged");
+                    } catch (RuntimeException ignored) {
+                        recordNative(DiagnosticsStore.Event.STARTUP, DiagnosticsStore.Outcome.FAILED, DiagnosticsStore.Failure.UNAVAILABLE);
+                    }
+                    startupHandoff.nativeFrame();
+                    finishStartupHandoff();
+                }));
+                return true;
+            }
+        });
+    }
+
+    /** Require the current document's committed content and its WebView frame before uncovering it. */
+    void setStartupContentReady(WebView source, String document, boolean ready) {
+        if (Build.VERSION.SDK_INT < 31 || source != webView || isDestroying
+                || isFinishing() || isDestroyed() || !startupHandoff.isPending()) return;
+        WailsBridge.WebViewBinding binding = bridge.captureWebViewBinding(source);
+        if (binding == null || !document.equals(binding.document)) return;
+        long revision = startupHandoff.content(ready);
+        if (DEBUG && ready) Log.d(TAG, "Startup content ready");
+        else if (DEBUG) Log.d(TAG, "Startup content invalidated");
+        if (!ready) return;
+        source.postVisualStateCallback(revision, new WebView.VisualStateCallback() {
+            @Override
+            public void onComplete(long request) {
+                if (DEBUG) Log.d(TAG, "Startup visual state ready");
+                if (!bridge.isCurrentBinding(binding) || !document.equals(binding.document)
+                        || source != webView || isDestroying || !startupHandoff.isPending()) return;
+                source.getViewTreeObserver().registerFrameCommitCallback(() -> source.post(() -> {
+                    if (DEBUG) Log.d(TAG, "Startup web frame committed");
+                    if (!bridge.isCurrentBinding(binding) || !document.equals(binding.document)
+                            || source != webView || isDestroying || recoveryPanel.getVisibility() == View.VISIBLE) return;
+                    startupHandoff.webFrame(request);
+                    finishStartupHandoff();
+                }));
+                source.invalidate();
+            }
+        });
+    }
+
+    /** Dismiss once, only while foregrounded; ordinary refreshes cannot resurrect the loader. */
+    private void finishStartupHandoff() {
+        if (isResumed && !isDestroying && !isFinishing() && !isDestroyed() && startupHandoff.finish()) {
+            startupLoading.setVisibility(View.GONE);
+            if (DEBUG) Log.d(TAG, "Startup handoff complete");
+            if (webView != null) webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+        }
     }
 
     /** Initialize Go only after diagnostics and native recovery controls are available. */
@@ -166,6 +235,8 @@ public class MainActivity extends AppCompatActivity {
         viewerDiagnostics.startViewer();
         updateDiagnosticsEntry();
         webView = new WebView(this);
+        if (Build.VERSION.SDK_INT >= 31 && startupHandoff.isPending())
+            webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         FrameLayout container = findViewById(R.id.main_container);
         container.addView(webView, 0, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -200,6 +271,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 if (view != webView || isDestroying) return;
+                startupHandoff.content(false);
                 bridge.onDocumentStarted(view);
                 setViewerShown(view, false);
                 super.onPageStarted(view, url, favicon);
@@ -405,6 +477,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** Invalidate callbacks before removing and destroying the current view. */
     private void disposeWebView() {
+        startupHandoff.content(false);
         viewerDiagnostics.startViewer();
         updateDiagnosticsEntry();
         WebView disposedView = webView;
@@ -979,6 +1052,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        isResumed = true;
+        finishStartupHandoff();
         recordNative(DiagnosticsStore.Event.LIFECYCLE_RESUME, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (bridge != null) {
             bridge.onResume();
@@ -987,6 +1062,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        isResumed = false;
         super.onPause();
         recordNative(DiagnosticsStore.Event.LIFECYCLE_PAUSE, DiagnosticsStore.Outcome.SUCCEEDED, DiagnosticsStore.Failure.NONE);
         if (bridge != null) {

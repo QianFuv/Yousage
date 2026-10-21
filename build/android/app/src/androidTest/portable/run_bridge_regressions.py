@@ -34,6 +34,10 @@ package com.wails.app;
 public class MainActivity extends android.app.Activity {
     final ViewerDiagnosticsState viewerDiagnostics = new ViewerDiagnosticsState();
     int shownCalls;
+    int startupCalls;
+    void setStartupContentReady(android.webkit.WebView view, String document, boolean ready) {
+        startupCalls++;
+    }
     void setViewerShown(android.webkit.WebView view, boolean isShown) {
         shownCalls++;
         viewerDiagnostics.setViewerShown(isShown);
@@ -133,14 +137,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix="yousage-bridge-regression-") as temporary:
         temporary_path = Path(temporary)
         production_sources = []
-        for filename in ("WailsBridge.java", "WailsJSBridge.java", "WailsPathHandler.java", "DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java"):
+        for filename in ("WailsBridge.java", "WailsJSBridge.java", "WailsPathHandler.java", "DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java", "StartupHandoff.java"):
             relative = Path("build/android/app/src/main/java/com/wails/app") / filename
             source = (
                 subprocess.check_output(
                     ["git", "show", f"{arguments.baseline_ref}:{relative.as_posix()}"],
                     cwd=repository,
                 ).decode("utf-8")
-                if arguments.baseline_ref and filename not in ("DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java")
+                if arguments.baseline_ref and filename not in ("DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java", "StartupHandoff.java")
                 else (repository / relative).read_text(encoding="utf-8")
             )
             if filename == "WailsBridge.java":
@@ -185,7 +189,8 @@ def main():
         run_java(
             ["--release", "11", "-proc:none", "-classpath", compiled_classpath, "-d", test_output,
              *fake_sources, Path(__file__).with_name("BridgeLifetimeRegression.java"),
-             Path(__file__).with_name("ViewerDiagnosticsRegression.java")],
+             Path(__file__).with_name("ViewerDiagnosticsRegression.java"),
+             Path(__file__).with_name("StartupHandoffRegression.java")],
             javac_binary,
             temporary_path,
         )
@@ -201,6 +206,8 @@ def main():
             java_binary,
             temporary_path,
         )
+        run_java(["-classpath", os.pathsep.join([str(test_output), compiled_classpath]),
+                  "com.wails.app.StartupHandoffRegression"], java_binary, temporary_path)
     print("Production bridge queue and visibility reasons tested; MainActivity rendering/touch and platform callbacks remain device-only")
 
 

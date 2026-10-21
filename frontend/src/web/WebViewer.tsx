@@ -28,6 +28,7 @@ import { DISPLAY_CHANGES_EVENT } from "./displaySync";
 import { PROBLEMS } from "./load";
 import { ViewerBoundary } from "./ViewerBoundary";
 import { ViewerCommitMarker } from "./renderAcknowledgment";
+import { ContentCommitMarker } from "./ContentCommitMarker";
 
 /**
  * Pages loaded only once visited. A failed load stays failed in its lazy component,
@@ -59,7 +60,13 @@ type ViewerRoute = "statistics" | "quota" | "loss" | "speed" | "settings";
  * @param props - The retry action.
  * @returns The message in place of the page.
  */
-function PageProblem({ onRetry }: { onRetry: () => void }) {
+function PageProblem({
+  onRetry,
+  onShown,
+}: {
+  onRetry: () => void;
+  onShown?: () => void;
+}) {
   return (
     <RelayProblem
       title={t(PROBLEMS.display.title)}
@@ -69,6 +76,7 @@ function PageProblem({ onRetry }: { onRetry: () => void }) {
         <RefreshCwIcon aria-hidden />
         {t("Try again")}
       </Button>
+      <ContentCommitMarker onCommit={onShown} />
     </RelayProblem>
   );
 }
@@ -90,6 +98,7 @@ export function WebViewer({
   renderKey = 0,
   onRenderError,
   onShowDiagnostics,
+  onErrorShown,
 }: {
   generatedAt: string;
   appVersion: string;
@@ -99,6 +108,7 @@ export function WebViewer({
   renderKey?: number;
   onRenderError?: (error: unknown) => void;
   onShowDiagnostics?: () => void;
+  onErrorShown?: () => void;
 }) {
   useI18n();
   const data = useData();
@@ -185,7 +195,12 @@ export function WebViewer({
               resetKey={renderKey}
               onError={onRenderError}
               onRetry={() => setPages(lazyPages())}
-              fallback={(retry) => <PageProblem onRetry={retry} />}
+              fallback={(retry) => (
+                <PageProblem
+                  onRetry={retry}
+                  onShown={route === "loss" ? onErrorShown : undefined}
+                />
+              )}
             >
               <Suspense fallback={null}>
                 <LossPage isActive={route === "loss"} />
@@ -200,7 +215,12 @@ export function WebViewer({
               resetKey={renderKey}
               onError={onRenderError}
               onRetry={() => setPages(lazyPages())}
-              fallback={(retry) => <PageProblem onRetry={retry} />}
+              fallback={(retry) => (
+                <PageProblem
+                  onRetry={retry}
+                  onShown={route === "speed" ? onErrorShown : undefined}
+                />
+              )}
             >
               <Suspense fallback={null}>
                 <SpeedPage isActive={route === "speed"} />

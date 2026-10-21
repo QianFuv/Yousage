@@ -1,5 +1,6 @@
 /** Android entry: pair with the desktop's relay once, then show its saved and latest snapshots read-only. */
 import { createRoot, type Root } from "react-dom/client";
+import type { ReactNode } from "react";
 import { getTransport } from "@wailsio/runtime";
 import { RefreshCwIcon, Unlink2Icon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
@@ -21,6 +22,7 @@ import type { SnapshotCandidate } from "../web/snapshotSession";
 import { RelayProblem } from "../web/WebViewer";
 import { interpretSnapshot, type DeviceRead } from "./snapshot";
 import { PairScreen } from "./PairScreen";
+import { StartupContent, startupContentReporter } from "./startup";
 import "../style.css";
 import "../web/web.css";
 import "./android.css";
@@ -29,6 +31,10 @@ import "./android.css";
 const reportDiagnostic = createDiagnosticReporter(androidDiagnosticSink());
 /** Native recovery visibility is independent of rate-limited diagnostic logging. */
 const REPORT_VIEWER_SHOWN = androidViewerShownReporter();
+/** Pairing and errors can finish startup without claiming an accepted report. */
+const REPORT_STARTUP_CONTENT = startupContentReporter();
+/** Invalidate callbacks when a standalone presentation is replaced within an opening request. */
+let contentRevision = 0;
 /** The early listener in `android.html` normally owns these, so this only fills in when it is missing. */
 installDiagnosticListeners(window, reportDiagnostic);
 
@@ -60,9 +66,32 @@ let openQueue = Promise.resolve();
 
 /** Leave the viewer and reveal standalone diagnostics, restoring native calls to Go. */
 function leaveViewer() {
+  contentRevision++;
+  REPORT_STARTUP_CONTENT(false);
   unmountViewer?.();
   unmountViewer = null;
   REPORT_VIEWER_SHOWN?.(false);
+}
+
+/**
+ * Attach a commit marker whose callbacks belong only to this standalone presentation.
+ *
+ * @param children - The pairing or problem screen.
+ * @returns The guarded content marker.
+ */
+function startupContent(children: ReactNode) {
+  const generation = openGeneration;
+  const revision = contentRevision;
+  return (
+    <StartupContent
+      onReady={(isReady) => {
+        if (generation === openGeneration && revision === contentRevision)
+          REPORT_STARTUP_CONTENT(isReady);
+      }}
+    >
+      {children}
+    </StartupContent>
+  );
 }
 
 /** Show the standalone screens in the device's language and color scheme. */
@@ -110,10 +139,12 @@ function showPairing(canKeepLink = false) {
   leaveViewer();
   applyDeviceLook();
   root.render(
-    <PairScreen
-      onPaired={finishPairing}
-      onCancel={canKeepLink ? () => history.back() : undefined}
-    />,
+    startupContent(
+      <PairScreen
+        onPaired={finishPairing}
+        onCancel={canKeepLink ? () => history.back() : undefined}
+      />,
+    ),
   );
 }
 
@@ -133,21 +164,23 @@ function showProblem(problem: keyof typeof PROBLEMS, shouldDownload = false) {
   leaveViewer();
   applyDeviceLook();
   root.render(
-    <RelayProblem
-      title={t(PROBLEMS[problem].title)}
-      detail={t(PROBLEMS[problem].detail)}
-    >
-      <div className="android-problem-actions">
-        <Button onClick={() => void openSnapshot(shouldDownload)}>
-          <RefreshCwIcon aria-hidden />
-          {t("Try again")}
-        </Button>
-        <Button variant="outline" onClick={changeLink}>
-          <Unlink2Icon aria-hidden />
-          {t("Use another link")}
-        </Button>
-      </div>
-    </RelayProblem>,
+    startupContent(
+      <RelayProblem
+        title={t(PROBLEMS[problem].title)}
+        detail={t(PROBLEMS[problem].detail)}
+      >
+        <div className="android-problem-actions">
+          <Button onClick={() => void openSnapshot(shouldDownload)}>
+            <RefreshCwIcon aria-hidden />
+            {t("Try again")}
+          </Button>
+          <Button variant="outline" onClick={changeLink}>
+            <Unlink2Icon aria-hidden />
+            {t("Use another link")}
+          </Button>
+        </div>
+      </RelayProblem>,
+    ),
   );
 }
 
@@ -231,7 +264,19 @@ async function showSnapshot(generation: number, shouldDownload: boolean) {
       showDiagnostics: androidDiagnosticsOpener() ?? undefined,
       /** Ignore visibility from an opening request superseded by recovery or pairing. */
       reportViewerShown: (isShown) => {
-        if (isCurrent()) REPORT_VIEWER_SHOWN?.(isShown);
+        if (isCurrent()) {
+          REPORT_VIEWER_SHOWN?.(isShown);
+          REPORT_STARTUP_CONTENT(isShown);
+        }
+      },
+      /** A first render/save failure must offer recovery instead of retaining the native spinner. */
+      onInitialFailure: () => {
+        if (!isCurrent()) return;
+        openGeneration++;
+        showProblem("display", true);
+      },
+      reportErrorShown: () => {
+        if (isCurrent()) REPORT_STARTUP_CONTENT(true);
       },
       open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
       connection: {
@@ -255,6 +300,7 @@ async function showSnapshot(generation: number, shouldDownload: boolean) {
  */
 function openSnapshot(shouldDownload = false): Promise<void> {
   const generation = ++openGeneration;
+  REPORT_STARTUP_CONTENT(false);
   isShowingFatal = false;
   openQueue = openQueue
     .then(() => {

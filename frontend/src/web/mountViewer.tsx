@@ -29,6 +29,7 @@ import {
   type SnapshotCandidate,
 } from "./snapshotSession";
 import { ViewerBoundary } from "./ViewerBoundary";
+import { ContentCommitMarker } from "./ContentCommitMarker";
 import {
   createRenderAcknowledger,
   VIEWER_COMMIT_CONTEXT,
@@ -96,6 +97,10 @@ export type ViewerHost = {
   showDiagnostics?: () => void;
   /** Report fresh accepted rendering, or that loading, failure or teardown hides it. */
   reportViewerShown?: (isShown: boolean) => void;
+  /** Replace startup with an actionable standalone error if no snapshot has ever been shown. */
+  onInitialFailure?: () => void;
+  /** A current actionable error committed, even if native startup has not yet uncovered the viewer. */
+  reportErrorShown?: () => void;
 };
 
 /**
@@ -117,6 +122,9 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   let generation = 0;
   let acknowledgedGeneration: number | null = null;
   let failedGeneration: number | null = null;
+  let hasShownSnapshot = false;
+  let hasReportedInitialFailure = false;
+  let acknowledgmentAttempt = 0;
   let status: FollowStatus = { state: "current" };
   /** Render the shell again so it shows the latest snapshot time and refresh status. */
   let render: () => void = () => {};
@@ -128,11 +136,21 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
     dispatchEvent("system-appearance", event.matches);
   /** Notify the host without letting a detached bridge affect snapshot acceptance. */
   const reportViewerShown = (isShown: boolean) => {
+    if (isShown) hasShownSnapshot = true;
     try {
       host.reportViewerShown?.(isShown);
     } catch {
       /* Visibility is independent of diagnostics and snapshot storage. */
     }
+  };
+  /** Defer host root replacement until after the current React commit or promise callback. */
+  const reportInitialFailure = () => {
+    if (!host.onInitialFailure || hasShownSnapshot || hasReportedInitialFailure)
+      return;
+    hasReportedInitialFailure = true;
+    queueMicrotask(() => {
+      if (isMounted && !hasShownSnapshot) host.onInitialFailure?.();
+    });
   };
   /** Stop all viewer work and reveal the host's standalone diagnostics entry. */
   const unmount = () => {
@@ -164,7 +182,18 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   const acknowledge = async () => {
     if (!isMounted) throw new Error("The viewer was closed.");
     const rendered = generation;
-    await acknowledger.wait(rendered);
+    const attempt = ++acknowledgmentAttempt;
+    try {
+      await acknowledger.wait(rendered);
+    } catch (cause) {
+      if (
+        isMounted &&
+        rendered === generation &&
+        attempt === acknowledgmentAttempt
+      )
+        reportInitialFailure();
+      throw cause;
+    }
     if (!isMounted || rendered !== generation || failedGeneration === rendered)
       throw new Error("The snapshot is no longer shown.");
     acknowledgedGeneration = rendered;
@@ -248,7 +277,12 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
         return initial ?? session.fetch(isRetry);
       },
       async (candidate) => {
-        await session.accept(candidate);
+        try {
+          await session.accept(candidate);
+        } catch (cause) {
+          if (isMounted && session.accepted() === null) reportInitialFailure();
+          throw cause;
+        }
         if (isMounted && acknowledgedGeneration === generation)
           reportViewerShown(true);
       },
@@ -272,11 +306,21 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
         failedGeneration = rendered;
         acknowledger.failed(rendered);
         reportViewerShown(false);
+        reportInitialFailure();
         try {
           host.reportDiagnostic?.("render");
         } catch {
           /* Diagnostics never change how the viewer recovers from the failure. */
         }
+      };
+      /** A committed error can complete startup without falsely accepting its failed snapshot. */
+      const onErrorShown = () => {
+        if (
+          isMounted &&
+          rendered === generation &&
+          failedGeneration === rendered
+        )
+          host.reportErrorShown?.();
       };
       host.root.render(
         <ViewerBoundary
@@ -291,6 +335,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
                 <RefreshCwIcon aria-hidden />
                 {t("Try again")}
               </Button>
+              <ContentCommitMarker onCommit={onErrorShown} />
             </RelayProblem>
           )}
         >
@@ -312,6 +357,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
                     refresh={{ status, onRetry: () => refreshShown(true) }}
                     renderKey={rendered}
                     onRenderError={onRenderError}
+                    onErrorShown={onErrorShown}
                   />
                 </DataProvider>
                 <Toaster />

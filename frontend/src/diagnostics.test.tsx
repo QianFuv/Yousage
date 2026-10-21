@@ -322,12 +322,14 @@ describe("Android viewer visibility lifecycle", () => {
       etag: "cached",
       text: "cached",
     },
+    downloaded?: object,
   ) {
     vi.resetModules();
     vi.useFakeTimers();
     const runtime = await import("@wailsio/runtime");
     vi.doMock("@wailsio/runtime", () => runtime);
     const shown = vi.fn();
+    const contentReady = vi.fn();
     const diagnostic = vi.fn();
     const render =
       vi.fn<(element: ReactElement<Record<string, unknown>>) => void>();
@@ -338,8 +340,15 @@ describe("Android viewer visibility lifecycle", () => {
       hosts.push(host);
       return unmount;
     });
-    const load = vi.fn(() => new Promise(() => {}));
-    vi.stubGlobal("wails", { setViewerShown: shown, diagnostic });
+    const load = vi.fn(() =>
+      downloaded ? Promise.resolve(downloaded) : new Promise(() => {}),
+    );
+    vi.stubGlobal("wails", {
+      setViewerShown: shown,
+      diagnostic,
+      startupDocument: () => "test-document",
+      setStartupContentReady: contentReady,
+    });
     vi.stubGlobal("window", new EventTarget());
     vi.stubGlobal(
       "document",
@@ -377,6 +386,7 @@ describe("Android viewer visibility lifecycle", () => {
     await vi.advanceTimersByTimeAsync(0);
     return {
       shown,
+      contentReady,
       diagnostic,
       render,
       failRoot: () => failRoot(),
@@ -397,6 +407,58 @@ describe("Android viewer visibility lifecycle", () => {
       expect(render).toHaveBeenCalled();
     },
   );
+
+  it.each(["unpaired", "problem"])(
+    "hands off %s only after its own content commit and rejects the replaced marker",
+    async (status) => {
+      const response = {
+        status,
+        problem: "network",
+      };
+      const { contentReady, render, failRoot } = await androidEntry(
+        response,
+        response,
+      );
+      expect(contentReady).not.toHaveBeenCalledWith("test-document", true);
+      const ready = render.mock.calls.at(-1)![0].props.onReady as (
+        ready: boolean,
+      ) => void;
+      ready(true);
+      expect(contentReady).toHaveBeenLastCalledWith("test-document", true);
+      failRoot();
+      const count = contentReady.mock.calls.length;
+      ready(true);
+      expect(contentReady).toHaveBeenCalledTimes(count);
+      await vi.advanceTimersByTimeAsync(0);
+      const errorReady = render.mock.calls.at(-1)![0].props.onReady as (
+        ready: boolean,
+      ) => void;
+      errorReady(true);
+      expect(contentReady).toHaveBeenLastCalledWith("test-document", true);
+    },
+  );
+
+  it("keeps loading covered and opens a committed problem screen on initial viewer failure", async () => {
+    const loading = await androidEntry({ status: "empty" });
+    expect(loading.contentReady).not.toHaveBeenCalledWith(
+      "test-document",
+      true,
+    );
+    const viewer = await androidEntry();
+    viewer.hosts[0].onInitialFailure!();
+    expect(viewer.contentReady).toHaveBeenLastCalledWith(
+      "test-document",
+      false,
+    );
+    const count = viewer.contentReady.mock.calls.length;
+    viewer.hosts[0].reportViewerShown!(true);
+    expect(viewer.contentReady).toHaveBeenCalledTimes(count);
+    const ready = viewer.render.mock.calls.at(-1)![0].props.onReady as (
+      ready: boolean,
+    ) => void;
+    ready(true);
+    expect(viewer.contentReady).toHaveBeenLastCalledWith("test-document", true);
+  });
 
   it("does not equate mount completion with readiness and ignores a viewer left for pairing", async () => {
     const { shown, hosts, unmount } = await androidEntry();

@@ -105,7 +105,7 @@ public class WailsBridge {
     /** Identify one attachment so callbacks queued before a rebind cannot reach another document. */
     static final class WebViewBinding {
         final WebView view;
-        volatile Object document = new Object();
+        volatile Object document = java.util.UUID.randomUUID().toString();
 
         WebViewBinding(WebView view) {
             this.view = view;
@@ -152,6 +152,13 @@ public class WailsBridge {
         WebViewBinding binding = webViewBinding;
         if (isCurrentBinding(binding) && activity instanceof MainActivity) {
             ((MainActivity) activity).setViewerShown(binding.view, isShown);
+        }
+    }
+
+    /** Pass fixed readiness plus a document ticket without exposing application or pairing data. */
+    void setStartupContentReady(WebViewBinding binding, String document, boolean ready) {
+        if (isCurrentBinding(binding) && document.equals(binding.document) && activity instanceof MainActivity) {
+            ((MainActivity) activity).setStartupContentReady(binding.view, document, ready);
         }
     }
 
@@ -215,7 +222,7 @@ public class WailsBridge {
     /** Invalidate queued frontend signals when the current view starts another document. */
     void onDocumentStarted(WebView view) {
         WebViewBinding binding = captureWebViewBinding(view);
-        if (binding != null) binding.document = new Object();
+        if (binding != null) binding.document = java.util.UUID.randomUUID().toString();
     }
 
     /** Recheck attachment, document and Activity lifetime when frontend UI work actually runs. */
