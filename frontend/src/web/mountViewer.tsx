@@ -94,6 +94,8 @@ export type ViewerHost = {
   reportDiagnostic?: DiagnosticReporter;
   /** Open the host's local diagnostics from the settings page, when the host has them. */
   showDiagnostics?: () => void;
+  /** Report fresh accepted rendering, or that loading, failure or teardown hides it. */
+  reportViewerShown?: (isShown: boolean) => void;
 };
 
 /**
@@ -101,6 +103,7 @@ export type ViewerHost = {
  *
  * A newer snapshot replaces the shown one only after the active page rendered its answered
  * reports without failing and the host saved it; otherwise the kept snapshot is shown again.
+ * Cached and restored snapshots report visibility only after their own fresh render acknowledgement.
  *
  * @param host - Snapshot source and page integration.
  * @returns A function that stops following the relay and device color scheme and restores the fallback transport.
@@ -112,6 +115,8 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   let isMounted = true;
   /** Counts shown snapshots, so failures and boundaries belong to one of them. */
   let generation = 0;
+  let acknowledgedGeneration: number | null = null;
+  let failedGeneration: number | null = null;
   let status: FollowStatus = { state: "current" };
   /** Render the shell again so it shows the latest snapshot time and refresh status. */
   let render: () => void = () => {};
@@ -121,9 +126,19 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
   /** Tell the theme controller that the device color scheme changed. */
   const onSchemeChange = (event: MediaQueryListEvent) =>
     dispatchEvent("system-appearance", event.matches);
+  /** Notify the host without letting a detached bridge affect snapshot acceptance. */
+  const reportViewerShown = (isShown: boolean) => {
+    try {
+      host.reportViewerShown?.(isShown);
+    } catch {
+      /* Visibility is independent of diagnostics and snapshot storage. */
+    }
+  };
+  /** Stop all viewer work and reveal the host's standalone diagnostics entry. */
   const unmount = () => {
     if (!isMounted) return;
     isMounted = false;
+    reportViewerShown(false);
     follower?.stop();
     acknowledger.cancel();
     clearNotifications();
@@ -136,28 +151,60 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
     const changes = displayChanges(snapshot.display.value, next.display.value);
     snapshot = next;
     generation++;
+    acknowledgedGeneration = null;
+    acknowledger.cancel();
+    reportViewerShown(false);
     render();
     dispatchEvent("appearance-snapshot", snapshot.appearance);
     if (Object.keys(changes).length)
       dispatchEvent(DISPLAY_CHANGES_EVENT, changes);
     dispatchEvent("usage-invalidated", null);
   };
+  /** Wait for this generation's page commit without accepting obsolete render evidence. */
+  const acknowledge = async () => {
+    if (!isMounted) throw new Error("The viewer was closed.");
+    const rendered = generation;
+    await acknowledger.wait(rendered);
+    if (!isMounted || rendered !== generation || failedGeneration === rendered)
+      throw new Error("The snapshot is no longer shown.");
+    acknowledgedGeneration = rendered;
+  };
+  /** Freshly acknowledge already accepted cached or restored data, independently of networking. */
+  const acknowledgeAccepted = () => {
+    const rendered = generation;
+    void acknowledge().then(
+      () => {
+        if (
+          isMounted &&
+          rendered === generation &&
+          acknowledgedGeneration === rendered
+        )
+          reportViewerShown(true);
+      },
+      () => {},
+    );
+  };
   /** Candidates the first refresh applies before downloading anything newer. */
   let pendingInitial = host.isSaved ? null : host.initial;
   const session = createSnapshotSession<PrivateSnapshot>({
     accepted: host.isSaved ? host.initial : null,
     download: host.download,
+    /** Keep candidate acceptance pending until the current generation actually renders. */
     async show(next) {
       present(next);
-      if (!isMounted) throw new Error("The viewer was closed.");
-      await acknowledger.wait(generation);
+      await acknowledge();
     },
-    restore: present,
+    /** Restore accepted data with a fresh acknowledgement rather than reusing its old commit. */
+    restore(next) {
+      present(next);
+      if (isMounted) acknowledgeAccepted();
+    },
     describe: (reason) => t(REJECTION_MESSAGES[reason]),
   });
   /** Refresh with visible progress; failures stay in the status. */
   const refreshShown = (isRetry = false) =>
     void follower?.refetch(true, isRetry).catch(() => {});
+  reportViewerShown(false);
   try {
     const names = await captureMethodIds(setTransport, fallback);
     const transport = createSnapshotTransport(names, {
@@ -200,19 +247,31 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
         pendingInitial = null;
         return initial ?? session.fetch(isRetry);
       },
-      session.accept,
+      async (candidate) => {
+        await session.accept(candidate);
+        if (isMounted && acknowledgedGeneration === generation)
+          reportViewerShown(true);
+      },
       (next) => {
         status = next;
         render();
       },
     );
-    /** Acknowledge commits of the active page while a shown snapshot waits for one. */
-    const onCommit = (token: number) => acknowledger.committed(token);
+    /** Render this generation with callbacks that cannot affect a later or closed viewer. */
     render = () => {
+      if (!isMounted) return;
       const rendered = generation;
+      /** Acknowledge only the current mounted page's confirmation token. */
+      const onCommit = (token: number) => {
+        if (isMounted && rendered === generation) acknowledger.committed(token);
+      };
       /** A failure belongs to the snapshot this render showed, even when reported later. */
       const onRenderError = () => {
+        if (!isMounted || rendered !== generation) return;
+        acknowledgedGeneration = null;
+        failedGeneration = rendered;
         acknowledger.failed(rendered);
+        reportViewerShown(false);
         try {
           host.reportDiagnostic?.("render");
         } catch {
@@ -263,6 +322,7 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
       );
     };
     render();
+    if (host.isSaved) acknowledgeAccepted();
   } catch (cause) {
     unmount();
     throw cause;

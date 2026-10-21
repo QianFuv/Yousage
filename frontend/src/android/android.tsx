@@ -10,6 +10,7 @@ import { viewerHistory } from "../usage/dialogHistory";
 import {
   androidDiagnosticSink,
   androidDiagnosticsOpener,
+  androidViewerShownReporter,
   createDiagnosticReporter,
   installDiagnosticListeners,
 } from "../diagnostics";
@@ -26,6 +27,8 @@ import "./android.css";
 
 /** Fixed render/internal categories for the native diagnostics, which work without Go. */
 const reportDiagnostic = createDiagnosticReporter(androidDiagnosticSink());
+/** Native recovery visibility is independent of rate-limited diagnostic logging. */
+const REPORT_VIEWER_SHOWN = androidViewerShownReporter();
 /** The early listener in `android.html` normally owns these, so this only fills in when it is missing. */
 installDiagnosticListeners(window, reportDiagnostic);
 
@@ -35,10 +38,15 @@ let isShowingFatal = false;
 const root: Root = createRoot(document.getElementById("root")!, {
   /** Replace a blank page after a failure no boundary caught, without looping on the problem screen. */
   onUncaughtError() {
+    REPORT_VIEWER_SHOWN?.(false);
     reportDiagnostic("render");
     if (isShowingFatal) return;
     isShowingFatal = true;
-    setTimeout(() => showProblem("display", true));
+    const generation = ++openGeneration;
+    leaveViewer();
+    setTimeout(() => {
+      if (generation === openGeneration) showProblem("display", true);
+    });
   },
 });
 const locale = navigator.language || "en";
@@ -50,10 +58,11 @@ let openGeneration = 0;
 /** Opens run one after another, so two viewers never swap transports concurrently. */
 let openQueue = Promise.resolve();
 
-/** Leave the viewer, if one is mounted, so native calls reach Go directly again. */
+/** Leave the viewer and reveal standalone diagnostics, restoring native calls to Go. */
 function leaveViewer() {
   unmountViewer?.();
   unmountViewer = null;
+  REPORT_VIEWER_SHOWN?.(false);
 }
 
 /** Show the standalone screens in the device's language and color scheme. */
@@ -181,6 +190,7 @@ function toCandidate(
  * Show the snapshot saved on this device at once, or download one, and mount the viewer.
  *
  * Saved data this version cannot show is downloaded again without deleting it or the link.
+ * Visibility notifications belong only to this opening request and its live viewer.
  *
  * @param generation - This request's place among requests to open the snapshot.
  * @param shouldDownload - Download the snapshot instead of opening the saved one.
@@ -219,6 +229,10 @@ async function showSnapshot(generation: number, shouldDownload: boolean) {
       recover: () => void openSnapshot(true),
       reportDiagnostic,
       showDiagnostics: androidDiagnosticsOpener() ?? undefined,
+      /** Ignore visibility from an opening request superseded by recovery or pairing. */
+      reportViewerShown: (isShown) => {
+        if (isCurrent()) REPORT_VIEWER_SHOWN?.(isShown);
+      },
       open: (url) => void mobileApi.OpenURL(url).catch(() => {}),
       connection: {
         relay: pairing?.relayOrigin.replace(/^https?:\/\//, "") ?? "",

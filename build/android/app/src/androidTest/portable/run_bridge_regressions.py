@@ -19,8 +19,27 @@ STUBS = {
     **DIAGNOSTICS_STUBS,
     "android/content/Context.java": "package android.content; public class Context {}",
     "android/app/Activity.java": (
-        "package android.app; public class Activity extends android.content.Context {}"
+        """package android.app;
+public class Activity extends android.content.Context {
+    public boolean isFinishing;
+    public boolean isDestroyed;
+    public boolean isFinishing() { return isFinishing; }
+    public boolean isDestroyed() { return isDestroyed; }
+}
+"""
     ),
+    "com/wails/app/MainActivity.java": """
+package com.wails.app;
+/** Recording sink only: this fake does not instantiate or render production MainActivity. */
+public class MainActivity extends android.app.Activity {
+    final ViewerDiagnosticsState viewerDiagnostics = new ViewerDiagnosticsState();
+    int shownCalls;
+    void setViewerShown(android.webkit.WebView view, boolean isShown) {
+        shownCalls++;
+        viewerDiagnostics.setViewerShown(isShown);
+    }
+}
+""",
     "android/view/View.java": "package android.view; public class View {}",
     "android/os/Looper.java": """
 package android.os;
@@ -84,7 +103,7 @@ def run_java(arguments, executable, directory):
         "\n".join('"' + str(value).replace("\\", "/") + '"' for value in arguments),
         encoding="utf-8",
     )
-    subprocess.run([str(executable), "@" + str(argument_file)], check=True, timeout=60)
+    subprocess.run([str(executable), "@" + str(argument_file)], check=True, timeout=120)
 
 
 def main():
@@ -94,6 +113,8 @@ def main():
     parser.add_argument("--baseline-ref")
     parser.add_argument("--privacy-negative-control", action="store_true",
                         help="Temporarily restore raw console passthrough; privacy regression must fail")
+    parser.add_argument("--visibility-negative-control", choices=("render-clears-stall", "rate-limits-entry"),
+                        help="Break one visibility rule in the disposable source copy; its regression must fail")
     arguments = parser.parse_args()
     repository = Path(__file__).resolve().parents[6]
     android_project = repository / "build/android"
@@ -112,14 +133,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix="yousage-bridge-regression-") as temporary:
         temporary_path = Path(temporary)
         production_sources = []
-        for filename in ("WailsBridge.java", "WailsJSBridge.java", "WailsPathHandler.java", "DiagnosticsStore.java", "DiagnosticsUi.java"):
+        for filename in ("WailsBridge.java", "WailsJSBridge.java", "WailsPathHandler.java", "DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java"):
             relative = Path("build/android/app/src/main/java/com/wails/app") / filename
             source = (
                 subprocess.check_output(
                     ["git", "show", f"{arguments.baseline_ref}:{relative.as_posix()}"],
                     cwd=repository,
                 ).decode("utf-8")
-                if arguments.baseline_ref and filename not in ("DiagnosticsStore.java", "DiagnosticsUi.java")
+                if arguments.baseline_ref and filename not in ("DiagnosticsStore.java", "DiagnosticsUi.java", "ViewerDiagnosticsState.java")
                 else (repository / relative).read_text(encoding="utf-8")
             )
             if filename == "WailsBridge.java":
@@ -132,6 +153,17 @@ def main():
                 if source.count(console) != 1:
                     raise ValueError("Expected one no-op legacy console method in the disposable host copy")
                 source = source.replace(console, "public void log(String level, String message) {\n        Log.e(TAG, message);\n    }")
+            if arguments.visibility_negative_control == "rate-limits-entry" and filename == "WailsJSBridge.java":
+                reveal = "postToCurrentViewer(() -> bridge.setViewerShown(false));"
+                if source.count(reveal) != 1:
+                    raise ValueError("Expected exactly one fixed-failure visibility dispatch")
+                source = source.replace(reveal,
+                    "if (DiagnosticsStore.current() == null || DiagnosticsStore.current().frontendFailure(category)) " + reveal)
+            if arguments.visibility_negative_control == "render-clears-stall" and filename == "ViewerDiagnosticsState.java":
+                readiness = "isAwaitingRender = !isShown;"
+                if source.count(readiness) != 1:
+                    raise ValueError("Expected exactly one accepted-render state transition")
+                source = source.replace(readiness, readiness + "\n        if (isShown) isUnresponsive = false;")
             destination = temporary_path / "production/com/wails/app" / filename
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(source, encoding="utf-8")
@@ -152,7 +184,8 @@ def main():
         compiled_classpath = os.pathsep.join([str(production_output), classpath])
         run_java(
             ["--release", "11", "-proc:none", "-classpath", compiled_classpath, "-d", test_output,
-             *fake_sources, Path(__file__).with_name("BridgeLifetimeRegression.java")],
+             *fake_sources, Path(__file__).with_name("BridgeLifetimeRegression.java"),
+             Path(__file__).with_name("ViewerDiagnosticsRegression.java")],
             javac_binary,
             temporary_path,
         )
@@ -162,6 +195,13 @@ def main():
             java_binary,
             temporary_path,
         )
+        run_java(
+            ["-classpath", os.pathsep.join([str(test_output), compiled_classpath]),
+             "com.wails.app.ViewerDiagnosticsRegression"],
+            java_binary,
+            temporary_path,
+        )
+    print("Production bridge queue and visibility reasons tested; MainActivity rendering/touch and platform callbacks remain device-only")
 
 
 if __name__ == "__main__":

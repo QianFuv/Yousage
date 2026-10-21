@@ -178,6 +178,175 @@ function commitPage(rendered: ReactElement[], index = -1) {
 }
 
 describe("mountViewer", () => {
+  it("does not report a cached commit whose render fails before acknowledgement settles", async () => {
+    const reportViewerShown = vi.fn();
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      reportViewerShown,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    rendered.at(-1)!.props.onError(new Error("commit effect failed"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+    expect(reportViewerShown).toHaveBeenLastCalledWith(false);
+    unmount();
+  });
+
+  it("reports a cached offline viewer only after its fresh page acknowledgement", async () => {
+    const reportViewerShown = vi.fn();
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      download: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+      reportViewerShown,
+    });
+    expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+    await vi.advanceTimersByTimeAsync(1_500);
+    commitPage(rendered, 0);
+    expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).toHaveBeenLastCalledWith(true);
+    unmount();
+    expect(reportViewerShown).toHaveBeenLastCalledWith(false);
+  });
+
+  it("never reports cached data as shown merely because its acknowledgement timed out", async () => {
+    const reportViewerShown = vi.fn();
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      reportViewerShown,
+    });
+    await vi.advanceTimersByTimeAsync(ACKNOWLEDGE_TIMEOUT_MS);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+    unmount();
+  });
+
+  it("waits for saving after render acknowledgement before reporting a download shown", async () => {
+    let finishSave = () => {};
+    const commit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+    const reportViewerShown = vi.fn();
+    const { rendered, unmount } = await mount({
+      initial: candidate(snapshot("2026-10-20T00:00:00Z"), commit),
+      reportViewerShown,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(commit).toHaveBeenCalledOnce();
+    expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+    finishSave();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).toHaveBeenLastCalledWith(true);
+    unmount();
+  });
+
+  it.each(["unmount", "render failure"])(
+    "ignores save completion after %s",
+    async (ending) => {
+      let finishSave = () => {};
+      const reportViewerShown = vi.fn();
+      const { rendered, unmount } = await mount({
+        initial: candidate(
+          snapshot("2026-10-20T00:00:00Z"),
+          () =>
+            new Promise<void>((resolve) => {
+              finishSave = resolve;
+            }),
+        ),
+        reportViewerShown,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      commitPage(rendered);
+      await vi.advanceTimersByTimeAsync(0);
+      if (ending === "unmount") unmount();
+      else rendered.at(-1)!.props.onError(new Error("late failure"));
+      finishSave();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+      expect(reportViewerShown).toHaveBeenLastCalledWith(false);
+      unmount();
+    },
+  );
+
+  it.each(["render", "save"])(
+    "requires a fresh rollback acknowledgement after a candidate's %s failure",
+    async (failure) => {
+      const kept = candidate(snapshot("2026-10-20T00:00:00Z"));
+      const commit = vi.fn(async () => {
+        if (failure === "save") throw new Error("storage failed");
+      });
+      const newer = candidate(snapshot("2026-10-20T01:00:00Z"), commit);
+      const reportViewerShown = vi.fn();
+      const { rendered, unmount } = await mount({
+        initial: kept,
+        isSaved: true,
+        download: vi
+          .fn<ViewerHost["download"]>()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(newer),
+        reportViewerShown,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const cachedIndex = rendered.length - 1;
+      const refresh = pressRefresh();
+      await vi.advanceTimersByTimeAsync(0);
+      const rejectedIndex = rendered.length - 1;
+      if (failure === "render")
+        rendered.at(-1)!.props.onError(new Error("bad page"));
+      else commitPage(rendered);
+      await refresh;
+      expect(shownTime(rendered.at(-1))).toBe(kept.payload.generatedAt);
+      expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+      commitPage(rendered, cachedIndex);
+      commitPage(rendered, rejectedIndex);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reportViewerShown).not.toHaveBeenCalledWith(true);
+      commitPage(rendered);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reportViewerShown).toHaveBeenLastCalledWith(true);
+      const calls = reportViewerShown.mock.calls.length;
+      rendered[rejectedIndex].props.onError(new Error("obsolete failure"));
+      expect(reportViewerShown).toHaveBeenCalledTimes(calls);
+      unmount();
+      const closedCalls = reportViewerShown.mock.calls.length;
+      rendered.at(-1)!.props.onError(new Error("closed viewer"));
+      commitPage(rendered);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reportViewerShown).toHaveBeenCalledTimes(closedCalls);
+    },
+  );
+
+  it("reports mount failure without allowing a throwing visibility callback to change recovery", async () => {
+    const reportViewerShown = vi.fn(() => {
+      throw new Error("bridge detached");
+    });
+    const broken = snapshot("2026-10-20T00:00:00Z");
+    broken.display = null as unknown as PrivateSnapshot["display"];
+    await expect(
+      mount({ initial: candidate(broken), reportViewerShown }),
+    ).rejects.toThrow();
+    expect(reportViewerShown).toHaveBeenLastCalledWith(false);
+    const { rendered, unmount } = await mount({
+      isSaved: true,
+      reportViewerShown,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    commitPage(rendered);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reportViewerShown).toHaveBeenLastCalledWith(true);
+    expect(() => unmount()).not.toThrow();
+  });
+
   it("tells the host's diagnostics about each render failure and offers its diagnostics in settings", async () => {
     const reportDiagnostic = vi.fn();
     const showDiagnostics = vi.fn();

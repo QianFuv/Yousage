@@ -151,22 +151,54 @@ def verify_log_privacy(production):
 
 
 def verify_native_layout(source_root):
-    """Verify recovery controls do not require WebView inflation or overlay the viewer.
+    """Verify independent native controls overlay the viewer without reserving healthy height.
 
     Args:
         source_root: Android main source set directory containing res/layout.
     """
     root = element_tree.parse(source_root / "res/layout/activity_main.xml").getroot()
-    identifier = "{http://schemas.android.com/apk/res/android}id"
+    android = "{http://schemas.android.com/apk/res/android}"
+    identifier = android + "id"
     container = next((child for child in root if child.get(identifier) == "@+id/main_container"), None)
-    entry = next((child for child in root if child.get(identifier) == "@+id/diagnostics_open"), None)
-    if container is None or container.tag != "FrameLayout" or entry is None:
-        raise AssertionError("Native diagnostics must reserve sibling space beside the recovery FrameLayout")
+    if container is None or container.tag != "FrameLayout" or list(root) != [container]:
+        raise AssertionError("Native diagnostics must not reserve sibling layout space")
+    children = list(container)
+    entry = next((child for child in children if child.get(identifier) == "@+id/diagnostics_open"), None)
+    recovery = next((child for child in children if child.get(identifier) == "@+id/viewer_recovery"), None)
+    if entry is None or recovery is None or children.index(entry) >= children.index(recovery):
+        raise AssertionError("Native chip must overlay the WebView below the opaque recovery panel")
+    expected = {
+        "layout_width": "wrap_content", "layout_height": "wrap_content",
+        "layout_gravity": "bottom|center_horizontal", "layout_marginBottom": "96dp",
+        "minWidth": "48dp", "minHeight": "48dp", "elevation": "0dp",
+        "stateListAnimator": "@null", "textColor": "#A3A3A3",
+        "background": "?android:attr/selectableItemBackgroundBorderless",
+    }
+    if any(entry.get(android + key) != value for key, value in expected.items()):
+        raise AssertionError("Native chip must retain approved muted, borderless, 48dp overlay presentation")
+    if container.get(android + "layout_height") != "match_parent" or recovery.get(android + "background") != "@color/wails_background":
+        raise AssertionError("Viewer must fill normal height and recovery must remain opaque")
     if any("WebView" in child.tag for child in root.iter()):
         raise AssertionError("Native recovery layout must inflate without constructing a WebView")
     if not any(child.get(identifier) == "@+id/viewer_diagnostics" for child in container.iter()):
         raise AssertionError("Recovery view must expose native diagnostics")
-    print("PASS native entry reserves layout space and inflates without WebView")
+    source = (source_root / "java/com/wails/app/MainActivity.java").read_text(encoding="utf-8")
+    creation = source[source.index("protected void onCreate("):source.index("private void startViewer(")]
+    if creation.index("DiagnosticsStore.initialize") >= creation.index("startViewer();") or creation.count("DiagnosticsUi.show(this, diagnostics)") != 2:
+        raise AssertionError("Both native diagnostics controls must exist before Go/WebView startup")
+    if "viewerDiagnostics.shouldShowEntry() ? View.VISIBLE : View.GONE" not in source:
+        raise AssertionError("Healthy native entry must be GONE rather than reserve invisible height")
+    finished = source[source.index("public void onPageFinished("):source.index("public boolean onRenderProcessGone(")]
+    if "setViewerShown" in finished:
+        raise AssertionError("Page load completion must never claim accepted rendering")
+    renderer = source[source.index("private void setupRendererClient("):source.index("void setViewerShown(")]
+    if any(action in renderer for action in ("terminate(", "loadUrl(", "reload(", "disposeWebView(", "startViewer(")):
+        raise AssertionError("Renderer responsiveness callbacks must not replace a live view")
+    if "if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) setupRendererClient(webView);" not in source:
+        raise AssertionError("Platform renderer callbacks require the API 29 guard")
+    if renderer.count("bridge.isCurrentBinding(binding)") != 2:
+        raise AssertionError("Both renderer callbacks must reject obsolete attachments")
+    print("PASS native overlay reserves no healthy height and initializes independently of Go/WebView")
 
 
 def main():

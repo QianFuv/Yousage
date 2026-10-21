@@ -72,6 +72,7 @@ export type RenderAcknowledger = {
  * confirmation token. A marker committing with that token, with no read started since and
  * no failure of that snapshot, acknowledges it. Commits of loading fallbacks, of data from
  * before the reads were answered, or of another snapshot's pages acknowledge nothing.
+ * Unanswered reads from an obsolete generation never delay the current snapshot.
  *
  * @param confirm - Render the viewer again with the current {@link RenderAcknowledger.token}.
  * @param timeoutMs - How long to wait before giving up.
@@ -81,12 +82,11 @@ export function createRenderAcknowledger(
   confirm: () => void,
   timeoutMs = ACKNOWLEDGE_TIMEOUT_MS,
 ): RenderAcknowledger {
-  let reads = 0;
-  /** Counts started reads, so a read started after a confirmation invalidates it. */
-  let readCount = 0;
+  /** Count reads per snapshot so an obsolete request cannot block its replacement. */
+  const reads = new Map<number, { pending: number; count: number }>();
   let token = 0;
   let confirmation: { token: number; readCount: number } | null = null;
-  let isConfirming = false;
+  let confirmationTimer: ReturnType<typeof setTimeout> | null = null;
   const failures = new Set<number>();
   let pending: {
     generation: number;
@@ -104,6 +104,8 @@ export function createRenderAcknowledger(
     const { resolve, reject, timer } = pending;
     pending = null;
     confirmation = null;
+    if (confirmationTimer !== null) clearTimeout(confirmationTimer);
+    confirmationTimer = null;
     clearTimeout(timer);
     if (cause) reject(cause);
     else resolve();
@@ -120,46 +122,59 @@ export function createRenderAcknowledger(
   };
   /** Render a confirmation once the reads answered and their updates were scheduled. */
   const scheduleConfirmation = () => {
-    if (!pending || reads > 0 || isConfirming) return;
-    isConfirming = true;
-    setTimeout(() => {
-      isConfirming = false;
-      if (!pending || reads > 0) return;
-      confirmation = { token: ++token, readCount };
+    if (
+      !pending ||
+      (reads.get(pending.generation)?.pending ?? 0) > 0 ||
+      confirmationTimer !== null
+    )
+      return;
+    confirmationTimer = setTimeout(() => {
+      confirmationTimer = null;
+      if (!pending) return;
+      const current = reads.get(pending.generation);
+      if ((current?.pending ?? 0) > 0) return;
+      confirmation = { token: ++token, readCount: current?.count ?? 0 };
       confirm();
     });
   };
   return {
+    /** Track only this snapshot's reads; late completion cannot alter its replacement. */
     track(generation, read) {
-      reads++;
-      readCount++;
+      const current = reads.get(generation) ?? { pending: 0, count: 0 };
+      reads.set(generation, current);
+      current.pending++;
+      current.count++;
       return read.then(
         (value) => {
-          reads--;
-          scheduleConfirmation();
+          current.pending--;
+          if (pending?.generation === generation) scheduleConfirmation();
           return value;
         },
         (cause: unknown) => {
-          reads--;
+          current.pending--;
           fail(generation);
-          scheduleConfirmation();
+          if (pending?.generation === generation) scheduleConfirmation();
           throw cause;
         },
       );
     },
     token: () => token,
+    /** Accept a confirmation only if its own snapshot started no further report reads. */
     committed(committedToken) {
       if (
         pending &&
-        reads === 0 &&
+        (reads.get(pending.generation)?.pending ?? 0) === 0 &&
         confirmation?.token === committedToken &&
-        confirmation.readCount === readCount
+        confirmation.readCount === (reads.get(pending.generation)?.count ?? 0)
       )
         settle();
     },
     failed: fail,
+    /** Supersede an earlier wait and discard its read counters before confirming this snapshot. */
     wait(generation) {
       settle(new Error("Another snapshot is shown."));
+      for (const previous of reads.keys())
+        if (previous < generation) reads.delete(previous);
       for (const failed of failures)
         if (failed < generation) failures.delete(failed);
       if (failures.has(generation))

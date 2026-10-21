@@ -6,10 +6,24 @@ telemetry service.
 
 ## Android: view and share
 
-Open **Settings → Diagnostics**, or use the native **Diagnostics** button below
-the WebView. The native recovery screen also offers **View diagnostics**. The
-native entries work independently of React and the Go service, including when
-the page fails to load or its renderer stops.
+Open **Settings → Diagnostics** during normal use. A small native **Diagnostics**
+entry overlays startup, pairing and failure screens without reserving page
+height. It disappears only after the current viewer has acknowledged rendering
+an accepted snapshot. A saved snapshot can provide this acknowledgement while
+offline; returning from the mount call or finishing an HTML load cannot.
+
+The native recovery screen also offers **View diagnostics**. Native controls are
+created before Go or the WebView, and open the report independently of either.
+Hiding the startup entry does not delete logs. A fresh document, a current render
+failure or leaving the viewer makes it available again. Signals from an obsolete
+document, detached WebView or closed Activity are ignored.
+
+On Android 10 (API 29) and later, WebView renderer-unresponsive callbacks also
+reveal the entry. This does not reload or terminate a stalled renderer. A
+responsive callback clears only the stall reason; it does not acknowledge an
+unrendered or failed snapshot. These callbacks do not guarantee detection within
+a fixed interval. Android 5–9 (API 21–28) lack this callback path, and a blocked
+native UI thread can prevent the controls from responding.
 
 The dialog shows a read-only report. **Refresh** reads it again. **Share** reads
 and filters the files again, then opens Android's share chooser with plain text.
@@ -91,6 +105,9 @@ change the result of the action being diagnosed.
 
 Synthetic Go and portable JVM tests exercise filtering, capacity, retention,
 partial writes, concurrency and failure paths. Browser fault injection exercises
-render recovery separately. These checks do not establish reproduction of a
-particular user's incident, physical-device behavior, or successful delivery to a
-share recipient. Record device/emulator validation explicitly when it is run.
+render recovery separately. Host tests also cover startup/render/stall visibility,
+stale native bridge signals and the absence of reserved page height. They do not
+exercise Android touch dispatch or the share chooser on a device. These checks do
+not establish reproduction of a particular user's incident, physical-device
+behavior, or successful delivery to a share recipient. Record device/emulator
+validation explicitly when it is run.

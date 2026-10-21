@@ -9,8 +9,24 @@
     <FrameLayout
         android:id="@+id/main_container"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="match_parent">
+
+        <Button
+            android:id="@+id/diagnostics_open"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="96dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:elevation="0dp"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:stateListAnimator="@null"
+            android:text="@string/diagnostics_open"
+            android:textAllCaps="false"
+            android:textColor="#A3A3A3"
+            android:textSize="12sp" />
 
         <LinearLayout
             android:id="@+id/viewer_recovery"
@@ -48,12 +64,5 @@
         </LinearLayout>
 
     </FrameLayout>
-
-    <Button
-        android:id="@+id/diagnostics_open"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="48dp"
-        android:text="@string/diagnostics_open" />
 
 </LinearLayout>

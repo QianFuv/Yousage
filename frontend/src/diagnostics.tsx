@@ -27,7 +27,7 @@ const LISTENERS_KEY = Symbol.for("yousage.diagnostics.listeners");
 let isForwardingRenderFailure = false;
 
 /** The Android `window.wails` interface methods used here; other hosts lack them. */
-type AndroidMethod = "diagnostic" | "showDiagnostics";
+type AndroidMethod = "diagnostic" | "showDiagnostics" | "setViewerShown";
 
 /**
  * Create a reporter that forwards fixed categories to a host intake.
@@ -117,6 +117,27 @@ export function androidDiagnosticsOpener(
           showDiagnostics();
         } catch {
           /* The native screen offers the same dialog when this call fails. */
+        }
+      }
+    : null;
+}
+
+/**
+ * Report accepted viewer visibility independently of diagnostic logging limits.
+ *
+ * @param scope - Global object that may carry `wails`.
+ * @returns The boolean-only reporter, or `null` when the native method is unavailable.
+ */
+export function androidViewerShownReporter(
+  scope: object = globalThis,
+): ((isShown: boolean) => void) | null {
+  const setViewerShown = androidMethod(scope, "setViewerShown");
+  return setViewerShown
+    ? (isShown) => {
+        try {
+          setViewerShown(isShown);
+        } catch {
+          /* A detached native bridge must not interrupt viewer recovery. */
         }
       }
     : null;

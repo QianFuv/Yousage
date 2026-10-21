@@ -56,6 +56,22 @@ function harness() {
 }
 
 describe("createRenderAcknowledger", () => {
+  it("does not let an obsolete unanswered report hold the restored generation open", async () => {
+    const { acknowledger, wait } = harness();
+    const obsolete = deferredRead();
+    const tracked = acknowledger.track(1, obsolete.read).catch(() => "failed");
+    const old = wait(1);
+    const current = wait(2);
+    await vi.advanceTimersByTimeAsync(0);
+    acknowledger.committed(acknowledger.token());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(old.state).toBe("failed");
+    expect(current.state).toBe("shown");
+    obsolete.fail(new Error("obsolete read"));
+    await tracked;
+    expect(current.state).toBe("shown");
+  });
+
   it("does not confirm while a report read is unanswered, however long it takes", async () => {
     const { acknowledger, confirmations, wait } = harness();
     const late = deferredRead();

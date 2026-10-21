@@ -21,11 +21,13 @@ public class WailsJSBridge {
 
     private final WailsBridge bridge;
     private final WebView webView;
+    private final WailsBridge.WebViewBinding binding;
     private volatile boolean isAttached = true;
 
     public WailsJSBridge(WailsBridge bridge, WebView webView) {
         this.bridge = bridge;
         this.webView = webView;
+        this.binding = bridge.captureWebViewBinding(webView);
     }
 
     /** Reject calls and replies belonging to a document that has been disposed. */
@@ -35,7 +37,15 @@ public class WailsJSBridge {
 
     /** Check both interface lifetime and current native attachment before invoking Go. */
     private boolean canInvoke() {
-        return isAttached && bridge.isCurrentWebView(webView);
+        return isAttached && bridge.isCurrentBinding(binding);
+    }
+
+    /** Retain interface lifetime as well as attachment lifetime across queued native UI work. */
+    private void postToCurrentViewer(Runnable action) {
+        if (!canInvoke()) return;
+        bridge.postForBinding(binding, () -> {
+            if (canInvoke()) action.run();
+        });
     }
 
     /**
@@ -87,13 +97,22 @@ public class WailsJSBridge {
     /** Accept a fixed render/internal category only from the currently attached document. */
     @JavascriptInterface
     public void diagnostic(String category) {
-        if (canInvoke()) bridge.recordFrontendDiagnostic(category);
+        if (canInvoke() && ("render".equals(category) || "internal".equals(category))) {
+            postToCurrentViewer(() -> bridge.setViewerShown(false));
+            bridge.recordFrontendDiagnostic(category);
+        }
+    }
+
+    /** Report fresh accepted rendering, or leaving/failing the current viewer, without payload data. */
+    @JavascriptInterface
+    public void setViewerShown(boolean isShown) {
+        postToCurrentViewer(() -> bridge.setViewerShown(isShown));
     }
 
     /** Open the native diagnostics dialog from frontend settings without a Go round trip. */
     @JavascriptInterface
     public void showDiagnostics() {
-        if (canInvoke()) bridge.showDiagnostics();
+        postToCurrentViewer(() -> bridge.showDiagnostics());
     }
 
     /**

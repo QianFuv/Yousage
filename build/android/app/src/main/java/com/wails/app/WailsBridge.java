@@ -103,8 +103,9 @@ public class WailsBridge {
     private boolean pendingLocationRequest = false;
 
     /** Identify one attachment so callbacks queued before a rebind cannot reach another document. */
-    private static final class WebViewBinding {
+    static final class WebViewBinding {
         final WebView view;
+        volatile Object document = new Object();
 
         WebViewBinding(WebView view) {
             this.view = view;
@@ -144,6 +145,14 @@ public class WailsBridge {
     /** Accept only fixed frontend failure literals; the store enforces the process-wide rate limit. */
     public void recordFrontendDiagnostic(String category) {
         if (diagnostics != null) diagnostics.frontendFailure(category);
+    }
+
+    /** Apply frontend readiness on the UI thread without invoking Go or touching stored logs. */
+    void setViewerShown(boolean isShown) {
+        WebViewBinding binding = webViewBinding;
+        if (isCurrentBinding(binding) && activity instanceof MainActivity) {
+            ((MainActivity) activity).setViewerShown(binding.view, isShown);
+        }
     }
 
     /** Open the independent native diagnostic UI, including when Go has failed to initialize. */
@@ -191,10 +200,31 @@ public class WailsBridge {
         webViewBinding = webView == null ? null : new WebViewBinding(webView);
     }
 
-    /** Check whether a JavaScript interface still belongs to the attached document. */
-    boolean isCurrentWebView(WebView view) {
+    /** Capture the attachment itself, including when the same WebView has been rebound. */
+    WebViewBinding captureWebViewBinding(WebView view) {
         WebViewBinding binding = webViewBinding;
-        return binding != null && binding.view == view;
+        return isCurrentBinding(binding) && binding.view == view ? binding : null;
+    }
+
+    /** Reject a replaced attachment or an Activity that is finishing or destroyed. */
+    boolean isCurrentBinding(WebViewBinding binding) {
+        return binding != null && webViewBinding == binding
+                && (activity == null || (!activity.isFinishing() && !activity.isDestroyed()));
+    }
+
+    /** Invalidate queued frontend signals when the current view starts another document. */
+    void onDocumentStarted(WebView view) {
+        WebViewBinding binding = captureWebViewBinding(view);
+        if (binding != null) binding.document = new Object();
+    }
+
+    /** Recheck attachment, document and Activity lifetime when frontend UI work actually runs. */
+    void postForBinding(WebViewBinding binding, Runnable action) {
+        if (!isCurrentBinding(binding)) return;
+        Object document = binding.document;
+        mainHandler.post(() -> {
+            if (isCurrentBinding(binding) && binding.document == document) action.run();
+        });
     }
 
     // Lifecycle forwarding
