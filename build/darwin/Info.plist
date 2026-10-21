@@ -5,8 +5,8 @@
   <key>CFBundleName</key><string>Yousage</string>
   <key>CFBundleExecutable</key><string>yousage</string>
   <key>CFBundleIdentifier</key><string>app.yousage.desktop</string>
-  <key>CFBundleVersion</key><string>0.1.6</string>
-  <key>CFBundleShortVersionString</key><string>0.1.6</string>
+  <key>CFBundleVersion</key><string>0.1.7</string>
+  <key>CFBundleShortVersionString</key><string>0.1.7</string>
   <key>CFBundleIconFile</key><string>icon</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
