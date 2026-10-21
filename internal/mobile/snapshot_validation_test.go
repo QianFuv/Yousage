@@ -68,7 +68,7 @@ func TestSnapshotContractCompatibility(test *testing.T) {
 		name   string
 		change func(map[string]any)
 	}{
-		{"current empty reports", func(value map[string]any) {}},
+		{"current populated reports", func(value map[string]any) {}},
 		{"older omitted scalars", func(value map[string]any) {
 			value["display"].(map[string]any)["value"] = map[string]any{}
 			value["appearance"] = map[string]any{}
@@ -101,6 +101,42 @@ func TestSnapshotContractCompatibility(test *testing.T) {
 			payload := changedSnapshot(test, fixture, scenario.change)
 			if problem := snapshotProblem([]byte(payload)); problem != "" {
 				test.Fatalf("compatible snapshot rejected: %s", problem)
+			}
+		})
+	}
+}
+
+// TestPopulatedParityValidation checks the previously hidden fields as real binding inputs.
+func TestPopulatedParityValidation(test *testing.T) {
+	fixture := snapshotFixture(test, "parity")
+	if problem := snapshotProblem([]byte(fixture)); problem != "" {
+		test.Fatal("complete business fixture rejected", problem)
+	}
+	for _, path := range [][]string{
+		{"usage", "environments", "summary", "buckets", "totals", "cachedInputTokens"},
+		{"usage", "environments", "serverConfig", "providers", "usageLimits", "resetCredits", "availableCount"},
+		{"usage", "environments", "cycleValues", "history", "valueUsd"},
+		{"loss", "events", "idleMs"},
+		{"loss", "events", "tokens"},
+		{"speed", "models", "decodeTokensPerSecond"},
+		{"speed", "models", "medianLatencyMs"},
+		{"speed", "models", "cacheHitRate"},
+		{"speed", "models", "unmeasuredRequests"},
+		{"receipt", "items", "tokens"},
+	} {
+		test.Run(path[len(path)-1], func(test *testing.T) {
+			bad := changedSnapshot(test, fixture, func(value map[string]any) {
+				var current any = value["periods"].(map[string]any)["90"]
+				for _, name := range path[:len(path)-1] {
+					current = current.(map[string]any)[name]
+					if rows, ok := current.([]any); ok {
+						current = rows[0]
+					}
+				}
+				current.(map[string]any)[path[len(path)-1]] = "not a number"
+			})
+			if problem := snapshotProblem([]byte(bad)); problem != "data" {
+				test.Fatal("invalid business field escaped validation", problem)
 			}
 		})
 	}

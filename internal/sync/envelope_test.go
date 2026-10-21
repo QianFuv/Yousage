@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -23,6 +24,81 @@ func TestEnvelopeVersion(test *testing.T) {
 	for _, invalid := range [][]byte{nil, {1}, {1, 2, 3}} {
 		if _, err = Open(invalid, key, "space:version"); err == nil || errors.Is(err, ErrEnvelopeVersion) {
 			test.Fatalf("invalid envelope error = %v", err)
+		}
+	}
+}
+
+// TestEnvelopeBusinessFieldPreservation authenticates and compares every populated report field.
+func TestEnvelopeBusinessFieldPreservation(test *testing.T) {
+	expected := paritySnapshot(test)
+	plaintext, err := json.Marshal(expected)
+	if err != nil {
+		test.Fatal(err)
+	}
+	key, err := NewKey()
+	if err != nil {
+		test.Fatal(err)
+	}
+	envelope, err := Seal(plaintext, key, "space:synthetic-parity")
+	if err != nil {
+		test.Fatal(err)
+	}
+	opened, err := Open(envelope, key, "space:synthetic-parity")
+	if err != nil || !bytes.Equal(opened, plaintext) {
+		test.Fatal("encryption/compression changed report JSON", err)
+	}
+	var actual Snapshot
+	if err := json.Unmarshal(opened, &actual); err != nil || !reflect.DeepEqual(actual, expected) {
+		test.Fatal("envelope lost business fields", err)
+	}
+}
+
+// TestParityOracleDetectsLoss proves field stripping and wrong-period reads fail the same
+// equality used above, using disposable in-memory copies rather than changing production.
+func TestParityOracleDetectsLoss(test *testing.T) {
+	expected := paritySnapshot(test)
+	encoded, err := json.Marshal(expected)
+	if err != nil {
+		test.Fatal(err)
+	}
+	for _, field := range []string{"totals", "categoryCostUsd", "sources", "resetCredits", "history", "unavailable", "idleMs", "tokens", "decodeTokensPerSecond", "medianLatencyMs", "cacheHitRate", "unmeasuredRequests", "model", "display", "appearance", "bootstrap", "wrong period"} {
+		test.Run(field, func(test *testing.T) {
+			var altered map[string]any
+			if err := json.Unmarshal(encoded, &altered); err != nil {
+				test.Fatal(err)
+			}
+			if field == "wrong period" {
+				periods := altered["periods"].(map[string]any)
+				periods["7"] = periods["30"]
+			} else {
+				stripParityField(altered, field)
+			}
+			changed, err := json.Marshal(altered)
+			if err != nil {
+				test.Fatal(err)
+			}
+			var actual Snapshot
+			if err := json.Unmarshal(changed, &actual); err != nil {
+				test.Fatal("negative control must remain decodable", err)
+			}
+			if reflect.DeepEqual(actual, expected) {
+				test.Fatal("preservation oracle missed injected loss", field)
+			}
+		})
+	}
+}
+
+// stripParityField simulates a lossy projection of one field anywhere in a private copy.
+func stripParityField(value any, field string) {
+	switch value := value.(type) {
+	case map[string]any:
+		delete(value, field)
+		for _, nested := range value {
+			stripParityField(nested, field)
+		}
+	case []any:
+		for _, nested := range value {
+			stripParityField(nested, field)
 		}
 	}
 }

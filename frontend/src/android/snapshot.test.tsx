@@ -1,5 +1,6 @@
 /** The Android app shows only valid snapshots and maps every Go outcome to a problem page. */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { SnapshotResult } from "../../bindings/yousage/internal/mobile/models";
 import { interpretSnapshot } from "./snapshot";
 
@@ -24,6 +25,65 @@ function snapshotJson(formatVersion = 1): string {
 }
 
 describe("interpretSnapshot", () => {
+  it("keeps all four populated Go report periods and shared settings unchanged", () => {
+    const source = readFileSync(
+      new URL("../../../internal/sync/snapshot_test.go", import.meta.url),
+      "utf8",
+    );
+    const fixture = /const reportParityJSON = `([\s\S]*?)`/.exec(source)?.[1];
+    if (!fixture) throw new Error("Shared report parity fixture is missing");
+    const snapshots = [1, 7, 30, 90].map((days) => {
+      const start = Date.UTC(2026, 9, 20 - Math.max(1, days - 1));
+      const since = new Date(start).toISOString().slice(0, 10);
+      const window = {
+        timeZone: "UTC",
+        sinceDay: since,
+        untilDay: "2026-10-20",
+        resolution: days === 1 ? "hour" : "day",
+        ...(days === 1
+          ? { sinceTimeMs: start, untilTimeMs: Date.UTC(2026, 9, 20) }
+          : {}),
+      };
+      return JSON.parse(
+        fixture
+          .replaceAll("__DAYS__", String(days))
+          .replaceAll("__SINCE__", since)
+          .replaceAll("__WINDOW__", JSON.stringify(window))
+          .replaceAll("__START_MS__", String(start)),
+      );
+    });
+    const expected = {
+      ...snapshots[0],
+      periods: Object.assign(
+        {},
+        ...snapshots.map((snapshot) => snapshot.periods),
+      ),
+    };
+    const payload = JSON.stringify(expected);
+    for (const candidateId of ["synthetic-candidate", ""]) {
+      const read = interpretSnapshot(
+        new SnapshotResult({
+          status: "ok",
+          payload,
+          etag: "synthetic-etag",
+          candidateId,
+        }),
+      );
+      expect(read).toEqual({
+        status: "ok",
+        payload: expected,
+        text: payload,
+        etag: "synthetic-etag",
+        candidateId,
+      });
+    }
+    expect(
+      Object.values(expected.periods).map(
+        (period) => (period as { receipt: { days: number } }).receipt.days,
+      ),
+    ).toEqual([1, 7, 30, 90]);
+  });
+
   it("accepts a valid snapshot with its entity tag, text and candidate ID", () => {
     const payload = snapshotJson();
     const read = interpretSnapshot(

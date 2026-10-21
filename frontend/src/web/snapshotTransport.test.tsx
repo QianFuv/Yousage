@@ -1,4 +1,5 @@
 /** The viewer answers reads from the snapshot and refuses every desktop-only action. */
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getTransport,
@@ -12,33 +13,56 @@ import {
   type SnapshotSource,
 } from "./snapshotTransport";
 import type { PrivateSnapshot } from "./payloads";
+import { SnapshotResult } from "../../bindings/yousage/internal/mobile/models";
+import {
+  LossReport,
+  Receipt,
+  ReceiptItem,
+  Snapshot,
+  SpeedReport,
+} from "../../bindings/yousage/internal/service/models";
+import { interpretSnapshot } from "../android/snapshot";
+import { mergeAnsweredUsage, type UsageSnapshot } from "../usage/data";
+import { modelShare } from "../../vendor/usageBreakdown";
 
 /**
- * Build a snapshot whose reports name their own period.
+ * Expand the Go-owned wire fixture, keeping one source for cross-language business fields.
  *
- * @returns The snapshot.
+ * @returns All four periods with distinct values and complete shared settings.
  */
 function snapshotFixture(): PrivateSnapshot {
-  const periods = Object.fromEntries(
-    ["1", "7", "30", "90"].map((days) => [
-      days,
-      {
-        usage: { name: `usage-${days}` },
-        loss: { name: `loss-${days}` },
-        speed: { name: `speed-${days}` },
-        receipt: { name: `receipt-${days}` },
-      },
-    ]),
+  const source = readFileSync(
+    new URL("../../../internal/sync/snapshot_test.go", import.meta.url),
+    "utf8",
   );
+  const fixture = /const reportParityJSON = `([\s\S]*?)`/.exec(source)?.[1];
+  if (!fixture) throw new Error("Shared report parity fixture is missing");
+  const snapshots = [1, 7, 30, 90].map((days) => {
+    const start = Date.UTC(2026, 9, 20 - Math.max(1, days - 1));
+    const since = new Date(start).toISOString().slice(0, 10);
+    const window = {
+      timeZone: "UTC",
+      sinceDay: since,
+      untilDay: "2026-10-20",
+      resolution: days === 1 ? "hour" : "day",
+      ...(days === 1
+        ? { sinceTimeMs: start, untilTimeMs: Date.UTC(2026, 9, 20) }
+        : {}),
+    };
+    return JSON.parse(
+      fixture
+        .replaceAll("__DAYS__", String(days))
+        .replaceAll("__SINCE__", since)
+        .replaceAll("__WINDOW__", JSON.stringify(window))
+        .replaceAll("__START_MS__", String(start)),
+    ) as PrivateSnapshot;
+  });
   return {
-    formatVersion: 1,
-    generatedAt: "2026-10-16T00:00:00Z",
-    appVersion: "test",
-    timeZone: "UTC",
-    periods,
-    display: { revision: 3, value: { windowDays: 30 } },
-    appearance: { revision: 1 },
-    bootstrap: { isSystemDark: false, systemLocale: "zh-CN" },
+    ...snapshots[0],
+    periods: Object.assign(
+      {},
+      ...snapshots.map((snapshot) => snapshot.periods),
+    ),
   };
 }
 
@@ -62,19 +86,130 @@ async function install() {
 afterEach(() => setTransport(null));
 
 describe("snapshot transport", () => {
+  it.each([1, 7, 30, 90])(
+    "preserves every supplied business field through interpretation and generated models for %i days",
+    async (days) => {
+      const expected = snapshotFixture();
+      const text = JSON.stringify(expected);
+      const read = interpretSnapshot(
+        new SnapshotResult({
+          status: "ok",
+          payload: text,
+          candidateId: "synthetic-candidate",
+          etag: "synthetic-etag",
+        }),
+      );
+      if (read.status !== "ok")
+        throw new Error("Business fixture was rejected");
+      const names = await captureMethodIds(setTransport);
+      setTransport(
+        createSnapshotTransport(names, {
+          current: () => read.payload,
+          refetch: async () => {},
+          device: { isDark: () => true, locale: "en-US" },
+          open: () => {},
+        }),
+      );
+      const usage = await nativeApi.GetUsage(days, "UTC");
+      const loss = await nativeApi.GetLossReport(days, "UTC");
+      const speed = await nativeApi.GetSpeedReport(days, "UTC");
+      const receipt = await nativeApi.GetReceipt(days, "UTC");
+      expect(usage).toBeInstanceOf(Snapshot);
+      expect(loss).toBeInstanceOf(LossReport);
+      expect(speed).toBeInstanceOf(SpeedReport);
+      expect(receipt).toBeInstanceOf(Receipt);
+      expect(receipt.items[0]).toBeInstanceOf(ReceiptItem);
+      expect(
+        JSON.parse(JSON.stringify({ usage, loss, speed, receipt })),
+      ).toMatchObject(expected.periods[String(days)]);
+      const merged = mergeAnsweredUsage(
+        (usage as unknown as UsageSnapshot).environments,
+      );
+      const model = merged.models.find((value) => value.provider === "codex")!;
+      expect(model.model).toBe(
+        `synthetic/vendor/complete-model-identifier-${days}`,
+      );
+      expect(model.costUsd).toBe(days + 0.25);
+      expect(model.totalTokens).toBe(days * 400 + 10);
+      expect(modelShare(model, "cost")).toBeCloseTo((days + 0.25) / (days + 3));
+      expect(modelShare(model, "tokens")).toBeCloseTo(
+        (days * 400 + 10) / (days * 400 + 220),
+      );
+      expect(speed.models[1]).toMatchObject({
+        provider: "pi",
+        requests: 0,
+        unmeasuredRequests: days,
+        totalTokens: days * 1000 + 210,
+        tokensPerSecond: 0,
+        decodeTokensPerSecond: 0,
+        ttftRequests: 0,
+        medianLatencyMs: 0,
+      });
+      expect(await nativeApi.GetDisplay()).toMatchObject(expected.display);
+      expect(await nativeApi.GetAppearance()).toMatchObject(
+        expected.appearance as Record<string, unknown>,
+      );
+      expect(await nativeApi.GetBootstrap()).toEqual({
+        isSystemDark: true,
+        systemLocale: "en-US",
+      });
+      expect(read.text).toBe(text);
+      expect(read.payload).toEqual(expected);
+      usage.environments[0].summary!.buckets[0].totals.outputTokens = -1;
+      receipt.items[0].model = "mutated consumer copy";
+      expect(
+        JSON.parse(JSON.stringify(await nativeApi.GetUsage(days, "UTC"))),
+      ).toMatchObject(
+        expected.periods[String(days)].usage as Record<string, unknown>,
+      );
+      expect(
+        JSON.parse(JSON.stringify(await nativeApi.GetReceipt(days, "UTC"))),
+      ).toMatchObject(
+        expected.periods[String(days)].receipt as Record<string, unknown>,
+      );
+      expect(read.payload).toEqual(expected);
+    },
+  );
+
+  it("preserves the desktop Loss event cap without replacing complete-period totals", async () => {
+    const snapshot = snapshotFixture();
+    const loss = LossReport.createFrom(
+      structuredClone(snapshot.periods["90"].loss),
+    );
+    loss.events = Array.from({ length: 200 }, (_, index) => ({
+      ...loss.events[0],
+      atMs: loss.events[0].atMs - index * 1000,
+    }));
+    loss.cacheExpiry.events = 290;
+    snapshot.periods["90"].loss = loss;
+    const names = await captureMethodIds(setTransport);
+    setTransport(
+      createSnapshotTransport(names, {
+        current: () => snapshot,
+        refetch: async () => {},
+        device: { isDark: () => false, locale: "en" },
+        open: () => {},
+      }),
+    );
+    const actual = await nativeApi.GetLossReport(90, "UTC");
+    expect(actual.events).toEqual(loss.events);
+    expect(actual.events).toHaveLength(200);
+    expect(actual.cacheExpiry.events).toBe(290);
+  });
+
   it("answers each report for the requested period", async () => {
     await install();
     expect(await nativeApi.GetUsage(7, "Asia/Tokyo")).toMatchObject({
-      name: "usage-7",
+      environments: [{ environmentId: "desktop-7" }],
     });
     expect(await nativeApi.GetLossReport(90, "UTC")).toMatchObject({
-      name: "loss-90",
+      cacheExpiry: { tokens: 90500 },
     });
     expect(await nativeApi.GetSpeedReport(1, "UTC")).toMatchObject({
-      name: "speed-1",
+      overall: { decodeTokensPerSecond: 1.8 },
     });
     expect(await nativeApi.GetReceipt(30, "UTC")).toMatchObject({
-      name: "receipt-30",
+      days: 30,
     });
   });
 
@@ -141,12 +276,13 @@ describe("snapshot transport", () => {
 
   it("keeps display changes on the device", async () => {
     await install();
+    expect((await nativeApi.GetDisplay()).value.windowDays).toBe(7);
     const saved = await nativeApi.SaveDisplay({
       revision: 3,
-      value: { windowDays: 7 },
+      value: { windowDays: 30 },
     } as never);
     expect(saved.revision).toBe(4);
-    expect((await nativeApi.GetDisplay()).value.windowDays).toBe(7);
+    expect((await nativeApi.GetDisplay()).value.windowDays).toBe(30);
   });
 
   it("turns refreshes into a relay refetch and opens links on the device", async () => {
@@ -165,6 +301,15 @@ describe("snapshot transport", () => {
     ).rejects.toThrow();
     await expect(nativeApi.GetConfiguration()).rejects.toThrow();
     await expect(nativeApi.SaveAppearance(1, {} as never)).rejects.toThrow();
+    await expect(nativeApi.SaveConfiguration({} as never)).rejects.toThrow();
+    await expect(nativeApi.SaveSources({} as never)).rejects.toThrow();
+    await expect(nativeApi.GetSources()).rejects.toThrow();
+    await expect(nativeApi.GetSync()).rejects.toThrow();
+    await expect(nativeApi.SaveSync({} as never)).rejects.toThrow();
+    await expect(nativeApi.RotatePairing()).rejects.toThrow();
+    await expect(nativeApi.CreateShare({} as never)).rejects.toThrow();
+    await expect(nativeApi.ApplyPricing([], {} as never)).rejects.toThrow();
+    await expect(nativeApi.SetAutostart(true)).rejects.toThrow();
   });
 
   it("restores the host transport after recording method IDs", async () => {
@@ -187,7 +332,7 @@ describe("snapshot transport", () => {
       }),
     );
     expect(await nativeApi.GetUsage(7, "UTC")).toMatchObject({
-      name: "usage-7",
+      environments: [{ environmentId: "desktop-7" }],
     });
     expect(forwarded).not.toHaveBeenCalled();
     await expect(nativeApi.GetConfiguration()).resolves.toBeDefined();

@@ -13,40 +13,144 @@ import (
 	"testing"
 	"time"
 	"yousage/internal/accounting"
-	"yousage/internal/preferences"
 	"yousage/internal/service"
 	datasync "yousage/internal/sync"
-	"yousage/internal/theme"
 )
 
-// snapshotFixture encodes an empty, complete desktop report using only synthetic metadata.
+// snapshotFixture uses the shared synthetic business fixture, never private runtime data.
+// Its strict decoder catches fixture/schema drift before mobile validation is exercised.
 func snapshotFixture(test *testing.T, label string) string {
 	test.Helper()
-	now := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
-	snapshot := datasync.Snapshot{
-		FormatVersion: 1, GeneratedAt: now.Format(time.RFC3339), AppVersion: label, TimeZone: "UTC",
-		Periods: map[string]datasync.Period{}, Display: preferences.SavedDisplay{Value: preferences.Defaults()},
-		Appearance: theme.LibrarySnapshot{Value: theme.LibraryValue{Preferences: theme.AppearancePreferences{
-			Mode: "system", BaseThemeId: "system", Typography: theme.Typography{InterfaceSize: 16, CodeSize: 14},
-			Contrast: 100, GlassOpacity: 80, AppliedGenerations: map[string]string{},
-		}}}, Bootstrap: map[string]any{"isSystemDark": false, "systemLocale": "en"},
+	source, err := os.ReadFile("../sync/snapshot_test.go")
+	if err != nil {
+		test.Fatal(err)
 	}
+	_, fixture, found := strings.Cut(string(source), "const reportParityJSON = `")
+	fixture, _, closed := strings.Cut(fixture, "`")
+	if !found || !closed {
+		test.Fatal("shared report parity fixture is missing")
+	}
+	var snapshot datasync.Snapshot
+	periods := map[string]datasync.Period{}
 	for _, days := range []int{1, 7, 30, 90} {
-		window, err := accounting.BuildWindow(now, days, "UTC")
+		name := strconv.Itoa(days)
+		window, err := accounting.BuildWindow(time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), days, "UTC")
 		if err != nil {
 			test.Fatal(err)
 		}
-		snapshot.Periods[strconv.Itoa(days)] = datasync.Period{
-			Usage: service.Snapshot{Window: window, Environments: []service.EnvironmentState{}},
-			Loss:  service.LossReport{Window: window}, Speed: service.SpeedReport{Window: window},
-			Receipt: service.Receipt{Window: window, Days: days, TimeZone: "UTC", SinceDay: window.SinceDay, UntilDay: window.UntilDay, Items: []service.ReceiptItem{}},
+		windowJSON, err := json.Marshal(window)
+		if err != nil {
+			test.Fatal(err)
+		}
+		start, err := time.Parse(time.DateOnly, window.SinceDay)
+		if err != nil {
+			test.Fatal(err)
+		}
+		payload := strings.NewReplacer("__DAYS__", name, "__SINCE__", window.SinceDay, "__WINDOW__", string(windowJSON), "__START_MS__", strconv.FormatInt(start.UnixMilli(), 10)).Replace(fixture)
+		decoder := json.NewDecoder(strings.NewReader(payload))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&snapshot); err != nil {
+			test.Fatal(err)
+		}
+		periods[name] = snapshot.Periods[name]
+	}
+	snapshot.Periods, snapshot.AppVersion = periods, label
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		test.Fatal(err)
+	}
+	return string(encoded)
+}
+
+// TestEmptyReportsSurviveCandidateAndCache preserves valid zero-data reports for every period.
+func TestEmptyReportsSurviveCandidateAndCache(test *testing.T) {
+	var snapshot datasync.Snapshot
+	if err := json.Unmarshal([]byte(snapshotFixture(test, "empty")), &snapshot); err != nil {
+		test.Fatal(err)
+	}
+	for name, period := range snapshot.Periods {
+		snapshot.Periods[name] = datasync.Period{
+			Usage: service.Snapshot{Window: period.Usage.Window, Environments: []service.EnvironmentState{}},
+			Loss:  service.LossReport{Window: period.Loss.Window},
+			Speed: service.SpeedReport{Window: period.Speed.Window},
+			Receipt: service.Receipt{
+				Window: period.Receipt.Window, Days: period.Receipt.Days, TimeZone: period.Receipt.TimeZone,
+				SinceDay: period.Receipt.SinceDay, UntilDay: period.Receipt.UntilDay, Items: []service.ReceiptItem{},
+			},
 		}
 	}
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
 		test.Fatal(err)
 	}
-	return string(encoded)
+	if problem := snapshotProblem(encoded); problem != "" {
+		test.Fatalf("valid empty reports rejected: %s", problem)
+	}
+	viewer, relay := newSnapshotRelay(test)
+	payload := string(encoded)
+	relay.set(payload, `"empty"`)
+	candidate := loadCandidate(test, viewer)
+	if candidate.Payload != payload || candidate.ETag != `"empty"` {
+		test.Fatal("empty reports changed during candidate loading")
+	}
+	if err := viewer.CommitSnapshot(candidate.CandidateId); err != nil {
+		test.Fatal(err)
+	}
+	acceptedSnapshot(test, viewer, payload, `"empty"`)
+}
+
+// TestBusinessFieldsSurviveCandidateAndCache retains all supplied rows and aggregate totals.
+// The desktop already caps Loss events; mobile must not apply another projection or cap.
+func TestBusinessFieldsSurviveCandidateAndCache(test *testing.T) {
+	viewer, relay := newSnapshotRelay(test)
+	accepted := snapshotFixture(test, "A")
+	acceptedSnapshot(test, viewer, accepted, `"A"`)
+	var snapshot datasync.Snapshot
+	if err := json.Unmarshal([]byte(snapshotFixture(test, "C")), &snapshot); err != nil {
+		test.Fatal(err)
+	}
+	for name, period := range snapshot.Periods {
+		first := period.Loss.Events[0]
+		period.Loss.Events = nil
+		for index := range service.LossEventLimit {
+			event := first
+			event.AtMs -= int64(index) * 1000
+			period.Loss.Events = append(period.Loss.Events, event)
+		}
+		period.Loss.CacheExpiry.Events = service.LossEventLimit + period.Receipt.Days
+		period.Receipt.Items[0].Model += "/recovered-C"
+		snapshot.Periods[name] = period
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		test.Fatal(err)
+	}
+	recovered := string(encoded)
+	bad := changedSnapshot(test, recovered, func(value map[string]any) {
+		value["periods"].(map[string]any)["7"].(map[string]any)["speed"] = nil
+	})
+	relay.set(bad, `"B"`)
+	if result, err := viewer.LoadSnapshot(`"A"`); err != nil || result.Problem != "data" || result.Payload != "" {
+		test.Fatal("bad B was exposed to the viewer", result.Status, err)
+	}
+	acceptedSnapshot(test, viewer, accepted, `"A"`)
+	relay.set(recovered, `"C"`)
+	candidate := loadCandidate(test, viewer)
+	if candidate.Payload != recovered || candidate.ETag != `"C"` {
+		test.Fatal("validation/candidate projection changed business fields")
+	}
+	acceptedSnapshot(test, viewer, accepted, `"A"`)
+	if err := viewer.CommitSnapshot(candidate.CandidateId); err != nil {
+		test.Fatal(err)
+	}
+	acceptedSnapshot(test, viewer, recovered, `"C"`)
+	stored, err := os.ReadFile(filepath.Join(viewer.directory, snapshotFile))
+	if err != nil {
+		test.Fatal(err)
+	}
+	if bytes.Contains(stored, []byte("recovered-C")) || bytes.Contains(stored, []byte("fixture@example.invalid")) {
+		test.Fatal("business fields were stored in plaintext")
+	}
 }
 
 // changedSnapshot modifies one JSON field without weakening the source-schema fixture.
