@@ -77,6 +77,8 @@ Docker / Compose 部署、HTTPS 入口与桌面配对见 [中继指南](relay.md
 
 ## 测试与检查
 
+CI 的质量门禁、缓存、并发安排与历史耗时基线见 [CI 执行说明](ci.md)。
+
 ```powershell
 go test -p 1 ./...
 go vet ./...
