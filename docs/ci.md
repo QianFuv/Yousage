@@ -4,6 +4,30 @@ CI runs on pushes to `main`, pull requests, and manual dispatch. All existing
 platforms, architectures, build tasks, package formats, and release outputs remain
 supported. Performance changes must preserve the checks below.
 
+## Workflow conventions
+
+Use two spaces for each YAML nesting level and preserve the indentation inside
+embedded scripts. Step names use `Setup /`, `Verify /`, `Build /`, `Package /`,
+`Publish /`, and `Report /` prefixes. These labels describe the existing execution
+order; they do not introduce new jobs or reorder checks.
+
+Keep workflow names, job IDs, and job display names stable for required-check
+compatibility. In particular, CI still reports `Verify desktop and frontend` and
+`Test relay on Linux`. Preserve native PowerShell on Windows and Bash on Linux,
+Android signing and dependency preparation, and the relay image smoke test.
+
+Each started job appends a summary with `always()`, showing its status immediately
+before the summary step. This includes earlier failures, but excludes later
+post-action results; the Actions job conclusion remains authoritative. Skipped
+jobs do not run summaries. The release preparation job also retains its existing
+version decision summary. See the [GitHub job summary documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary).
+
+CI and release jobs that install frontend dependencies use the same pinned pnpm
+setup and both lockfiles as cache inputs. Every `setup-go` step explicitly hashes
+`go.mod` and `go.sum`. Release preparation/publication jobs only need Node.js, so
+they do not restore a pnpm store. Relay builds keep their Docker-specific setup.
+CI's Windows temporary Go paths remain specific to its verification workload.
+
 ## Quality gates and ordering
 
 | Work | Execution policy |
@@ -63,7 +87,8 @@ established improvement.
 
 The latest successful [release run](https://github.com/QianFuv/Yousage/actions/runs/39640032725)
 took 213 seconds: Android 167 s, Windows 157 s, relay 59 s, and publish 26 s.
-Those build jobs overlap. Release behavior is outside this CI-only change.
+Those build jobs overlap. Workflow normalization preserves release triggers,
+build commands, signing, smoke tests, artifact names, and publication behavior.
 
 Expected benefits are fewer repeated pnpm downloads and less Windows cache/temp
 I/O on the default system paths. Cache misses still install and compile normally;

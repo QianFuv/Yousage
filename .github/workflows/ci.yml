@@ -21,10 +21,11 @@ jobs:
     env:
       CGO_ENABLED: "0"
     steps:
-      - name: Preserve LF line endings
+      - name: Setup / Preserve LF line endings
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - name: Use runner temporary storage for Go
+      - name: Setup / Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Setup / Use runner temporary storage for Go
         run: |
           $cacheRoot = Join-Path $env:RUNNER_TEMP 'yousage-go'
           foreach ($name in @('build', 'modules', 'temporary')) {
@@ -37,49 +38,52 @@ jobs:
             "TMP=$(Join-Path $cacheRoot 'temporary')"
             "TEMP=$(Join-Path $cacheRoot 'temporary')"
           ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Setup / Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           package_json_file: frontend/package.json
           run_install: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - name: Setup / Install Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
           cache: pnpm
           cache-dependency-path: |
             tools/parity/pnpm-lock.yaml
             frontend/pnpm-lock.yaml
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Setup / Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           cache-dependency-path: |
             go.mod
             go.sum
-      - name: Check version consistency
+      - name: Verify / Check version consistency
         run: node build/version.mjs check
-      - name: Test categorized release notes
+      - name: Verify / Test categorized release notes
         run: node --test build/release-notes.test.mjs
-      - name: Verify portable package layout and upgrades
+      - name: Verify / Portable package layout and upgrades
         run: ./build/test-package-windows.ps1
-      - name: Install dependencies
+      - name: Setup / Install dependencies
         run: |
           pnpm --dir tools/parity install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm --dir frontend install --frozen-lockfile
-      - name: Verify reference sources and tests
+      - name: Verify / Reference sources and tests
         run: pnpm --dir tools/parity test
-      - name: Check frontend types
+      - name: Verify / Check frontend types
         run: pnpm --dir frontend typecheck
-      - name: Lint frontend
+      - name: Verify / Lint frontend
         run: pnpm --dir frontend lint
-      - name: Check frontend formatting
+      - name: Verify / Check frontend formatting
         run: pnpm --dir frontend format:check
-      - name: Test frontend
+      - name: Verify / Test frontend
         run: pnpm --dir frontend test
-      - name: Build desktop frontend
+      - name: Build / Desktop frontend
         run: pnpm --dir frontend build
-      - name: Build relay frontend
+      - name: Build / Relay frontend
         run: pnpm --dir frontend build:web
-      - name: Check Go formatting
+      - name: Verify / Check Go formatting
         run: |
           $unformatted = gofmt -l .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -87,22 +91,44 @@ jobs:
             $unformatted
             exit 1
           }
-      - name: Test Go packages
+      - name: Verify / Test Go packages
         run: go test -count=1 -p 1 -timeout=10m ./...
-      - name: Vet Go packages
+      - name: Verify / Vet Go packages
         run: go vet ./...
+      - name: Report / Job summary
+        if: ${{ always() }}
+        env:
+          JOB_LABEL: Verify desktop and frontend
+          JOB_STATUS: ${{ job.status }}
+        shell: pwsh
+        run: |
+          @(
+            "## $env:JOB_LABEL"
+            ""
+            "Result before summary: $env:JOB_STATUS"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
   relay:
     name: Test relay on Linux
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - name: Setup / Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Setup / Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           cache-dependency-path: |
             go.mod
             go.sum
-      - name: Test Linux relay packages
+      - name: Verify / Test Linux relay packages
         run: go test -count=1 -timeout=5m ./internal/relay ./cmd/yousage-relay ./internal/sync
+      - name: Report / Job summary
+        if: ${{ always() }}
+        env:
+          JOB_LABEL: Test relay on Linux
+          JOB_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
