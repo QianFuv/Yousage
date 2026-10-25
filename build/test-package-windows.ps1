@@ -23,8 +23,11 @@ try {
     $databaseHash = (Get-FileHash -LiteralPath $databasePath).Hash
     $browserHash = (Get-FileHash -LiteralPath $browserPath).Hash
     & (Join-Path $fixtureRoot 'build/package-windows.ps1')
-    $archivePath = Join-Path $fixtureRoot 'artifacts/releases/yousage-0.1.1-windows-amd64.zip'
+    $archivePath = Join-Path $fixtureRoot 'artifacts/releases/yousage_0.1.1_windows_amd64.zip'
     if (-not (Test-Path -LiteralPath $archivePath)) { throw 'Archive was not created outside bin.' }
+    $checksum = [IO.File]::ReadAllText((Join-Path $fixtureRoot 'artifacts/releases/SHA256SUMS'))
+    $archiveDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
+    if ($checksum -ne "$archiveDigest  yousage_0.1.1_windows_amd64.zip`n") { throw 'Public checksum does not match the archive.' }
     $archive = [IO.Compression.ZipFile]::OpenRead($archivePath)
     try {
         $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') } | Where-Object { -not $_.EndsWith('/') })

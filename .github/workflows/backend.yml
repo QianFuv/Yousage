@@ -1,0 +1,131 @@
+name: Reusable Go Checks
+
+on:
+  workflow_call:
+    inputs:
+      frontend_artifact_id:
+        description: Immutable tested frontend artifact from this CI run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify desktop and frontend
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Preserve LF line endings
+        id: preserve_lf_line_endings
+        run: git config --global core.autocrlf false
+      - name: Check out source
+        id: check_out_source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Use runner temporary storage for Go
+        id: use_runner_temporary_storage_for_go
+        run: |
+          $cacheRoot = Join-Path $env:RUNNER_TEMP 'yousage-go'
+          foreach ($name in @('build', 'modules', 'temporary')) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $cacheRoot $name) | Out-Null
+          }
+          @(
+            "GOCACHE=$(Join-Path $cacheRoot 'build')"
+            "GOMODCACHE=$(Join-Path $cacheRoot 'modules')"
+            "GOTMPDIR=$(Join-Path $cacheRoot 'temporary')"
+            "TMP=$(Join-Path $cacheRoot 'temporary')"
+            "TEMP=$(Join-Path $cacheRoot 'temporary')"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install Node.js
+        id: install_node_js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - name: Install Go
+        id: install_go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.mod
+            go.sum
+      - name: Check version consistency
+        id: check_version_consistency
+        run: node build/version.mjs check
+      - name: Test categorized release notes
+        id: test_categorized_release_notes
+        run: node --test build/release-notes.test.mjs
+      - name: Portable package layout and upgrades
+        id: portable_package_layout_and_upgrades
+        run: ./build/test-package-windows.ps1
+      - name: Download tested frontend bytes
+        id: download_tested_frontend_bytes
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ inputs.frontend_artifact_id }}
+          path: .task/quality
+          merge-multiple: true
+      - name: Verify and restore tested frontend bytes
+        id: verify_and_restore_tested_frontend_bytes
+        run: node build/ci-artifacts.mjs restore-frontend .task/quality
+      - name: Check Go formatting
+        id: check_go_formatting
+        run: |
+          $unformatted = gofmt -l .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($unformatted) {
+            $unformatted
+            exit 1
+          }
+      - name: Test Go packages
+        id: test_go_packages
+        run: go test -count=1 -p 1 -timeout=10m ./...
+      - name: Vet Go packages
+        id: vet_go_packages
+        run: go vet ./...
+      - name: Report quality summary
+        id: report_quality_summary
+        if: always()
+        env:
+          CI_STAGE: quality
+          CI_PLATFORM: windows/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
+
+  relay:
+    name: Test relay on Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        id: check_out_source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node.js
+        id: set_up_node_js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - name: Install Go
+        id: install_go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.mod
+            go.sum
+      - name: Test Linux relay packages
+        id: test_linux_relay_packages
+        run: go test -count=1 -timeout=5m ./internal/relay ./cmd/yousage-relay ./internal/sync
+      - name: Report quality summary
+        id: report_quality_summary
+        if: always()
+        env:
+          CI_STAGE: quality
+          CI_PLATFORM: linux/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs

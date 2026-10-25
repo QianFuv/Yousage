@@ -22,7 +22,7 @@ wails3 doctor
 ```powershell
 wails3 task dev                                   # Windows 开发模式，前端端口 4175
 wails3 task windows:build ARCH=amd64 -f           # 生成 bin/yousage.exe
-powershell -NoProfile -File build/package-windows.ps1  # 生成便携版 ZIP 和 SHA256SUMS.txt
+powershell -NoProfile -File build/package-windows.ps1  # Generate the portable ZIP and SHA256SUMS
 ```
 
 构建任务依次执行：安装前端依赖、生成第三方许可证（`build/dependencies.json` 与
@@ -30,7 +30,7 @@ powershell -NoProfile -File build/package-windows.ps1  # 生成便携版 ZIP 和
 最后以 `production` 标签编译 GUI 子系统的可执行文件。构建期的 Node 工具不会被打包。
 
 便携版 ZIP 的根目录只包含 `yousage.exe` 和 `data/`，文档、许可证、依赖清单和文件校验和放在
-`data/package/`，不会打包本机数据库或缓存。ZIP 和 ZIP 自身的 `SHA256SUMS.txt` 输出到
+`data/package/`，不会打包本机数据库或缓存。ZIP 和 ZIP 自身的 `SHA256SUMS` 输出到
 `artifacts/releases/`；依赖分析临时文件放在 `.task/build/`，使 `bin/` 只保留程序和数据。
 
 GitHub Release 从上一个已发布且在当前历史中的稳定版本起列出全部提交，按 Conventional Commit
@@ -115,15 +115,27 @@ node build/version.mjs check        # 检查各副本是否一致（CI 也会检
 Android 的 versionCode 由版本号换算（主版本 × 10000 + 次版本 × 100 + 修订号），
 因此次版本号和修订号都必须小于 100。
 
-平时推送到 main 只运行 CI 检查，不构建安装包和镜像。CI 通过后，Release 工作流检查
-`v<版本号>` 标签是否已存在；不存在时（即提升版本号后的第一次推送）同时构建并发布：
+Ordinary pushes to `main` run quality checks. An increase of the configured version
+across the pushed commit range also invokes the reusable Release workflow after
+Frontend and Backend checks succeed. The release title is `Yousage v<version>`:
 
-- `yousage-<版本>-windows-amd64.zip`：Windows 便携版
-- `yousage-<版本>-android-arm64.apk`：Android 安装包
+- `yousage_<version>_windows_amd64.zip`: Windows portable package
+- `yousage_<version>_android_arm64.apk`: officially signed Android package
 - `ghcr.io/qianfuv/yousage-relay:<版本>` 与 `:latest`：中继镜像
 
-发布页同时附带 `SHA256SUMS.txt`。某个构建失败时不会发布任何内容；修复后再次推送，
-或在 Actions 中手动运行 Release 工作流即可重试。
+The public release also contains `SHA256SUMS`, with hashes for exactly those two
+packages. Notes list all commits since the preceding stable release by category,
+with commit links and the full changelog. The ZIP retains its internal
+`data/package/SHA256SUMS.txt` for portable content verification.
+
+All three platform builds and the Relay image smoke test must pass before
+publication. To retry after a failure, select `main` in the **CI** workflow's manual
+dispatch and provide its checked-in version. Leave the version empty for quality
+checks only. A retry rejects a tag belonging to another commit and refuses to
+overwrite different existing assets. Validated assets are uploaded to a draft
+before the tested Relay version image and public release are published. These
+external writes are sequential; a failure can leave a draft or version image for
+inspection. An older retry cannot replace a newer release's `latest` pointer.
 
 Android 安装包必须用固定的发布密钥签名，换了密钥的新版本无法覆盖安装旧版本。在仓库的
 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`（keystore 文件的 Base64）、

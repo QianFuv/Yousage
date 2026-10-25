@@ -4,7 +4,7 @@ $workspaceDirectory = Split-Path -Parent $PSScriptRoot
 $configText = [IO.File]::ReadAllText((Join-Path $workspaceDirectory 'build/config.yml'))
 $versionMatch = [regex]::Match($configText, '(?m)^\s+version:\s*["'']?([^\s"'']+)')
 if (-not $versionMatch.Success) { throw 'build/config.yml has no info.version.' }
-$packageName = "yousage-$($versionMatch.Groups[1].Value)-windows-amd64"
+$packageName = "yousage_$($versionMatch.Groups[1].Value)_windows_amd64"
 $executablePath = Join-Path $workspaceDirectory 'bin/yousage.exe'
 if (-not (Test-Path -LiteralPath $executablePath)) { throw 'Build bin/yousage.exe first.' }
 $binaryBytes = [IO.File]::ReadAllBytes($executablePath)
@@ -32,7 +32,7 @@ try {
     Compress-Archive -LiteralPath $archiveFiles -DestinationPath $archivePath -Force
     Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath, $archivePath | Format-Table
     $archiveDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
-    [IO.File]::WriteAllText((Join-Path $outputDirectory 'SHA256SUMS.txt'), "$archiveDigest  $packageName.zip`n", [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText((Join-Path $outputDirectory 'SHA256SUMS'), "$archiveDigest  $packageName.zip`n", [Text.Encoding]::ASCII)
 } finally {
     $resolvedRelease = (Resolve-Path -LiteralPath $releaseDirectory).Path
     $resolvedTask = (Resolve-Path -LiteralPath $taskDirectory).Path

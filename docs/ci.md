@@ -1,72 +1,98 @@
-# CI execution and performance
+# CI execution and releases
 
-CI runs on pushes to `main`, pull requests, and manual dispatch. All existing
-platforms, architectures, build tasks, package formats, and release outputs remain
-supported. Performance changes must preserve the checks below.
+The workflow organization follows LitRadar's main revision
+`49609249721c610294bd378cebb9775982d514ae`, with Yousage's own platform and
+toolchain contracts. The public presentation follows LitRadar v0.2.4.
 
-## Workflow conventions
+## Stages and reusable workflows
 
-Use two spaces for each YAML nesting level and preserve the indentation inside
-embedded scripts. Step names use `Setup /`, `Verify /`, `Build /`, `Package /`,
-`Publish /`, and `Report /` prefixes. These labels describe the existing execution
-order; they do not introduce new jobs or reorder checks.
+`ci.yml` is the only push, pull-request and manual entry point:
 
-Keep workflow names, job IDs, and job display names stable for required-check
-compatibility. In particular, CI still reports `Verify desktop and frontend` and
-`Test relay on Linux`. Preserve native PowerShell on Windows and Bash on Linux,
-Android signing and dependency preparation, and the relay image smoke test.
+1. **detect-changes** (`Release rules`) checks version consistency, release
+   contracts and the version change across the entire pushed commit range.
+2. **quality** invokes `frontend.yml` (`Reusable Frontend Checks`), then
+   `backend.yml` (`Reusable Go Checks`). The frontend exports source-bound build
+   bytes by immutable same-run artifact ID. Backend verifies the source, complete
+   file inventory and SHA-256 hashes before restoring embedded frontend assets.
+3. **build-acceptance** invokes `release.yml` (`Release`) only for an increased
+   main version or a matching explicit main-only retry, after both quality
+   workflows succeed. It builds Windows amd64, signed Android arm64, and the
+   Relay image, including the existing HTTP smoke test.
+4. **publish** consumes only the three explicitly named platform artifacts,
+   validates their source/platform/membership/hashes, prepares a draft with the
+   exact public attachments, publishes the tested version image and release,
+   updates latest only for the newest stable version, and confirms publication.
 
-Each started job appends a summary with `always()`, showing its status immediately
-before the summary step. This includes earlier failures, but excludes later
-post-action results; the Actions job conclusion remains authoritative. Skipped
-jobs do not run summaries. The release preparation job also retains its existing
-version decision summary. See the [GitHub job summary documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary).
+The intentional organization change produces nested check names under
+`Frontend`, `Backend` and `Version release`. Repository required-check/security
+settings are not changed. At rollout, main was unprotected with no rulesets.
 
-CI and release jobs that install frontend dependencies use the same pinned pnpm
-setup and both lockfiles as cache inputs. Every `setup-go` step explicitly hashes
-`go.mod` and `go.sum`. Release preparation/publication jobs only need Node.js, so
-they do not restore a pnpm store. Relay builds keep their Docker-specific setup.
-CI's Windows temporary Go paths remain specific to its verification workload.
+Each started job uses `always()` to report its stage, platform, source SHA and
+individual check outcomes. Summaries describe status before the summary step;
+the final Actions job conclusion remains authoritative. Skipped jobs have no
+summary. Artifact manifests bind successful build bytes to their source SHA,
+platform and checksums; they contain no environment dumps or runtime user data.
 
-## Quality gates and ordering
+## Preserved quality and platform contracts
 
-| Work | Execution policy |
+| Work | Required checks |
 | --- | --- |
-| Version and packaging checks | Run version consistency, categorized release-note tests, and Windows portable layout/upgrade tests on every CI run. |
-| Frontend | Install both dependency trees with frozen lockfiles; run parity verification/tests, TypeScript, ESLint, Prettier, and frontend tests. Build desktop and relay assets before Windows Go tests. |
-| Go unit and integration tests | Run the entire package suite with `-count=1 -p 1` and a ten-minute test timeout. Integration checks remain in the ordinary suite, including process fixtures and the packaged Windows credential helper. |
-| Go static checks | Keep `gofmt` and the separate full `go vet ./...` check. The vet subset inside `go test` is not a replacement. |
-| Linux relay | Run the existing relay, relay command, and sync tests in parallel with the Windows job. |
-| Race detector | There is no dedicated `-race` CI gate at this baseline. Concurrency-behavior tests are not equivalent to the Go race detector. This optimization does not remove an existing race check or claim race-detector coverage. |
-| Release | Keep the existing version-gated Windows, signed Android, and relay builds, relay image smoke test, and publish dependencies. Local desktop tasks for other platforms are unchanged. |
+| Release rules | Version consistency, categorized notes, detection/retry/identity rules, artifact corruption and exact-public-membership regressions, workflow dependency contracts. |
+| Frontend | Frozen installs for both lockfiles; parity source/tests, TypeScript, ESLint, Prettier, frontend tests, desktop and relay frontend builds. |
+| Windows Backend | Version consistency, release-note tests, portable layout/private-data exclusion/upgrade test, verified frontend restoration, full gofmt, `go test -count=1 -p 1 -timeout=10m ./...`, separate `go vet ./...`. |
+| Linux Backend | Existing relay, relay-command and sync tests, uncached with a five-minute timeout. |
+| Windows release | Existing production executable and portable ZIP build. Internal package layout and upgrade behavior are unchanged. |
+| Android release | Existing arm64 release build, four explicit signing secrets, mandatory signature verification and debug-key rejection. Dependency preparation and immutable Go module checks remain. |
+| Relay release | Existing Docker build, health/auth/share HTTP smoke with disposable data, and transport of the tested image to publication. No running service is deployed. |
 
-Windows Go integration tests compile the application, which embeds
-`frontend/dist`. Keep frontend generation ahead of those tests. Splitting jobs
-without transferring the correct assets would weaken that coverage. No new path
-filters, skipped checks, shortened tests, or `continue-on-error` exemptions are
-introduced.
+Windows Go integration tests compile the main package, which embeds
+`frontend/dist`; verified same-run frontend restoration must happen first. No
+existing test is replaced by a narrower test, path filter, failure exemption or
+cache hit. There was no dedicated race-detector gate to migrate.
 
-## Caches, concurrency, and artifacts
+## Release presentation and retries
 
-- Install the pnpm version declared in `frontend/package.json` before
-  `setup-node` restores the pnpm store. Hash both lockfiles because frontend
-  scripts also use the Vite installation in `tools/parity`. Cache package data,
-  not `node_modules`; always perform both frozen installs, including on a hit.
-- Keep the existing `setup-go` module/build caching, with both `go.mod` and
-  `go.sum` explicitly included in the cache key inputs. On Windows, create Go
-  build/module caches and compiler/test temporary directories under
-  `RUNNER_TEMP` before invoking `setup-go` so restoration and compilation use
-  the same paths. Never clear the developer's caches or user data.
-- Retain the CI concurrency group and `cancel-in-progress: true`, which cancel
-  superseded runs for the same ref. Retain release serialization without
-  cancelling an in-flight publication.
-- Release already transfers the built Windows/Android packages and the
-  smoke-tested relay image to the publish job. Keep that same-run artifact reuse.
-  Do not add privileged CI-to-release artifact consumption merely to save a few
-  seconds of frontend bundling; provenance and exact build inputs would need
-  separate validation.
+The title is `Yousage v<version>`. Public assets are exactly
+`yousage_<version>_windows_amd64.zip`, `yousage_<version>_android_arm64.apk` and
+`SHA256SUMS`. The checksum manifest covers exactly the ZIP and APK, excluding
+itself, the Relay transport tar and CI evidence. The portable ZIP still contains
+`data/package/SHA256SUMS.txt`. Release notes use the existing categorized complete
+commit list and changelog links, with the Yousage Relay image reference appended.
 
-## Observed baseline
+Normal unchanged-version pushes run quality only. Manual **CI** dispatch without
+a version does the same; an explicit version retries only the checked-in version
+on `main`. GitHub metadata errors fail closed. A conflicting source tag fails;
+published releases are verified without rewriting them. A draft retry skips
+byte-identical assets and refuses different bytes, without `--clobber`.
+
+All platform acceptance completes before external publication writes. A draft
+and/or version image may remain if a later external write fails; the writes are
+not atomic. Preserve those facts when retrying. Release serialization does not
+cancel in-flight publication, and version comparisons protect latest pointers
+from older retries. No signing key, credential or repository security permission
+is created or changed by the pipeline.
+
+## Caches, concurrency and artifact boundaries
+
+Frontend/dependency-building jobs retain the pinned pnpm and Node setup, both
+lockfiles and frozen installs. Go jobs retain the pinned setup action with both
+`go.mod` and `go.sum` as cache inputs. Windows Backend preserves runner-temporary
+Go cache/module/test paths. Backend Node-only setup no longer restores pnpm data.
+The Docker image keeps its existing independent dependency/build environment.
+
+Only ordinary quality jobs share cancellation groups for a ref. Release
+candidates use run-specific quality groups; the reusable Release workflow uses
+one non-cancelling publication group. There is no workflow-wide cancellation
+that could interrupt publication after a later main push.
+
+The `frontend-quality` artifact carries only desktop/relay frontend build trees
+and their manifest. `windows-release`, `android-release` and `relay-release` each
+carry only the intended package/image and a source/platform/hash manifest.
+Publication downloads these names individually, so quality and diagnostic files
+cannot leak into public assets. `release-publication` retains notes/checksums as
+CI evidence for fourteen days. Public uploads use an explicit three-file list.
+
+## Historical performance baseline
 
 The following successful GitHub runs were read on 2026-10-23 (Asia/Singapore),
 before this optimization. Durations come from Actions timestamps, rounded to

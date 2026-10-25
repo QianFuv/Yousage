@@ -5,130 +5,90 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Retry the checked-in version on main (leave empty for quality only)
+        required: false
+        type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify:
-    name: Verify desktop and frontend
-    runs-on: windows-latest
-    timeout-minutes: 25
-    env:
-      CGO_ENABLED: "0"
+  # Stage 1: detect-changes.
+  release-rules:
+    name: Release rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      release: ${{ steps.version.outputs.release }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Setup / Preserve LF line endings
-        run: git config --global core.autocrlf false
-      - name: Setup / Check out source
+      - name: Checkout source
+        id: checkout_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - name: Setup / Use runner temporary storage for Go
-        run: |
-          $cacheRoot = Join-Path $env:RUNNER_TEMP 'yousage-go'
-          foreach ($name in @('build', 'modules', 'temporary')) {
-            New-Item -ItemType Directory -Force -Path (Join-Path $cacheRoot $name) | Out-Null
-          }
-          @(
-            "GOCACHE=$(Join-Path $cacheRoot 'build')"
-            "GOMODCACHE=$(Join-Path $cacheRoot 'modules')"
-            "GOTMPDIR=$(Join-Path $cacheRoot 'temporary')"
-            "TMP=$(Join-Path $cacheRoot 'temporary')"
-            "TEMP=$(Join-Path $cacheRoot 'temporary')"
-          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Setup / Install pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
-          package_json_file: frontend/package.json
-          run_install: false
-      - name: Setup / Install Node.js
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        id: set_up_node_js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
-          cache: pnpm
-          cache-dependency-path: |
-            tools/parity/pnpm-lock.yaml
-            frontend/pnpm-lock.yaml
-      - name: Setup / Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: |
-            go.mod
-            go.sum
-      - name: Verify / Check version consistency
+      - name: Verify version consistency
+        id: verify_version_consistency
         run: node build/version.mjs check
-      - name: Verify / Test categorized release notes
-        run: node --test build/release-notes.test.mjs
-      - name: Verify / Portable package layout and upgrades
-        run: ./build/test-package-windows.ps1
-      - name: Setup / Install dependencies
-        run: |
-          pnpm --dir tools/parity install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm --dir frontend install --frozen-lockfile
-      - name: Verify / Reference sources and tests
-        run: pnpm --dir tools/parity test
-      - name: Verify / Check frontend types
-        run: pnpm --dir frontend typecheck
-      - name: Verify / Lint frontend
-        run: pnpm --dir frontend lint
-      - name: Verify / Check frontend formatting
-        run: pnpm --dir frontend format:check
-      - name: Verify / Test frontend
-        run: pnpm --dir frontend test
-      - name: Build / Desktop frontend
-        run: pnpm --dir frontend build
-      - name: Build / Relay frontend
-        run: pnpm --dir frontend build:web
-      - name: Verify / Check Go formatting
-        run: |
-          $unformatted = gofmt -l .
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($unformatted) {
-            $unformatted
-            exit 1
-          }
-      - name: Verify / Test Go packages
-        run: go test -count=1 -p 1 -timeout=10m ./...
-      - name: Verify / Vet Go packages
-        run: go vet ./...
-      - name: Report / Job summary
-        if: ${{ always() }}
+      - name: Verify release and workflow contracts
+        id: verify_release_and_workflow_contracts
+        run: node --test build/release-notes.test.mjs build/release-contract.test.mjs build/ci-artifacts.test.mjs build/ci-workflows.test.mjs
+      - name: Resolve version increase or explicit retry
+        id: version
         env:
-          JOB_LABEL: Verify desktop and frontend
-          JOB_STATUS: ${{ job.status }}
-        shell: pwsh
-        run: |
-          @(
-            "## $env:JOB_LABEL"
-            ""
-            "Result before summary: $env:JOB_STATUS"
-          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          BEFORE_SHA: ${{ github.event.before }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: node build/release-contract.mjs detect
+      - name: Report detect-changes summary
+        id: report_detect_changes_summary
+        if: always()
+        env:
+          CI_STAGE: detect-changes
+          CI_PLATFORM: independent
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
 
-  relay:
-    name: Test relay on Linux
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Setup / Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - name: Setup / Install Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: |
-            go.mod
-            go.sum
-      - name: Verify / Test Linux relay packages
-        run: go test -count=1 -timeout=5m ./internal/relay ./cmd/yousage-relay ./internal/sync
-      - name: Report / Job summary
-        if: ${{ always() }}
-        env:
-          JOB_LABEL: Test relay on Linux
-          JOB_STATUS: ${{ job.status }}
-        shell: bash
-        run: |
-          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+  # Stage 2: quality. Release candidates cannot be cancelled by later pushes.
+  frontend:
+    name: Frontend
+    needs: release-rules
+    concurrency:
+      group: frontend-${{ needs.release-rules.outputs.release == 'true' && format('release-{0}', github.run_id) || format('quality-{0}', github.ref) }}
+      cancel-in-progress: true
+    uses: ./.github/workflows/frontend.yml
+
+  backend:
+    name: Backend
+    needs: [release-rules, frontend]
+    concurrency:
+      group: backend-${{ needs.release-rules.outputs.release == 'true' && format('release-{0}', github.run_id) || format('quality-{0}', github.ref) }}
+      cancel-in-progress: true
+    uses: ./.github/workflows/backend.yml
+    with:
+      frontend_artifact_id: ${{ needs.frontend.outputs.artifact_id }}
+
+  # Stages 3 and 4: build-acceptance, then publish inside the reusable workflow.
+  release:
+    name: Version release
+    needs: [release-rules, frontend, backend]
+    if: needs.release-rules.outputs.release == 'true'
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.release-rules.outputs.version }}
+    secrets:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}

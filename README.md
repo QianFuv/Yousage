@@ -123,7 +123,7 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 1. 确认已安装 [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
    （Windows 11 通常已自带）。安装包不会自动下载它。
-2. 解压下载的 `yousage-<version>-windows-amd64.zip`，运行其中的 `yousage.exe`。
+2. 解压下载的 `yousage_<version>_windows_amd64.zip`，运行其中的 `yousage.exe`。
 
 可执行文件未签名，首次运行时 Windows 可能会提示安全警告。
 

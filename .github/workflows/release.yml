@@ -1,14 +1,20 @@
 name: Release
 
-# Publishes a release only when build/config.yml carries a version that has no tag yet.
-# Ordinary pushes stop after CI; bumping the version builds the Windows portable
-# package, the Android APK and the relay image, then publishes them together.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: true
+      ANDROID_KEY_ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
 
 permissions:
   contents: read
@@ -17,57 +23,52 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+env:
+  VERSION: ${{ inputs.version }}
+
 jobs:
-  prepare:
-    name: Check for a new version
-    if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+  # Stage 3: build-acceptance after all caller quality gates succeed.
+  context:
+    name: Validate version and source
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
-      should-release: ${{ steps.version.outputs.should-release }}
-      version: ${{ steps.version.outputs.version }}
-      commit: ${{ steps.version.outputs.commit }}
+      build: ${{ steps.context.outputs.build }}
+      published: ${{ steps.context.outputs.published }}
+      version: ${{ steps.context.outputs.version }}
     steps:
-      - name: Setup / Check out source
+      - name: Checkout source
+        id: checkout_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - name: Setup / Install Node.js
+          persist-credentials: false
+      - name: Set up Node.js
+        id: set_up_node_js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
-      - id: version
-        name: Verify / Read version
+      - name: Verify version consistency
+        id: verify_version_consistency
+        run: node build/version.mjs check
+      - name: Validate immutable release source
+        id: context
         env:
-          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
-        run: |
-          set -euo pipefail
-          node build/version.mjs check
-          version="$(node build/version.mjs)"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
-            echo "should-release=false" >> "$GITHUB_OUTPUT"
-            echo "v$version is already released; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "should-release=true" >> "$GITHUB_OUTPUT"
-            echo "Releasing v$version from \`$COMMIT\`." >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: Report / Job summary
-        if: ${{ always() }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node build/release-contract.mjs context
+      - name: Report build-acceptance summary
+        id: report_build_acceptance_summary
+        if: always()
         env:
-          JOB_LABEL: Check for a new version
-          JOB_STATUS: ${{ job.status }}
-        shell: bash
-        run: |
-          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          CI_STAGE: build-acceptance
+          CI_PLATFORM: independent
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
 
   desktop:
     name: Build Windows portable package
-    needs: prepare
-    if: needs.prepare.outputs.should-release == 'true'
+    needs: context
+    if: needs.context.outputs.build == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -75,18 +76,22 @@ jobs:
       GOOS: windows
       GOARCH: amd64
     steps:
-      - name: Setup / Preserve LF line endings
+      - name: Preserve LF line endings
+        id: preserve_lf_line_endings
         run: git config --global core.autocrlf false
-      - name: Setup / Check out source
+      - name: Check out source
+        id: check_out_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.prepare.outputs.commit }}
-      - name: Setup / Install pnpm
+          ref: ${{ github.sha }}
+      - name: Install pnpm
+        id: install_pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           package_json_file: frontend/package.json
           run_install: false
-      - name: Setup / Install Node.js
+      - name: Install Node.js
+        id: install_node_js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
@@ -94,14 +99,16 @@ jobs:
           cache-dependency-path: |
             tools/parity/pnpm-lock.yaml
             frontend/pnpm-lock.yaml
-      - name: Setup / Install Go
+      - name: Install Go
+        id: install_go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           cache-dependency-path: |
             go.mod
             go.sum
-      - name: Setup / Install dependencies
+      - name: Install dependencies
+        id: install_dependencies
         run: |
           pnpm --dir tools/parity install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -109,51 +116,62 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $wails = go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3
           go install "github.com/wailsapp/wails/v3/cmd/wails3@$wails"
-      - name: Build / Desktop frontend
+      - name: Desktop frontend
+        id: desktop_frontend
         run: pnpm --dir frontend build
-      - name: Build / Executable
+      - name: Executable
+        id: executable
         run: |
           wails3 generate syso -arch amd64 -icon build/windows/icon.ico -manifest build/windows/wails.exe.manifest -info build/windows/info.json -out wails_windows_amd64.syso
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui" -o bin/yousage.exe .
-      - name: Package / Portable ZIP
+      - name: Portable ZIP
+        id: portable_zip
         run: ./build/package-windows.ps1
-      - name: Package / Upload build artifact
+      - name: Record build-acceptance provenance
+        id: record_build_acceptance_provenance
+        run: |
+          New-Item -ItemType Directory -Path .task/windows -Force | Out-Null
+          Copy-Item -LiteralPath "artifacts/releases/yousage_${env:VERSION}_windows_amd64.zip" -Destination .task/windows
+          node build/ci-artifacts.mjs manifest .task/windows windows/amd64
+      - name: Upload build artifact
+        id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: desktop
-          path: artifacts/releases/yousage-${{ needs.prepare.outputs.version }}-windows-amd64.zip
+          name: windows-release
+          path: .task/windows/
+          include-hidden-files: true
           if-no-files-found: error
-      - name: Report / Job summary
-        if: ${{ always() }}
+      - name: Report build-acceptance summary
+        id: report_build_acceptance_summary
+        if: always()
         env:
-          JOB_LABEL: Build Windows portable package
-          JOB_STATUS: ${{ job.status }}
-        shell: pwsh
-        run: |
-          @(
-            "## $env:JOB_LABEL"
-            ""
-            "Result before summary: $env:JOB_STATUS"
-          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          CI_STAGE: build-acceptance
+          CI_PLATFORM: windows/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
 
   android:
     name: Build Android APK
-    needs: prepare
-    if: needs.prepare.outputs.should-release == 'true'
+    needs: context
+    if: needs.context.outputs.build == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - name: Setup / Check out source
+      - name: Check out source
+        id: check_out_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.prepare.outputs.commit }}
-      - name: Setup / Install pnpm
+          ref: ${{ github.sha }}
+      - name: Install pnpm
+        id: install_pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           package_json_file: frontend/package.json
           run_install: false
-      - name: Setup / Install Node.js
+      - name: Install Node.js
+        id: install_node_js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
@@ -161,27 +179,32 @@ jobs:
           cache-dependency-path: |
             tools/parity/pnpm-lock.yaml
             frontend/pnpm-lock.yaml
-      - name: Setup / Install Go
+      - name: Install Go
+        id: install_go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           cache-dependency-path: |
             go.mod
             go.sum
-      - name: Setup / Install Java
+      - name: Install Java
+        id: install_java
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "21"
-      - name: Setup / Install dependencies
+      - name: Install dependencies
+        id: install_dependencies
         run: |
           pnpm --dir tools/parity install --frozen-lockfile
           pnpm --dir frontend install --frozen-lockfile
           GOTOOLCHAIN=local go mod download
           git diff --exit-code -- go.mod go.sum
-      - name: Build / Android frontend
+      - name: Android frontend
+        id: android_frontend
         run: pnpm --dir frontend build:android
-      - name: Setup / Restore signing key
+      - name: Restore signing key
+        id: restore_signing_key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -197,15 +220,17 @@ jobs:
           keystore="$RUNNER_TEMP/yousage-release.jks"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           echo "ANDROID_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
-      - name: Build / Release APK
+      - name: Release APK
+        id: release_apk
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: go run ./build/android/scripts -mode release -arch arm64
-      - name: Verify / APK signature
+      - name: APK signature
+        id: apk_signature
         env:
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
@@ -215,44 +240,61 @@ jobs:
             echo "::error::The APK is signed with a debug key."
             exit 1
           fi
-          mv artifacts/releases/yousage-release-arm64.apk "artifacts/releases/yousage-$VERSION-android-arm64.apk"
-      - name: Package / Upload build artifact
+          mv artifacts/releases/yousage-release-arm64.apk "artifacts/releases/yousage_${VERSION}_android_arm64.apk"
+      - name: Record build-acceptance provenance
+        id: record_build_acceptance_provenance
+        run: |
+          mkdir -p .task/android
+          cp "artifacts/releases/yousage_${VERSION}_android_arm64.apk" .task/android/
+          node build/ci-artifacts.mjs manifest .task/android android/arm64
+      - name: Upload build artifact
+        id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android
-          path: artifacts/releases/yousage-${{ needs.prepare.outputs.version }}-android-arm64.apk
+          name: android-release
+          path: .task/android/
+          include-hidden-files: true
           if-no-files-found: error
-      - name: Report / Job summary
-        if: ${{ always() }}
+      - name: Report build-acceptance summary
+        id: report_build_acceptance_summary
+        if: always()
         env:
-          JOB_LABEL: Build Android APK
-          JOB_STATUS: ${{ job.status }}
-        shell: bash
-        run: |
-          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          CI_STAGE: build-acceptance
+          CI_PLATFORM: android/arm64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
 
   relay:
     name: Build and test relay image
-    needs: prepare
-    if: needs.prepare.outputs.should-release == 'true'
+    needs: context
+    if: needs.context.outputs.build == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Setup / Check out source
+      - name: Check out source
+        id: check_out_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.prepare.outputs.commit }}
-      - name: Build / Relay image
+          ref: ${{ github.sha }}
+      - name: Set up Node.js
+        id: set_up_node_js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - name: Relay image
+        id: relay_image
         env:
-          COMMIT: ${{ needs.prepare.outputs.commit }}
-          VERSION: ${{ needs.prepare.outputs.version }}
+          COMMIT: ${{ github.sha }}
+          VERSION: ${{ inputs.version }}
         run: |
           docker build --file build/relay/Dockerfile \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${COMMIT}" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --tag yousage-relay:ci .
-      - name: Verify / Smoke test relay image
+      - name: Smoke test relay image
+        id: smoke_test_relay_image
         shell: bash
         run: |
           set -euo pipefail
@@ -350,91 +392,210 @@ jobs:
           assert request(path)[0] == 404
           print("Relay image smoke checks passed")
           PY
-      - name: Package / Save relay image
-        run: docker save yousage-relay:ci | gzip > "$RUNNER_TEMP/relay-image.tar.gz"
-      - name: Package / Upload build artifact
+      - name: Save relay image
+        id: save_relay_image
+        run: |
+          mkdir -p .task/relay
+          docker save yousage-relay:ci | gzip > .task/relay/relay-image.tar.gz
+      - name: Record build-acceptance provenance
+        id: record_build_acceptance_provenance
+        run: node build/ci-artifacts.mjs manifest .task/relay linux/amd64
+      - name: Upload build artifact
+        id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: relay-image
-          path: ${{ runner.temp }}/relay-image.tar.gz
+          name: relay-release
+          path: .task/relay/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
-      - name: Report / Job summary
-        if: ${{ always() }}
+      - name: Report build-acceptance summary
+        id: report_build_acceptance_summary
+        if: always()
         env:
-          JOB_LABEL: Build and test relay image
-          JOB_STATUS: ${{ job.status }}
-        shell: bash
-        run: |
-          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          CI_STAGE: build-acceptance
+          CI_PLATFORM: linux/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
 
+  # Stage 4: publish only the fully accepted, same-source platform bytes.
   publish:
     name: Publish release
-    needs: [prepare, desktop, android, relay]
+    needs: [context, desktop, android, relay]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write
       packages: write
     env:
-      VERSION: ${{ needs.prepare.outputs.version }}
-      COMMIT: ${{ needs.prepare.outputs.commit }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Setup / Check out source
+      - name: Checkout source
+        id: checkout_source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.prepare.outputs.commit }}
           fetch-depth: 0
-      - name: Setup / Install Node.js
+          persist-credentials: false
+      - name: Set up Node.js
+        id: set_up_node_js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "24.15.0"
-      - name: Setup / Download build artifacts
+      - name: Download tested Windows archive
+        id: download_tested_windows_archive
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          path: dist
-          merge-multiple: true
-      - name: Publish / Generate categorized commit notes
+          name: windows-release
+          path: .task/release/windows
+      - name: Download signed Android package
+        id: download_signed_android_package
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: android-release
+          path: .task/release/android
+      - name: Download tested Relay image
+        id: download_tested_relay_image
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: relay-release
+          path: .task/release/relay
+      - name: Assemble and validate release assets
+        id: assemble_and_validate_release_assets
+        run: node build/release-contract.mjs assets
+      - name: Verify tested Relay image identity
+        id: verify_tested_relay_image_identity
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
-          echo "IMAGE=$image" >> "$GITHUB_ENV"
-          RELAY_IMAGE="$image:$VERSION" node build/release-notes.mjs > "$RUNNER_TEMP/release-notes.md"
-      - name: Publish / Publish relay image
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gunzip --stdout .task/release/relay/relay-image.tar.gz | docker load
+          test "$(docker image inspect yousage-relay:ci --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$COMMIT"
+          test "$(docker image inspect yousage-relay:ci --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$VERSION"
+          test "$(docker image inspect yousage-relay:ci --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
+          echo "RELAY_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay:$VERSION" >> "$GITHUB_ENV"
+      - name: Prepare categorized notes and immutable draft assets
+        id: prepare_categorized_notes_and_immutable_draft_assets
+        run: node build/release-contract.mjs prepare
+      - name: Publish tested Relay version image
+        id: publish_tested_relay_version_image
         run: |
           set -euo pipefail
-          image="$IMAGE"
-          gunzip --stdout dist/relay-image.tar.gz | docker load
-          rm dist/relay-image.tar.gz
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
-          docker tag yousage-relay:ci "$image:$VERSION"
-          docker tag yousage-relay:ci "$image:latest"
-          docker push "$image:$VERSION"
-          docker push "$image:latest"
-      - name: Publish / Create GitHub release
+          docker tag yousage-relay:ci "$RELAY_IMAGE"
+          docker push "$RELAY_IMAGE"
+      - name: Publish binary release
+        id: publish
+        run: node build/release-contract.mjs publish
+      - name: Upload publication evidence
+        id: upload_publication_evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-publication
+          include-hidden-files: true
+          path: |
+            .task/release/notes.md
+            .task/release/assets/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Report publish summary
+        id: report_publish_summary
+        if: always()
+        env:
+          CI_STAGE: publish
+          CI_PLATFORM: windows/amd64,android/arm64,linux/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
+
+  promote:
+    name: Update latest pointers
+    needs: [context, publish]
+    if: >-
+      !cancelled() && needs.context.result == 'success' &&
+      (needs.publish.result == 'success' || needs.context.outputs.published == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - name: Protect newest stable version
+        id: latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node build/release-contract.mjs latest
+      - name: Promote tested release image
+        if: steps.latest.outputs.latest == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          cd dist
-          sha256sum -- * > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          gh release create "v$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$COMMIT" \
-            --title "Yousage $VERSION" \
-            --notes-file "$RUNNER_TEMP/release-notes.md" \
-            -- *
-      - name: Report / Job summary
-        if: ${{ always() }}
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay"
+          docker pull "$image:$VERSION"
+          test "$(docker image inspect "$image:$VERSION" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$COMMIT"
+          docker tag "$image:$VERSION" "$image:latest"
+          docker push "$image:latest"
+      - name: Report publish summary
+        if: always()
         env:
-          JOB_LABEL: Publish release
-          JOB_STATUS: ${{ job.status }}
-        shell: bash
+          CI_STAGE: publish
+          CI_PLATFORM: linux/amd64
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
+
+  complete:
+    name: Confirm complete release
+    needs: [context, desktop, android, relay, publish, promote]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        id: checkout_source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node.js
+        id: set_up_node_js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "24.15.0"
+      - name: Require complete build acceptance and publication
+        id: require_complete_build_acceptance_and_publication
+        env:
+          RESULTS: ${{ toJSON(needs) }}
         run: |
-          printf '## %s\n\nResult before summary: %s\n' "$JOB_LABEL" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          node --input-type=module -e '
+          import assert from "node:assert/strict";
+          const results = JSON.parse(process.env.RESULTS);
+          assert.equal(results.context.result, "success");
+          assert.equal(results.promote.result, "success");
+          if (results.context.outputs.published !== "true")
+            for (const name of ["desktop", "android", "relay", "publish"])
+              assert.equal(results[name].result, "success", `${name} must succeed`);
+          '
+      - name: Verify public release and exact asset membership
+        id: verify_public_release_and_exact_asset_membership
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node build/release-contract.mjs verify
+      - name: Report publish summary
+        id: report_publish_summary
+        if: always()
+        env:
+          CI_STAGE: publish
+          CI_PLATFORM: independent
+          CI_STATUS: ${{ job.status }}
+          CI_CHECKS: ${{ toJSON(steps) }}
+        run: node build/ci-report.mjs
