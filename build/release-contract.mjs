@@ -88,6 +88,19 @@ export function validateIdentity(release, taggedSource, source) {
   return Boolean(release && !release.draft);
 }
 
+/** Preserve original accepted bytes when resuming a partially uploaded release. */
+export function validateDraftRun(release, run) {
+  if (!release?.draft || release.assets.length === 0) return;
+  const originalRun = /<!-- yousage-release-run: (\d+) -->/.exec(
+    release.body ?? "",
+  )?.[1];
+  assert.equal(
+    originalRun,
+    run,
+    `Draft assets belong to accepted workflow run ${originalRun ?? "unknown"}; re-run failed jobs on that original run to preserve exact accepted bytes`,
+  );
+}
+
 /** Assemble the exact verified platform files and write a checksum manifest. */
 export function assembleAssets(directory, version, source) {
   const [windows, android] = releaseAssetNames(version);
@@ -249,6 +262,7 @@ async function main() {
   const published = validateIdentity(release, tagged?.sha, source);
   if (mode === "context") {
     if (published) validatePublished(release, version);
+    validateDraftRun(release, process.env.GITHUB_RUN_ID);
     fs.appendFileSync(
       process.env.GITHUB_OUTPUT,
       `build=${!published}\npublished=${published}\nversion=${version}\n`,
@@ -288,7 +302,7 @@ async function main() {
         repository: process.env.GITHUB_REPOSITORY,
         releases: allReleases,
         relayImage: process.env.RELAY_IMAGE,
-      }),
+      }) + `\n<!-- yousage-release-run: ${process.env.GITHUB_RUN_ID} -->\n`,
     );
     if (!release)
       gh(

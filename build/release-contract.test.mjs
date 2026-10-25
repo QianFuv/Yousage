@@ -11,12 +11,28 @@ import {
   detectRelease,
   releaseAssetNames,
   validateAssets,
+  validateDraftRun,
   validateIdentity,
   validatePublished,
 } from "./release-contract.mjs";
 
 const SOURCE = "a".repeat(40);
 const VERSION = "0.1.9";
+
+test("partial draft publication resumes only with the original accepted artifact run", () => {
+  const release = {
+    draft: true,
+    body: "notes\n<!-- yousage-release-run: 123 -->",
+    assets: [{ name: "accepted.zip" }],
+  };
+  validateDraftRun(release, "123");
+  validateDraftRun({ ...release, assets: [] }, "456");
+  assert.throws(() => validateDraftRun(release, "456"), /re-run failed jobs/);
+  assert.throws(
+    () => validateDraftRun({ ...release, body: "unknown origin" }, "456"),
+    /original run/,
+  );
+});
 
 test("public release requires the LitRadar title and exactly three nonempty digest-bearing assets", () => {
   const release = {

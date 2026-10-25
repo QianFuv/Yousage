@@ -28,6 +28,7 @@ test("only main version increases or explicit retries reach a successful quality
     /needs: \[context, desktop, android, relay\]/,
   );
   assert.match(WORKFLOWS.release, /cancel-in-progress: false/);
+  assert.match(WORKFLOWS.release, /queue: max/);
   assert.doesNotMatch(WORKFLOWS.ci.split("jobs:")[0], /cancel-in-progress/);
   assert.match(WORKFLOWS.ci, /format\('release-\{0\}', github.run_id\)/);
 });
@@ -80,6 +81,23 @@ test("official Android signing and Relay smoke precede exact named artifact publ
   assert.match(WORKFLOWS.release, /name: android-release/);
   assert.match(WORKFLOWS.release, /name: relay-release/);
   assert.doesNotMatch(WORKFLOWS.release, /--clobber/);
+  assert.match(
+    WORKFLOWS.release,
+    /artifact-ids: \$\{\{ needs.desktop.outputs.artifact_id \}\}/,
+  );
+  assert.match(
+    WORKFLOWS.release,
+    /artifact-ids: \$\{\{ needs.android.outputs.artifact_id \}\}/,
+  );
+  assert.match(
+    WORKFLOWS.release,
+    /artifact-ids: \$\{\{ needs.relay.outputs.artifact_id \}\}/,
+  );
+  assert.match(
+    WORKFLOWS.release,
+    /name: release-publication-\$\{\{ github.run_attempt \}\}/,
+  );
+  assert.match(WORKFLOWS.release, /if: steps.registry.outputs.push == 'true'/);
   assert(
     WORKFLOWS.release.indexOf("release-contract.mjs assets") <
       WORKFLOWS.release.indexOf("release-contract.mjs prepare"),

@@ -21,6 +21,7 @@ permissions:
 
 concurrency:
   group: release
+  queue: max
   cancel-in-progress: false
 
 env:
@@ -71,6 +72,8 @@ jobs:
     if: needs.context.outputs.build == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      artifact_id: ${{ steps.upload_build_artifact.outputs.artifact-id }}
     env:
       CGO_ENABLED: "0"
       GOOS: windows
@@ -138,10 +141,11 @@ jobs:
         id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: windows-release
+          name: windows-release-${{ github.run_attempt }}
           path: .task/windows/
           include-hidden-files: true
           if-no-files-found: error
+          retention-days: 14
       - name: Report build-acceptance summary
         id: report_build_acceptance_summary
         if: always()
@@ -158,6 +162,8 @@ jobs:
     if: needs.context.outputs.build == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    outputs:
+      artifact_id: ${{ steps.upload_build_artifact.outputs.artifact-id }}
     steps:
       - name: Check out source
         id: check_out_source
@@ -251,10 +257,11 @@ jobs:
         id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-release
+          name: android-release-${{ github.run_attempt }}
           path: .task/android/
           include-hidden-files: true
           if-no-files-found: error
+          retention-days: 14
       - name: Report build-acceptance summary
         id: report_build_acceptance_summary
         if: always()
@@ -271,6 +278,8 @@ jobs:
     if: needs.context.outputs.build == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    outputs:
+      artifact_id: ${{ steps.upload_build_artifact.outputs.artifact-id }}
     steps:
       - name: Check out source
         id: check_out_source
@@ -404,11 +413,11 @@ jobs:
         id: upload_build_artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: relay-release
+          name: relay-release-${{ github.run_attempt }}
           path: .task/relay/
           include-hidden-files: true
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
       - name: Report build-acceptance summary
         id: report_build_acceptance_summary
         if: always()
@@ -446,20 +455,23 @@ jobs:
         id: download_tested_windows_archive
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: windows-release
+          artifact-ids: ${{ needs.desktop.outputs.artifact_id }}
           path: .task/release/windows
+          merge-multiple: true
       - name: Download signed Android package
         id: download_signed_android_package
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: android-release
+          artifact-ids: ${{ needs.android.outputs.artifact_id }}
           path: .task/release/android
+          merge-multiple: true
       - name: Download tested Relay image
         id: download_tested_relay_image
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: relay-release
+          artifact-ids: ${{ needs.relay.outputs.artifact_id }}
           path: .task/release/relay
+          merge-multiple: true
       - name: Assemble and validate release assets
         id: assemble_and_validate_release_assets
         run: node build/release-contract.mjs assets
@@ -474,11 +486,15 @@ jobs:
           test "$(docker image inspect yousage-relay:ci --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$VERSION"
           test "$(docker image inspect yousage-relay:ci --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
           echo "RELAY_IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/yousage-relay:$VERSION" >> "$GITHUB_ENV"
+      - name: Protect immutable Relay version image
+        id: registry
+        run: node build/release-image.mjs
       - name: Prepare categorized notes and immutable draft assets
         id: prepare_categorized_notes_and_immutable_draft_assets
         run: node build/release-contract.mjs prepare
       - name: Publish tested Relay version image
         id: publish_tested_relay_version_image
+        if: steps.registry.outputs.push == 'true'
         run: |
           set -euo pipefail
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
@@ -493,7 +509,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: release-publication
+          name: release-publication-${{ github.run_attempt }}
           include-hidden-files: true
           path: |
             .task/release/notes.md

@@ -67,8 +67,17 @@ byte-identical assets and refuses different bytes, without `--clobber`.
 
 All platform acceptance completes before external publication writes. A draft
 and/or version image may remain if a later external write fails; the writes are
-not atomic. Preserve those facts when retrying. Release serialization does not
-cancel in-flight publication, and version comparisons protect latest pointers
+not atomic. After any draft attachment has been uploaded, use **Re-run failed
+jobs** on the original workflow run: its successful build jobs retain their exact
+immutable artifact IDs. A new dispatch rejects a partial draft from another run
+before rebuilding; timestamp-bearing archives cannot be recreated with guaranteed
+identical bytes. Accepted platform artifacts are retained for fourteen days;
+expired evidence requires an explicit recovery decision, never automatic replacement.
+
+Registry lookup distinguishes a confirmed missing tag from lookup/authentication
+errors. An existing image with the same config/content digest is retained; a
+different image fails before draft upload. Release serialization does not
+cancel in-flight publication, queues up to 100 pending candidates, and protects latest pointers
 from older retries. No signing key, credential or repository security permission
 is created or changed by the pipeline.
 
@@ -85,11 +94,11 @@ candidates use run-specific quality groups; the reusable Release workflow uses
 one non-cancelling publication group. There is no workflow-wide cancellation
 that could interrupt publication after a later main push.
 
-The `frontend-quality` artifact carries only desktop/relay frontend build trees
-and their manifest. `windows-release`, `android-release` and `relay-release` each
+The `frontend-quality-<attempt>` artifact carries only desktop/relay frontend build trees
+and their manifest. `windows-release-<attempt>`, `android-release-<attempt>` and `relay-release-<attempt>` each
 carry only the intended package/image and a source/platform/hash manifest.
-Publication downloads these names individually, so quality and diagnostic files
-cannot leak into public assets. `release-publication` retains notes/checksums as
+Publication downloads their immutable same-run IDs individually, so quality and diagnostic files
+cannot leak into public assets. `release-publication-<attempt>` retains notes/checksums as
 CI evidence for fourteen days. Public uploads use an explicit three-file list.
 
 ## Historical performance baseline

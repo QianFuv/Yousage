@@ -137,6 +137,12 @@ before the tested Relay version image and public release are published. These
 external writes are sequential; a failure can leave a draft or version image for
 inspection. An older retry cannot replace a newer release's `latest` pointer.
 
+After a partial draft upload, use **Re-run failed jobs** on the original workflow
+run to reuse the exact accepted platform artifact IDs (retained for fourteen
+days). A new dispatch cannot resume another run's partially uploaded draft,
+because rebuilt archives may contain different timestamps. Existing Relay
+version images are preserved when content matches and rejected when it differs.
+
 Android 安装包必须用固定的发布密钥签名，换了密钥的新版本无法覆盖安装旧版本。在仓库的
 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`（keystore 文件的 Base64）、
 `ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`；

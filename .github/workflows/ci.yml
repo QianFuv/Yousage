@@ -40,7 +40,7 @@ jobs:
         run: node build/version.mjs check
       - name: Verify release and workflow contracts
         id: verify_release_and_workflow_contracts
-        run: node --test build/release-notes.test.mjs build/release-contract.test.mjs build/ci-artifacts.test.mjs build/ci-workflows.test.mjs
+        run: node --test build/release-notes.test.mjs build/release-contract.test.mjs build/release-image.test.mjs build/ci-artifacts.test.mjs build/ci-workflows.test.mjs
       - name: Resolve version increase or explicit retry
         id: version
         env:
