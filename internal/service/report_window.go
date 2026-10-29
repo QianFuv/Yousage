@@ -6,7 +6,7 @@ import (
 )
 
 // reportBucket applies Usage's exact rolling-hour bounds or local calendar-day bounds.
-func reportBucket(window accounting.Window, timestampMs int64, now time.Time) (string, bool) {
+func reportBucket(window accounting.Window, location *time.Location, timestampMs int64, now time.Time) (string, bool) {
 	if timestampMs > now.UnixMilli() {
 		return "", false
 	}
@@ -17,6 +17,6 @@ func reportBucket(window accounting.Window, timestampMs int64, now time.Time) (s
 		start := window.SinceTimeMs + (timestampMs-window.SinceTimeMs)/time.Hour.Milliseconds()*time.Hour.Milliseconds()
 		return time.UnixMilli(start).UTC().Format("2006-01-02T15:04:05.000Z"), true
 	}
-	day := time.UnixMilli(timestampMs).In(accounting.Location(window.TimeZone)).Format(time.DateOnly)
+	day := time.UnixMilli(timestampMs).In(location).Format(time.DateOnly)
 	return day, day >= window.SinceDay && day <= window.UntilDay
 }

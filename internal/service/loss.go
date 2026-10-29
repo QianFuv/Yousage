@@ -151,13 +151,14 @@ func cacheTtl(previous domain.Record) int64 {
 func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, now time.Time) LossReport {
 	result := LossReport{Window: options.Window, Providers: []LossProvider{}, Days: []LossDay{}, Events: []LossEvent{}}
 	pricer := accounting.NewPricer(options.Rates, options.Overrides)
+	location := accounting.Location(options.Window.TimeZone)
 	dayPositions := map[string]int{}
 	for _, label := range options.Window.BucketLabels() {
 		dayPositions[label] = len(result.Days)
 		result.Days = append(result.Days, LossDay{Day: label, Providers: []LossProviderDay{}})
 	}
 	inWindow := func(record domain.Record) bool {
-		_, isIncluded := reportBucket(options.Window, record.TimestampMs, now)
+		_, isIncluded := reportBucket(options.Window, location, record.TimestampMs, now)
 		return isIncluded
 	}
 	sessions := map[string][]domain.Record{}
@@ -201,7 +202,7 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 	}
 	providers := map[string]*LossProvider{}
 	for _, event := range result.Events {
-		day, _ := reportBucket(options.Window, event.AtMs, now)
+		day, _ := reportBucket(options.Window, location, event.AtMs, now)
 		daily := &result.Days[dayPositions[day]]
 		daily.CacheExpiryUsd += event.CostUsd
 		daily.CacheExpiryCount++

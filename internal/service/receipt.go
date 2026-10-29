@@ -55,12 +55,13 @@ func (service *Service) Receipt(ctx context.Context, days int, timeZone string) 
 	if err != nil {
 		return Receipt{}, err
 	}
+	location := accounting.Location(window.TimeZone)
 	start := time.UnixMilli(window.SinceTimeMs)
 	end := time.UnixMilli(window.UntilTimeMs)
 	period := "24H"
-	number := end.In(accounting.Location(window.TimeZone)).Format("200601021504") + "-24H"
+	number := end.In(location).Format("200601021504") + "-24H"
 	if window.Resolution != "hour" {
-		start, err = time.ParseInLocation(time.DateOnly, window.SinceDay, accounting.Location(window.TimeZone))
+		start, err = time.ParseInLocation(time.DateOnly, window.SinceDay, location)
 		if err != nil {
 			return Receipt{}, err
 		}
@@ -107,7 +108,7 @@ func (service *Service) Receipt(ctx context.Context, days int, timeZone string) 
 				instant := record.TimestampMs
 				result.LastAtMs = &instant
 			}
-			active[time.UnixMilli(record.TimestampMs).In(accounting.Location(window.TimeZone)).Format(time.DateOnly)] = true
+			active[time.UnixMilli(record.TimestampMs).In(location).Format(time.DateOnly)] = true
 		}
 	}
 	result.Sessions, result.ActiveDays = len(sessions), len(active)

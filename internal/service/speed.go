@@ -189,6 +189,7 @@ func (held *speedAccumulator) finish() SpeedStats {
 // per model and billing tier and per provider.
 func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map[string]string, now time.Time) SpeedReport {
 	result := SpeedReport{Window: window, Models: []SpeedModel{}, Providers: []SpeedProvider{}, Buckets: []SpeedBucket{}}
+	location := accounting.Location(window.TimeZone)
 	positions := map[string]int{}
 	buckets := []map[speedKey]*SpeedBucketModel{}
 	for _, label := range window.BucketLabels() {
@@ -210,7 +211,7 @@ func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map
 			}
 			seen[record.DedupeKey] = true
 		}
-		label, isIncluded := reportBucket(window, record.TimestampMs, now)
+		label, isIncluded := reportBucket(window, location, record.TimestampMs, now)
 		if !isIncluded {
 			continue
 		}
