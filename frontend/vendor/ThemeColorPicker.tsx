@@ -94,13 +94,54 @@ function themeRgbValue(hex: string) {
   return themeHexToRgb(hex).join(", ");
 }
 
+/**
+ * Create a batcher that commits at most one picked color per animation frame.
+ * Local picker state updates immediately for a smooth thumb, while the parent
+ * commit, which can regenerate a whole guided palette, waits for the frame.
+ * The popover flushes it on close, drag surfaces on release, and the picker on
+ * unmount, so the final frame is never lost.
+ *
+ * @returns The `schedule` and `flush` operations for one picker.
+ */
+function createFrameCommitter() {
+  let pending: {
+    readonly color: string;
+    readonly commit: (color: string) => void;
+  } | null = null;
+  let frame: number | null = null;
+  const flush = () => {
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+      frame = null;
+    }
+    const next = pending;
+    pending = null;
+    next?.commit(next.color);
+  };
+  return {
+    schedule(color: string, commit: (color: string) => void) {
+      pending = { color, commit };
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        flush();
+      });
+    },
+    flush,
+  };
+}
+
+type FrameCommitter = ReturnType<typeof createFrameCommitter>;
+
 function ThemeColorPickerPanel({
   label,
   value,
+  committer,
   onChange,
 }: {
   label: string;
   value: string;
+  committer: FrameCommitter;
   onChange: (value: string) => void;
 }) {
   const normalizedValue = normalizeThemePickerColor(value);
@@ -131,44 +172,15 @@ function ThemeColorPickerPanel({
     );
   }, [normalizedValue]);
 
-  // Local state updates immediately for a smooth thumb; the parent commit
-  // (which can regenerate a whole guided palette) is batched to one call per
-  // animation frame.
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const pendingCommitRef = useRef<string | null>(null);
-  const commitFrameRef = useRef<number | null>(null);
-  // The final drag frame must not be lost when the popover closes or the
-  // pointer lifts before the animation frame fires.
-  const flushPendingCommit = useCallback(() => {
-    if (commitFrameRef.current !== null) {
-      cancelAnimationFrame(commitFrameRef.current);
-      commitFrameRef.current = null;
-    }
-    const pending = pendingCommitRef.current;
-    pendingCommitRef.current = null;
-    if (pending !== null) onChangeRef.current(pending);
-  }, []);
-  useEffect(() => () => flushPendingCommit(), [flushPendingCommit]);
-  const scheduleCommit = useCallback((color: string) => {
-    pendingCommitRef.current = color;
-    commitFrameRef.current ??= requestAnimationFrame(() => {
-      commitFrameRef.current = null;
-      const pending = pendingCommitRef.current;
-      pendingCommitRef.current = null;
-      if (pending !== null) onChangeRef.current(pending);
-    });
-  }, []);
-
   const commitHsv = useCallback(
     (nextHsv: HsvColor) => {
       setHsv(nextHsv);
       const nextColor = hsvToHex(nextHsv.h, nextHsv.s, nextHsv.v);
       setHexDraft(nextColor);
       setRgbDraft(themeRgbValue(nextColor));
-      scheduleCommit(nextColor + alphaSuffix);
+      committer.schedule(nextColor + alphaSuffix, onChange);
     },
-    [alphaSuffix, scheduleCommit],
+    [alphaSuffix, committer, onChange],
   );
 
   const handleHexChange = (nextValue: string) => {
@@ -192,7 +204,7 @@ function ThemeColorPickerPanel({
   };
 
   return (
-    <div className="w-72 bg-popover">
+    <div className="w-72">
       <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold text-foreground">
@@ -210,13 +222,13 @@ function ThemeColorPickerPanel({
           label={label}
           value={hsv}
           onChange={commitHsv}
-          onInteractionEnd={flushPendingCommit}
+          onInteractionEnd={committer.flush}
         />
         <ColorHueSlider
           label={`${label} hue`}
           value={hsv.h}
           onChange={(h) => commitHsv({ ...hsv, h })}
-          onInteractionEnd={flushPendingCommit}
+          onInteractionEnd={committer.flush}
         />
         <div className="grid grid-cols-[1fr_1.2fr] gap-2">
           <label className="grid min-w-0 gap-1">
@@ -284,8 +296,14 @@ function ThemeColorPicker({
   onChange: (value: string) => void;
   onInteract?: () => void;
 }) {
+  const [committer] = useState(createFrameCommitter);
+  useEffect(() => committer.flush, [committer]);
   return (
-    <Popover>
+    <Popover
+      onOpenChange={(isOpen) => {
+        if (!isOpen) committer.flush();
+      }}
+    >
       <Tooltip>
         <TooltipTrigger
           render={
@@ -317,6 +335,7 @@ function ThemeColorPicker({
         sideOffset={10}
       >
         <ThemeColorPickerPanel
+          committer={committer}
           label={label}
           onChange={onChange}
           value={value}
