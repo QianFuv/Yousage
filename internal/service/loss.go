@@ -188,20 +188,22 @@ func analyzeLoss(records []domain.Record, options accounting.AggregateOptions, n
 	}
 	for _, session := range sessions {
 		sort.SliceStable(session, func(first, second int) bool { return session[first].TimestampMs < session[second].TimestampMs })
-		var previous *domain.Record
+		var previous domain.Record
+		hasPrevious := false
 		for _, record := range session {
-			if previous != nil && inWindow(record) {
+			if hasPrevious && inWindow(record) {
 				idle := record.TimestampMs - previous.TimestampMs
-				if tokens, precision, isRewrite := cacheRewrite(*previous, record); isRewrite && idle > cacheTtl(*previous) {
+				if tokens, precision, isRewrite := cacheRewrite(previous, record); isRewrite && idle > cacheTtl(previous) {
 					cost := pricer.CacheRewriteCost(record, tokens, record.Totals.CacheCreationTokens > 0)
 					result.Events = append(result.Events, LossEvent{Kind: "cacheExpiry", Provider: string(record.Provider), Model: record.Model, SessionId: record.SessionId, AtMs: record.TimestampMs, IdleMs: idle, Tokens: tokens, CostUsd: cost, Precision: precision})
 				}
 			}
 			current := record
-			if previous != nil && current.Model == previous.Model && current.CacheTtlMs == 0 && current.Totals.CachedInputTokens > 0 {
+			if hasPrevious && current.Model == previous.Model && current.CacheTtlMs == 0 && current.Totals.CachedInputTokens > 0 {
 				current.CacheTtlMs = previous.CacheTtlMs
 			}
-			previous = &current
+			previous = current
+			hasPrevious = true
 		}
 	}
 	providers := map[string]*LossProvider{}
