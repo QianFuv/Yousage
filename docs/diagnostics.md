@@ -59,7 +59,7 @@ usage snapshots, chat content or raw CLI output. Frontend intake accepts only
 fixed categories and is rate limited. Arbitrary console output is not captured.
 Android bridge/framework payload logging is disabled for debug and release APKs.
 The Android build also uses a temporary Go overlay to replace three reviewed
-Wails beta.30 JNI log calls with fixed text: unknown system events, asset startup
+Wails 3.0.0 JNI log calls with fixed text: unknown system events, asset startup
 timeouts, and asset failures. The build checks the exact framework version,
 source fingerprint and original calls, and fails explicitly if they change.
 Go disallows overlays inside its module cache, so the build copies the already

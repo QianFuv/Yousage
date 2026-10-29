@@ -7,13 +7,13 @@
 | Go | 1.26.10 |
 | Node | 24.15.0 |
 | pnpm | 10.32.0 |
-| Wails CLI | 3.0.0-beta.30 |
+| Wails CLI | 3.0.0 |
 
 前端依赖使用冻结的 lockfile 安装，Go 依赖由 `go.sum` 锁定。前端的 Vite 构建工具安装在
 `tools/parity` 中，因此两个目录都需要安装依赖（构建任务会自动执行）。
 
 ```powershell
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.30
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 wails3 doctor
 ```
 

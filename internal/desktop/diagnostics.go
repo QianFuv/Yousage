@@ -72,7 +72,7 @@ type diagnosticReport struct {
 // after a diagnostic failure. Availability is fixed metadata, never a raw error.
 func (service *App) GetDiagnostics() (string, error) {
 	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventReport, Outcome: diagnostics.OutcomeStarted})
-	value := diagnosticReport{Application: "Yousage", Wails: "3.0.0-beta.30", Go: runtime.Version(), Platform: runtime.GOOS + "/" + runtime.GOARCH, SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b"}
+	value := diagnosticReport{Application: "Yousage", Wails: "3.0.0", Go: runtime.Version(), Platform: runtime.GOOS + "/" + runtime.GOARCH, SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b"}
 	if service.usage != nil && service.context != nil {
 		config, configError := service.usage.Configuration(service.context)
 		sources, _, sourcesError := service.usage.Preferences.Sources(service.context)

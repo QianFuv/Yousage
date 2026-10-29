@@ -848,7 +848,7 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
     JSON.stringify(
       {
         application: "Yousage",
-        wails: "3.0.0-beta.30",
+        wails: "3.0.0",
         platform: "browser-fixture",
         historySources: sourceSettings.value.length,
       },

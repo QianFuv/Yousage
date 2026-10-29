@@ -13,8 +13,8 @@ import (
 	"strings"
 )
 
-const frameworkVersion = "v3.0.0-beta.30"
-const frameworkAndroidDigest = "7c5696cf63d24ae4a95772ba8d5047b1515c0600eae46a12dea016a13d2696e1"
+const frameworkVersion = "v3.0.0"
+const frameworkAndroidDigest = "725cea9f7dac631f7ed97b07fa55f06e281f29731bd765c55a6187e6d6875819"
 const frameworkModulePath = "github.com/wailsapp/wails/v3"
 
 // androidFrameworkBuild supplies only disposable inputs to one native build.

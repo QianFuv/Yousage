@@ -2,7 +2,7 @@
 
 ## 运行时
 
-Yousage 是单个 Go 程序，使用 Wails `3.0.0-beta.30` 承载内嵌的 React / Vite 前端，
+Yousage 是单个 Go 程序，使用 Wails `3.0.0` 承载内嵌的 React / Vite 前端，
 前端通过生成的 TypeScript 绑定调用 Go 服务。Node 和 pnpm 只在开发与构建时使用。
 外部依赖只有系统 WebView（Windows 上为 WebView2）以及各 Provider 已安装的 CLI，
 它们缺失时以明确的“不可用”状态呈现。

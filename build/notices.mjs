@@ -39,7 +39,7 @@ function collectNode(dependencies) {
       if (
         !files.length &&
         metadata.name === "@wailsio/runtime" &&
-        metadata.version === "3.0.0-beta.30"
+        metadata.version === "3.0.0"
       ) {
         directory = execFileSync(
           "go",
