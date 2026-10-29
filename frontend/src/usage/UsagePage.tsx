@@ -28,6 +28,7 @@ import {
   ToggleGroup,
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { mergeAnsweredUsage } from "./data";
+import { hour12ForTimestampFormat } from "./host";
 import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
@@ -312,6 +313,9 @@ export function UsagePage({
                         usageWindow.untilTimeMs !== undefined
                           ? new Date(usageWindow.untilTimeMs).toISOString()
                           : undefined,
+                      hour12: hour12ForTimestampFormat(
+                        data.display.value.timestampFormat,
+                      ),
                     }}
                     onSetPrice={(model) => onSettings("pricing", model)}
                   />

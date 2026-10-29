@@ -140,18 +140,35 @@ export function formatDayShort(day: string): string {
 }
 
 /**
- * An hour start as `2 PM` or `14时`.
+ * Hour options for the Chinese labels, which read 24-hour unless 12-hour is chosen.
+ *
+ * @param hour12 - Whether the 12-hour clock was chosen; omitted keeps 24-hour.
+ * @returns The hour formatting options.
+ */
+function chineseHourOptions(hour12?: boolean): Intl.DateTimeFormatOptions {
+  return hour12
+    ? { hour: "numeric", hour12: true }
+    : { hour: "numeric", hourCycle: "h23" };
+}
+
+/**
+ * An hour start as `2 PM`, `14:00` or `14时`.
  *
  * @param hourStart - ISO instant at the start of the hour.
  * @param timeZone - Optional IANA zone.
+ * @param hour12 - Whether to use the 12-hour clock; omitted keeps the language default.
  * @returns The short localized hour.
  */
-export function formatHourShort(hourStart: string, timeZone?: string): string {
+export function formatHourShort(
+  hourStart: string,
+  timeZone?: string,
+  hour12?: boolean,
+): string {
   if (currentLanguage === "en")
-    return formatHourShortEnglish(hourStart, timeZone);
+    return formatHourShortEnglish(hourStart, timeZone, hour12);
   const instant = new Date(hourStart);
   if (Number.isNaN(instant.getTime())) return hourStart;
-  return dateFormatter({ timeZone, hour: "numeric", hourCycle: "h23" }).format(
+  return dateFormatter({ timeZone, ...chineseHourOptions(hour12) }).format(
     instant,
   );
 }
@@ -161,22 +178,23 @@ export function formatHourShort(hourStart: string, timeZone?: string): string {
  *
  * @param instant - ISO instant.
  * @param timeZone - Optional IANA zone.
+ * @param hour12 - Whether to use the 12-hour clock; omitted keeps the language default.
  * @returns The short localized date and hour.
  */
 export function formatDateTimeShort(
   instant: string,
   timeZone?: string,
+  hour12?: boolean,
 ): string {
   if (currentLanguage === "en")
-    return formatDateTimeShortEnglish(instant, timeZone);
+    return formatDateTimeShortEnglish(instant, timeZone, hour12);
   const date = new Date(instant);
   if (Number.isNaN(date.getTime())) return instant;
   return dateFormatter({
     timeZone,
     month: "numeric",
     day: "numeric",
-    hour: "numeric",
-    hourCycle: "h23",
+    ...chineseHourOptions(hour12),
   }).format(date);
 }
 
@@ -186,23 +204,26 @@ export function formatDateTimeShort(
  * @param hourStart - ISO instant at the start of the hour.
  * @param relativeTo - ISO instant at the end of the window.
  * @param timeZone - Optional IANA zone.
+ * @param hour12 - Whether to use the 12-hour clock; omitted keeps the language default.
  * @returns The relative localized label.
  */
 export function formatRelativeHourShort(
   hourStart: string,
   relativeTo: string,
   timeZone?: string,
+  hour12?: boolean,
 ): string {
   const english = formatRelativeHourShortEnglish(
     hourStart,
     relativeTo,
     timeZone,
+    hour12,
   );
   if (currentLanguage === "en") return english;
-  const hour = formatHourShort(hourStart, timeZone);
+  const hour = formatHourShort(hourStart, timeZone, hour12);
   if (english.endsWith(" today")) return t("{hour} today", { hour });
   if (english.endsWith(" yesterday")) return t("{hour} yesterday", { hour });
-  return formatDateTimeShort(hourStart, timeZone);
+  return formatDateTimeShort(hourStart, timeZone, hour12);
 }
 
 /** Upstream wording for a reset less than a minute away. */

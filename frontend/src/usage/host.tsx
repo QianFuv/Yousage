@@ -21,6 +21,15 @@ export function formatUpcomingTimestamp(
     now,
   );
 }
+/**
+ * Resolve the hour clock for hourly labels from the desktop timestamp preference.
+ *
+ * @param format - The stored preference: `12h`, `24h` or `locale`.
+ * @returns Whether to use the 12-hour clock, or undefined to keep the language default.
+ */
+export function hour12ForTimestampFormat(format: string): boolean | undefined {
+  return format === "12h" ? true : format === "24h" ? false : undefined;
+}
 /** Supply the desktop timestamp preference to original renderer selectors. */
 export function usePrimarySettings<T>(
   select: (settings: { timestampFormat: string }) => T,

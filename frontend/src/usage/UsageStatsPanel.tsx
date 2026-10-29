@@ -246,6 +246,7 @@ export function UsageStatsPanel({
             referenceTime={chartWindow.referenceTime}
             resolution={chartWindow.resolution}
             timeZone={chartWindow.timeZone}
+            hour12={chartWindow.hour12}
           />
         </div>
       </section>
@@ -469,6 +470,7 @@ export function UsageStatsPanel({
                           ? formatHourShort(
                               period.hourStart,
                               chartWindow.timeZone,
+                              chartWindow.hour12,
                             )
                           : formatDayShort(period.day)}
                       </td>

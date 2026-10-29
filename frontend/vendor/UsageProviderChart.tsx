@@ -13,7 +13,11 @@ import {
   msg,
   t,
 } from "../src/i18n";
-import { orderProviderKinds, PROVIDER_ORDER, providerPresentation } from "./usageProviders";
+import {
+  orderProviderKinds,
+  PROVIDER_ORDER,
+  providerPresentation,
+} from "./usageProviders";
 
 const VIEW_WIDTH = 960;
 const VIEW_HEIGHT = 260;
@@ -32,6 +36,7 @@ interface UsageProviderChartProps {
   readonly referenceTime: string | undefined;
   readonly resolution: "day" | "hour";
   readonly timeZone: string;
+  readonly hour12?: boolean | undefined;
 }
 
 /** One day's per-provider values, shared by the paths and the hover readout. */
@@ -191,6 +196,7 @@ export function UsageProviderChart({
   referenceTime,
   resolution,
   timeZone,
+  hour12,
 }: UsageProviderChartProps) {
   const periods = resolution === "hour" ? hours : days;
   const byPeriod = useMemo(
@@ -241,9 +247,8 @@ export function UsageProviderChart({
         : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
 
     const built = providers.map((provider) => {
-      const providerIndex = columns[0]?.bands.findIndex(
-        (band) => band.provider === provider,
-      ) ?? -1;
+      const providerIndex =
+        columns[0]?.bands.findIndex((band) => band.provider === provider) ?? -1;
       const line = curvePath(
         smoothCurve(
           columns.map((column, periodIndex) => ({
@@ -346,11 +351,11 @@ export function UsageProviderChart({
   const hoveredColumn = hoverIndex === null ? undefined : series[hoverIndex];
   const formatPeriod = (period: string) =>
     resolution === "hour"
-      ? formatHourShort(period, timeZone)
+      ? formatHourShort(period, timeZone, hour12)
       : formatDayShort(period);
   const formatTooltipPeriod = (period: string) =>
     resolution === "hour" && referenceTime !== undefined
-      ? formatRelativeHourShort(period, referenceTime, timeZone)
+      ? formatRelativeHourShort(period, referenceTime, timeZone, hour12)
       : formatPeriod(period);
 
   return (
