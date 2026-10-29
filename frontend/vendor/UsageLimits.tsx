@@ -1,22 +1,21 @@
 import {
   type EnvironmentId,
-  type ProviderConsumeResetCreditOutcome,
   ProviderConsumeResetCreditInput,
   ServerProvider,
   ServerProviderResetCredits,
   ServerProviderUsageWindow,
-  UsageProviderKind,
 } from "@t3tools/contracts";
 
 import {
-  elapsedShare,
   type LimitPace,
   paceOf,
+  paceRemainingPercent,
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useState } from "react";
 
+import { observeResize } from "~/lib/observeResize";
 import { usePrimarySettings } from "../src/usage/host";
 import { formatDuration, formatResetsIn, msg, t } from "../src/i18n";
 
@@ -64,13 +63,10 @@ const PACE: Record<
 
 /** The series colour the cost chart uses for this driver, so the two views read as one. */
 export function barColor(driver: ServerProvider["driver"]): string {
-  const kind: UsageProviderKind | undefined =
-    driver === "codex"
-      ? "codex"
-      : driver === "claudeAgent"
-        ? "claude"
-        : undefined;
-  return kind ? PROVIDER_PRESENTATION[kind].color : "var(--foreground)";
+  const presentation = Object.values(PROVIDER_PRESENTATION).find(
+    (entry) => entry.driverKind === driver,
+  );
+  return presentation?.color ?? "var(--foreground)";
 }
 
 /** Pace as a glyph with the words on hover, tap or keyboard press. */
@@ -93,10 +89,58 @@ export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
 }
 
 /**
+ * Styles for an even-pace tick drawn in a transparent gap cut from the bar.
+ *
+ * The tick is clamped so it stays inside the bar at 0% and 100%. The gap is a
+ * clip-path slot rather than a mask, so the bar's rounded ends keep their
+ * antialiasing; the polygon reaches 1px past the box so only the slot edges clip.
+ * `gappedTrack` paints the track on an element that also draws focus rings,
+ * which a clip would cut.
+ *
+ * @param timeLeft - Share of the window still to run, or null without a clock.
+ * @returns The tick, gap and gapped-track styles, or null when there is no mark.
+ */
+function paceMarkStyles(timeLeft: number | null) {
+  if (timeLeft === null) return null;
+  const at = `clamp(3px, ${timeLeft}%, calc(100% - 3px))`;
+  const [left, right] = [`calc(${at} - 3px)`, `calc(${at} + 3px)`];
+  const [near, far] = ["-1px", "calc(100% + 1px)"];
+  return {
+    tick: { left: at },
+    gap: {
+      clipPath: `polygon(${near} ${near}, ${left} ${near}, ${left} ${far}, ${right} ${far}, ${right} ${near}, ${far} ${near}, ${far} ${far}, ${near} ${far})`,
+    },
+    gappedTrack: {
+      backgroundColor: "transparent",
+      backgroundImage: `linear-gradient(to right, var(--color-muted) ${left}, transparent ${left}, transparent ${right}, var(--color-muted) ${right})`,
+    },
+  };
+}
+
+/**
+ * Pace mark styles for the bar given the returned ref. Below 6px there is no
+ * room for the gap and tick, so the bar draws neither.
+ *
+ * @param timeLeft - Share of the window still to run, or null without a clock.
+ * @returns A ref callback for the bar and its pace mark styles, if any.
+ */
+export function usePaceMark(timeLeft: number | null) {
+  const [bar, setBar] = useState<HTMLElement | null>(null);
+  const [isRoomy, setIsRoomy] = useState(false);
+  useLayoutEffect(() => {
+    if (!bar) return;
+    const measure = () => setIsRoomy(bar.getBoundingClientRect().width >= 6);
+    measure();
+    return observeResize(bar, measure);
+  }, [bar]);
+  return [setBar, isRoomy ? paceMarkStyles(timeLeft) : null] as const;
+}
+
+/**
  * One window as a full-width bar from the moment it opened to its reset.
- * The fill is the share of quota spent; the hairline is how far into the
- * window the clock is, which is also where even spending would have put the
- * fill. Hover for the exact figures and reset time.
+ * The fill is the share of quota left; the tick in a gap is how much of the
+ * window is left, which is where even spending would have put the fill.
+ * Hover for the exact figures and reset time.
  */
 function WindowBar({
   color,
@@ -111,9 +155,8 @@ function WindowBar({
     (settings) => settings.timestampFormat,
   );
   const remaining = remainingPercent(window);
-  const elapsed = elapsedShare(window, now);
-  // The fill is quota left, so the even-spending mark is the time left.
-  const timeLeft = elapsed === null ? null : Math.round((1 - elapsed) * 100);
+  const timeLeft = paceRemainingPercent(window, now);
+  const [barRef, paceMark] = usePaceMark(timeLeft);
   const resetsIn = formatResetsIn(window, now);
   const resetsAt = window.resetsAt
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
@@ -129,6 +172,7 @@ function WindowBar({
       <TooltipTrigger
         render={
           <div
+            ref={barRef}
             role="img"
             aria-label={summary}
             tabIndex={0}
@@ -136,18 +180,20 @@ function WindowBar({
           />
         }
       >
-        <div className="absolute inset-x-0 inset-y-1.5 rounded-full bg-muted" />
-        {remaining > 0 ? (
-          <div
-            className="absolute inset-y-1.5 left-0 rounded-full"
-            style={{ width: `${remaining}%`, backgroundColor: color }}
-          />
-        ) : null}
-        {timeLeft !== null ? (
+        <div className="absolute inset-0" style={paceMark?.gap}>
+          <div className="absolute inset-x-0 inset-y-1.5 rounded-full bg-muted" />
+          {remaining > 0 ? (
+            <div
+              className="absolute inset-y-1.5 left-0 rounded-full"
+              style={{ width: `${remaining}%`, backgroundColor: color }}
+            />
+          ) : null}
+        </div>
+        {paceMark ? (
           <span
             aria-hidden
-            className="absolute inset-y-0.5 w-px -translate-x-1/2 bg-foreground/60"
-            style={{ left: `${timeLeft}%` }}
+            className="absolute inset-y-1 w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+            style={paceMark.tick}
           />
         ) : null}
       </TooltipTrigger>

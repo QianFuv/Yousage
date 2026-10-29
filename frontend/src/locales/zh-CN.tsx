@@ -916,4 +916,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Known amount paid": "已知实付",
   "Not measured: saved history has no request timing.":
     "未测量：已保存的历史不含请求计时。",
+  "Even pace": "均匀消耗",
+  "{percent}% left by now": "此时应剩余 {percent}%",
 };

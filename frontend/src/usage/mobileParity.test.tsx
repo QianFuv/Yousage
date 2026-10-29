@@ -113,25 +113,49 @@ vi.mock(
   "../../../tools/parity/upstream/apps/web/src/components/ui/popover",
   async () => {
     const { cloneElement } = await import("react");
+    /** A shared popover handle: the first trigger rendered becomes its active payload. */
+    type Handle = { payload: unknown; close: () => void };
     return {
-      Popover: ({ children }: { readonly children?: ReactNode }) => (
-        <>{children}</>
+      PopoverCreateHandle: (): Handle => ({
+        payload: undefined,
+        close: () => {},
+      }),
+      Popover: ({
+        children,
+        handle,
+      }: {
+        readonly children?:
+          | ReactNode
+          | ((state: { readonly payload: unknown }) => ReactNode);
+        readonly handle?: Handle;
+      }) => (
+        <>
+          {typeof children === "function"
+            ? children({ payload: handle?.payload })
+            : children}
+        </>
       ),
       PopoverTrigger: ({
         render,
         openOnHover,
+        handle,
+        payload,
         children,
         ...props
       }: {
         readonly render?: ReactElement;
         readonly openOnHover?: boolean;
+        readonly handle?: Handle;
+        readonly payload?: unknown;
         readonly children?: ReactNode;
-      } & Record<string, unknown>) =>
-        cloneElement(
+      } & Record<string, unknown>) => {
+        if (handle && handle.payload === undefined) handle.payload = payload;
+        return cloneElement(
           render ?? <button type="button" />,
           { ...props, "data-open-on-hover": openOnHover ? "" : undefined },
           children,
-        ),
+        );
+      },
       PopoverPopup: ({ children }: { readonly children?: ReactNode }) => (
         <div data-popup hidden={!harness.isPopoverInline}>
           {children}
