@@ -104,7 +104,11 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 		return LossReport{}, err
 	}
 	rates := service.Rates(ctx)
-	records := []domain.Record{}
+	recordCount := 0
+	for _, sourceRecords := range bySource {
+		recordCount += len(sourceRecords)
+	}
+	records := make([]domain.Record, 0, recordCount)
 	for _, sourceRecords := range bySource {
 		records = append(records, sourceRecords...)
 	}

@@ -112,7 +112,11 @@ func (service *Service) SpeedReport(ctx context.Context, days int, timeZone stri
 	if err != nil {
 		return SpeedReport{}, err
 	}
-	records := []domain.Record{}
+	recordCount := 0
+	for _, sourceRecords := range bySource {
+		recordCount += len(sourceRecords)
+	}
+	records := make([]domain.Record, 0, recordCount)
 	for _, sourceRecords := range bySource {
 		records = append(records, sourceRecords...)
 	}
