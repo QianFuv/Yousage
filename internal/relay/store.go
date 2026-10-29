@@ -78,7 +78,7 @@ func (store *blobStore) close() error {
 	return errors.Join(store.readStatement.Close(), store.spaceValidatorStatement.Close(), store.database.Close())
 }
 
-// initializeStore upgrades metadata without reading or rewriting existing ciphertext.
+// initializeStore upgrades metadata and indexes without materializing or rewriting ciphertext.
 func initializeStore(database *sql.DB) error {
 	transaction, err := database.Begin()
 	if err != nil {
@@ -137,6 +137,11 @@ func initializeStore(database *sql.DB) error {
 	_, err = transaction.Exec(`CREATE INDEX IF NOT EXISTS blob_validators
 		ON blobs(kind,id,etag,updated_at,expires_at)
 		WHERE data IS NOT NULL AND etag IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = transaction.Exec(`CREATE INDEX IF NOT EXISTS blob_expiry
+		ON blobs(expires_at) WHERE expires_at IS NOT NULL`)
 	if err != nil {
 		return err
 	}
