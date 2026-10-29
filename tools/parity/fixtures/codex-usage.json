@@ -1,0 +1,272 @@
+{
+  "cases": [
+    {
+      "name": "cumulative deltas, stale snapshots, malformed recovery and restart",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 20, "cached_input_tokens": 4, "cache_write_input_tokens": 2, "output_tokens": 8, "reasoning_output_tokens": 4, "total_tokens": 28}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 11, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 15}, "total_token_usage": {"input_tokens": 20, "cached_input_tokens": 4, "cache_write_input_tokens": 2, "output_tokens": 8, "reasoning_output_tokens": 4, "total_tokens": 28}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 11, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 15}, "total_token_usage": {"input_tokens": 30, "cached_input_tokens": 6, "cache_write_input_tokens": 3, "output_tokens": 12, "reasoning_output_tokens": 6, "total_tokens": 42}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 40, "cached_input_tokens": 8, "cache_write_input_tokens": 4, "output_tokens": 16, "reasoning_output_tokens": 8, "total_tokens": 56}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 5, "output_tokens": 1}, "total_token_usage": {"input_tokens": 5, "output_tokens": 1}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}, {"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}, {"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}, {"uncachedInputTokens": 5, "cachedInputTokens": 0, "cacheCreationTokens": 0, "outputTokens": 1, "reasoningTokens": 0}],
+      "malformedRecords": 1
+    },
+    {
+      "name": "legacy normalization, zero markers and synthetic cumulative baseline",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "output_tokens": 4}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"output_tokens": 4, "input_tokens": 10, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "reasoning_output_tokens": 0, "total_tokens": 14, "extra": 123}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 999}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "output_tokens": 4}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "output_tokens": 4}, "total_token_usage": {"input_tokens": 20, "output_tokens": 8}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "output_tokens": 4}, "total_token_usage": {"input_tokens": 30, "output_tokens": 12}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 10, "cachedInputTokens": 0, "cacheCreationTokens": 0, "outputTokens": 4, "reasoningTokens": 0}, {"uncachedInputTokens": 10, "cachedInputTokens": 0, "cacheCreationTokens": 0, "outputTokens": 4, "reasoningTokens": 0}, {"uncachedInputTokens": 10, "cachedInputTokens": 0, "cacheCreationTokens": 0, "outputTokens": 4, "reasoningTokens": 0}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "inherited prefix bills latest request only",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 30, "cached_input_tokens": 6, "cache_write_input_tokens": 3, "output_tokens": 12, "reasoning_output_tokens": 6, "total_tokens": 50}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "invalid inherited prefix",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 11, "cached_input_tokens": 5, "cache_write_input_tokens": 1, "output_tokens": 5, "reasoning_output_tokens": 3, "total_tokens": 16}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "valid cumulative survives malformed last request",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 5, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 20, "cached_input_tokens": 4, "cache_write_input_tokens": 2, "output_tokens": 8, "reasoning_output_tokens": 4, "total_tokens": 28}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 1
+    },
+    {
+      "name": "zero compaction resets baseline without billing",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 0, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "output_tokens": 0, "reasoning_output_tokens": 0, "total_tokens": 999}, "total_token_usage": {"input_tokens": 0, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "output_tokens": 0, "reasoning_output_tokens": 0, "total_tokens": 0}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}, {"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "null cumulative remains legacy",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": null}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "missing model or timestamp does not consume counters",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "turn_context", "payload": {"model": ""}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "invalid", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "fork copies advance baseline and identical genuine request bills",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "session_meta", "timestamp": "2026-10-29T12:00:00Z", "payload": {"id": "child", "forked_from_id": "parent"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 20, "cached_input_tokens": 4, "cache_write_input_tokens": 2, "output_tokens": 8, "reasoning_output_tokens": 4, "total_tokens": 28}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:02Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 30, "cached_input_tokens": 6, "cache_write_input_tokens": 3, "output_tokens": 12, "reasoning_output_tokens": 6, "total_tokens": 42}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "legacy fork copies normalize and advance synthetic baseline",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "session_meta", "timestamp": "2026-10-29T12:00:00Z", "payload": {"id": "child", "forked_from_id": "parent"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:00Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"total_tokens": 14, "reasoning_output_tokens": 2, "output_tokens": 4, "cache_write_input_tokens": 1, "cached_input_tokens": 2, "input_tokens": 10}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:02Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 20, "cached_input_tokens": 4, "cache_write_input_tokens": 2, "output_tokens": 8, "reasoning_output_tokens": 4, "total_tokens": 28}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "cache exceeds input",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 8, "cache_write_input_tokens": 3, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "reasoning exceeds output",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 5, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "total below components",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 13}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "last total exceeds components",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 15}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "fractional counter",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10.5, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 15}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "negative counter",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": -1, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "null optional counter",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": null, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "missing input",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"output_tokens": 4}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "missing output",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "string counter",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": "4", "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "nonobject request",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": []}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "malformed cumulative rejects valid request",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 11, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "nonobject cumulative rejects valid request",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": []}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "unchanged cumulative precedes last total mismatch check",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 15}, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 7, "cachedInputTokens": 2, "cacheCreationTokens": 1, "outputTokens": 4, "reasoningTokens": 2}],
+      "malformedRecords": 0
+    },
+    {
+      "name": "cumulative missing request is malformed",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": null, "total_token_usage": {"input_tokens": 10, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 2, "total_tokens": 14}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "unsafe integer counters are malformed",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 9007199254740992, "output_tokens": 0}}}}
+      ],
+      "expected": [],
+      "malformedRecords": 1
+    },
+    {
+      "name": "synthetic cumulative overflow is malformed",
+      "entries": [
+        {"type": "turn_context", "payload": {"model": "fixture"}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 9007199254740991, "output_tokens": 0}}}},
+        {"type": "event_msg", "timestamp": "2026-10-29T12:00:01Z", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 1, "output_tokens": 0}}}}
+      ],
+      "expected": [{"uncachedInputTokens": 9007199254740991, "cachedInputTokens": 0, "cacheCreationTokens": 0, "outputTokens": 0, "reasoningTokens": 0}],
+      "malformedRecords": 1
+    }
+  ]
+}

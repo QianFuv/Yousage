@@ -2,7 +2,6 @@
 package history
 
 import (
-	"bytes"
 	"encoding/json"
 	"math"
 	"strconv"
@@ -13,23 +12,26 @@ import (
 
 // CodexState checkpoints usage deduplication, native context identity and request timing without transcript content.
 type CodexState struct {
-	Model                 string      `json:"model"`
-	Speed                 string      `json:"speed"`
-	SessionId             string      `json:"sessionId"`
-	TranscriptId          string      `json:"transcriptId,omitempty"`
-	ContextEpoch          int64       `json:"contextEpoch,omitempty"`
-	LastUsageSignature    string      `json:"lastUsageSignature"`
-	SawSessionMeta        bool        `json:"sawSessionMeta"`
-	SuppressingForkCopies bool        `json:"suppressingForkCopies"`
-	ForkCopyAnchorMs      int64       `json:"forkCopyAnchorMs"`
-	GenerationStartMs     int64       `json:"generationStartMs,omitempty"`
-	ResponseEndMs         int64       `json:"responseEndMs,omitempty"`
-	NextGenerationMs      int64       `json:"nextGenerationMs,omitempty"`
-	FirstOutputMs         int64       `json:"firstOutputMs,omitempty"`
-	NextFirstOutputMs     int64       `json:"nextFirstOutputMs,omitempty"`
-	IsTimingAmbiguous     bool        `json:"isTimingAmbiguous,omitempty"`
-	Claude                ClaudeState `json:"claude,omitzero"`
-	Pi                    PiState     `json:"pi,omitzero"`
+	Model                 string           `json:"model"`
+	Speed                 string           `json:"speed"`
+	SessionId             string           `json:"sessionId"`
+	TranscriptId          string           `json:"transcriptId,omitempty"`
+	ContextEpoch          int64            `json:"contextEpoch,omitempty"`
+	LastUsageSignature    string           `json:"lastUsageSignature"`
+	LastCumulativeUsage   *codexTokenUsage `json:"lastCumulativeUsage,omitempty"`
+	MalformedRecords      int              `json:"malformedRecords,omitempty"`
+	TailMalformedRecords  int              `json:"tailMalformedRecords,omitempty"`
+	SawSessionMeta        bool             `json:"sawSessionMeta"`
+	SuppressingForkCopies bool             `json:"suppressingForkCopies"`
+	ForkCopyAnchorMs      int64            `json:"forkCopyAnchorMs"`
+	GenerationStartMs     int64            `json:"generationStartMs,omitempty"`
+	ResponseEndMs         int64            `json:"responseEndMs,omitempty"`
+	NextGenerationMs      int64            `json:"nextGenerationMs,omitempty"`
+	FirstOutputMs         int64            `json:"firstOutputMs,omitempty"`
+	NextFirstOutputMs     int64            `json:"nextFirstOutputMs,omitempty"`
+	IsTimingAmbiguous     bool             `json:"isTimingAmbiguous,omitempty"`
+	Claude                ClaudeState      `json:"claude,omitzero"`
+	Pi                    PiState          `json:"pi,omitzero"`
 }
 
 // ClaudeState checkpoints native context identity, request starts and unfinished messages without transcript content,
@@ -127,7 +129,7 @@ func ParseClaude(data []byte) *domain.Record {
 	usage := object(message["usage"])
 	instant, hasTimestamp := timestamp(record["timestamp"])
 	model := text(message["model"])
-	if usage == nil || !hasTimestamp || model == "" {
+	if usage == nil || !hasTimestamp || model == "" || model == "<synthetic>" {
 		return nil
 	}
 	result := &domain.Record{Provider: domain.Claude, TimestampMs: instant, Model: model, SessionId: text(record["sessionId"]), Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: integer(usage["input_tokens"]), CachedInputTokens: integer(usage["cache_read_input_tokens"]), CacheCreationTokens: integer(usage["cache_creation_input_tokens"]), OutputTokens: integer(usage["output_tokens"])}}
@@ -346,33 +348,15 @@ func ParseCodex(data []byte, state *CodexState) (result *domain.Record) {
 		}()
 	}
 	info := object(payload["info"])
-	usage := object(info["last_token_usage"])
-	if usage == nil || !hasTimestamp || state.Model == "" {
+	if info == nil || !hasTimestamp || state.Model == "" {
 		return nil
 	}
-	var raw struct {
-		Payload struct {
-			Info struct {
-				Usage json.RawMessage `json:"last_token_usage"`
-			} `json:"info"`
-		} `json:"payload"`
-	}
-	json.Unmarshal(data, &raw)
-	signature := orderedSignature(raw.Payload.Info.Usage)
-	if signature == state.LastUsageSignature {
+	usage := reconcileCodexUsage(info, instant, state)
+	if usage == nil {
 		return nil
 	}
-	state.LastUsageSignature = signature
-	if state.SuppressingForkCopies {
-		if instant-state.ForkCopyAnchorMs < 1000 {
-			clearCodexTiming(state)
-			state.ForkCopyAnchorMs = instant
-			return nil
-		}
-		state.SuppressingForkCopies = false
-	}
-	input, cached, creation, output := integer(usage["input_tokens"]), integer(usage["cached_input_tokens"]), integer(usage["cache_write_input_tokens"]), integer(usage["output_tokens"])
-	totals := domain.Tokens{UncachedInputTokens: max(0, input-cached-creation), CachedInputTokens: cached, CacheCreationTokens: creation, OutputTokens: output, ReasoningTokens: min(output, integer(usage["reasoning_output_tokens"]))}
+	output := usage.Output
+	totals := domain.Tokens{UncachedInputTokens: usage.Input - usage.Cached - usage.Creation, CachedInputTokens: usage.Cached, CacheCreationTokens: usage.Creation, OutputTokens: output, ReasoningTokens: usage.Reasoning}
 	if totals.Total() == 0 {
 		return nil
 	}
@@ -471,44 +455,6 @@ func codexQuota(limits map[string]any) *domain.QuotaObservation {
 		result.Windows = append(result.Windows, domain.QuotaWindow{Id: id, UsedPercent: used, WindowMinutes: int(minutes), ResetsAt: reset})
 	}
 	return result
-}
-
-// orderedSignature retains property order while normalizing JSON numeric spellings like JSON.stringify.
-func orderedSignature(data []byte) string {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	var encode func() []byte
-	encode = func() []byte {
-		token, err := decoder.Token()
-		if err != nil {
-			return nil
-		}
-		if delimiter, ok := token.(json.Delim); ok {
-			result := []byte{byte(delimiter)}
-			didWrite := false
-			for decoder.More() {
-				if didWrite {
-					result = append(result, ',')
-				}
-				if delimiter == '{' {
-					key, _ := decoder.Token()
-					encoded, _ := json.Marshal(key)
-					result = append(result, encoded...)
-					result = append(result, ':')
-				}
-				result = append(result, encode()...)
-				didWrite = true
-			}
-			closing, _ := decoder.Token()
-			result = append(result, byte(closing.(json.Delim)))
-			return result
-		}
-		if value, ok := token.(float64); ok && value == 0 {
-			return []byte("0")
-		}
-		encoded, _ := json.Marshal(token)
-		return encoded
-	}
-	return string(encode())
 }
 
 // DedupeMovedCodex matches occurrences across files while keeping repeated events inside each file.

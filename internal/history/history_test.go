@@ -18,7 +18,7 @@ const sessionMeta = `{"type":"session_meta","timestamp":"2026-10-06T12:00:00Z","
 const turnContext = `{"type":"turn_context","payload":{"model":"fixture"}}`
 
 func codexUsage(input int, timestamp string) string {
-	data, _ := json.Marshal(map[string]any{"timestamp": timestamp, "type": "event_msg", "payload": map[string]any{"type": "token_count", "info": map[string]any{"last_token_usage": map[string]any{"input_tokens": input, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 9}}}})
+	data, _ := json.Marshal(map[string]any{"timestamp": timestamp, "type": "event_msg", "payload": map[string]any{"type": "token_count", "info": map[string]any{"last_token_usage": map[string]any{"input_tokens": input, "cached_input_tokens": 2, "cache_write_input_tokens": 1, "output_tokens": 4, "reasoning_output_tokens": 4}}}})
 	return string(data)
 }
 func claudeUsage(id string) string {
@@ -192,7 +192,7 @@ func TestSynchronizeKeepsSavedFactsWithoutReturningFullHistory(t *testing.T) {
 	}
 }
 
-func TestTimestampFormatsAndOrderedSignatures(t *testing.T) {
+func TestTimestampFormats(t *testing.T) {
 	for _, value := range []string{"2026-10-06T12:00:00Z", "2026-10-06T20:00:00+08:00", "2026-10-06"} {
 		if _, ok := timestamp(value); !ok {
 			t.Fatal(value)
@@ -200,12 +200,6 @@ func TestTimestampFormatsAndOrderedSignatures(t *testing.T) {
 	}
 	if _, ok := timestamp(float64(1000)); ok {
 		t.Fatal("numeric transcript timestamp accepted")
-	}
-	if orderedSignature([]byte(`{"a":1e1,"b":2}`)) != `{"a":10,"b":2}` {
-		t.Fatal("numeric signature not normalized")
-	}
-	if orderedSignature([]byte(`{"a":1,"b":2}`)) == orderedSignature([]byte(`{"b":2,"a":1}`)) {
-		t.Fatal("property order discarded")
 	}
 }
 

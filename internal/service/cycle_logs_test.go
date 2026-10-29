@@ -34,7 +34,7 @@ func writeCycleLog(test *testing.T, home string, now time.Time) {
 		reset := start.Add(5 * time.Hour).Unix()
 		info := any(nil)
 		if index < 2 {
-			info = map[string]any{"last_token_usage": map[string]any{"input_tokens": 10 + index}}
+			info = map[string]any{"last_token_usage": map[string]any{"input_tokens": 10 + index, "output_tokens": 0}}
 		}
 		usage, _ := json.Marshal(map[string]any{"timestamp": quotaAt(start.Add(10 * time.Minute)), "type": "event_msg", "payload": map[string]any{"type": "token_count", "info": info, "rate_limits": map[string]any{"limit_id": "codex", "plan_type": "plus", "primary": map[string]any{"used_percent": 25, "window_minutes": 300, "resets_at": reset}, "secondary": nil}}})
 		observation, _ := json.Marshal(map[string]any{"timestamp": quotaAt(start.Add(30 * time.Minute)), "type": "event_msg", "payload": map[string]any{"type": "token_count", "info": nil, "rate_limits": map[string]any{"limit_id": "codex", "plan_type": "plus", "primary": map[string]any{"used_percent": 50, "window_minutes": 300, "resets_at": reset}}}})
@@ -121,7 +121,7 @@ func TestUsageFitsLogsBeforeFirstProbe(test *testing.T) {
 			if err != nil {
 				test.Fatal(err)
 			}
-			_, err = file.WriteString(`{"timestamp":"` + quotaAt(service.Now().Add(-time.Minute)) + `","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100}},"rate_limits":{"limit_id":"codex"}}}` + "\n")
+			_, err = file.WriteString(`{"timestamp":"` + quotaAt(service.Now().Add(-time.Minute)) + `","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"output_tokens":0}},"rate_limits":{"limit_id":"codex"}}}` + "\n")
 			file.Close()
 			if err != nil {
 				test.Fatal(err)
@@ -271,7 +271,7 @@ func TestOverlappingWindowChangesInvalidateFits(test *testing.T) {
 	key := "cycle-fits:" + hex.EncodeToString(digest[:])
 	var persisted persistedCycleFits
 	before, _ := service.Store.ReadSetting(ctx, key, &persisted)
-	appendLine(`{"type":"event_msg","timestamp":"` + quotaAt(service.Now().Add(-2*time.Hour)) + `","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":999}},"rate_limits":{"limit_id":"codex"}}}`)
+	appendLine(`{"type":"event_msg","timestamp":"` + quotaAt(service.Now().Add(-2*time.Hour)) + `","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":999,"output_tokens":0}},"rate_limits":{"limit_id":"codex"}}}`)
 	if err := service.RefreshHistory(ctx, refresh.Request{IsManual: true}); err != nil {
 		test.Fatal(err)
 	}

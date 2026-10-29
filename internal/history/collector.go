@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -324,6 +325,22 @@ func (collector Collector) scanSource(ctx context.Context, fingerprint domain.So
 	counts, err := collector.Store.FileRecordCounts(ctx, id)
 	if err != nil {
 		return result, err
+	}
+	if fingerprint.Provider == domain.Codex {
+		checkpoints, err := collector.Store.Checkpoints(ctx, id)
+		if err != nil {
+			return result, err
+		}
+		for _, checkpoint := range checkpoints {
+			var state struct {
+				MalformedRecords     int `json:"malformedRecords"`
+				TailMalformedRecords int `json:"tailMalformedRecords"`
+			}
+			if err := json.Unmarshal(checkpoint.Reducer, &state); err != nil {
+				return result, err
+			}
+			result.MalformedRecords += state.MalformedRecords + state.TailMalformedRecords
+		}
 	}
 	filePaths := []string{}
 	for path := range counts {

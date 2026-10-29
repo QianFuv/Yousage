@@ -14,8 +14,8 @@ import (
 	"yousage/internal/domain"
 )
 
-// ParserVersion includes Pi accounting and native context boundaries in retained transcripts.
-const ParserVersion = 10
+// ParserVersion includes validated Codex cumulative counters and excludes synthetic Claude usage.
+const ParserVersion = 11
 
 type FileRead struct {
 	Checkpoint domain.Checkpoint
@@ -71,6 +71,7 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 			state.Pi.TranscriptId = state.TranscriptId
 		}
 	}
+	state.TailMalformedRecords = 0
 	result.Checkpoint.Offset = start
 	reader := bufio.NewReaderSize(io.NewSectionReader(file, start, info.Size()-start), 256*1024)
 	readBytes := start
@@ -137,6 +138,7 @@ func ReadTranscript(ctx context.Context, path string, provider domain.Provider, 
 			state = lineState
 			result.Checkpoint.Offset = readBytes
 		} else {
+			state.TailMalformedRecords = lineState.MalformedRecords - state.MalformedRecords
 			break
 		}
 	}

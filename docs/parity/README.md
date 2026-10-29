@@ -27,6 +27,10 @@ pnpm --dir tools/parity reference    # 在 127.0.0.1:4174 打开参考工作台
 - Pi 原生读取器保持固定版本原文，`src/pi.test.tsx` 与 Go 的 Pi 测试共享
   `fixtures/pi-usage.json` 中手算的预期值，覆盖实际响应模型、工具和摘要费用、互斥缓存计数、
   推理子集、缺失价格与分叉复制的稳定身份。
+- Codex 原生读取器同样保持原文，`src/codex.test.tsx` 与 Go 的 Codex 测试共享
+  `fixtures/codex-usage.json` 中的 27 组手算用例，覆盖累计值核对、陈旧快照、压缩归零、
+  分叉复制、各类计数不变量与格式错误计数。读取器引用的 Codex 主目录发现和服务档位历史
+  只用于真实服务端，由 `src/bridges/codexServer.tsx` 占位。
 - `fixtures/theme-golden.json` 记录六套完整的 61 角色调色板（两种外观、三组种子色，
   包括灰度、透明度和 OKLCH）。正常测试只做比较；确需更新时运行
   `UPDATE_REFERENCE=1 pnpm --dir tools/parity test:theme`。Go 侧的

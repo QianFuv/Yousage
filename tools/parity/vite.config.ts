@@ -19,6 +19,7 @@ export default defineConfig({
         if (source === '~/lib/color' || source === '~/lib/observeResize' || source === '~/lib/visibleAnimation') return path.join(ROOT, 'upstream/apps/web/src', source.slice(2) + '.ts');
         if (source === './rpc/atomRegistry' && importer?.includes('/upstream/')) return path.join(ROOT, 'src/bridges/atomRegistry.tsx');
         if (source === './state/server' && importer?.includes('/upstream/')) return path.join(ROOT, 'src/bridges/server.tsx');
+        if ((source === './CodexHomeLayout.ts' || source === '../../usage/CodexUsageHistory.ts') && importer?.includes('/upstream/')) return path.join(ROOT, 'src/bridges/codexServer.tsx');
         if (source === '~/lib/windowControlsOverlay') return path.join(ROOT, 'src/bridges/titlebar.tsx');
         if (source === '@t3tools/contracts') return path.join(ROOT, 'src/bridges/contracts.tsx');
         if (source === '@t3tools/client-runtime/state/provider-instance-display') return path.join(ROOT, 'src/bridges/instance.tsx');
