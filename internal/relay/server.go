@@ -7,7 +7,6 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -212,13 +211,29 @@ func (server *Server) writeSpace(writer http.ResponseWriter, request *http.Reque
 	writer.WriteHeader(http.StatusNoContent)
 }
 
+// readBlob serves one consistent version and avoids loading unchanged space bodies.
 func (server *Server) readBlob(kind string) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		id, isValid := requestID(writer, request)
 		if !isValid {
 			return
 		}
-		value, err := server.store.read(request.Context(), kind, id, server.now())
+		now := server.now()
+		condition := request.Header.Get("If-None-Match")
+		var value blob
+		var err error
+		isUnchanged := false
+		if kind == "space" && condition != "" {
+			value, err = server.store.readSpaceValidator(request.Context(), id, now)
+			isUnchanged = err == nil && matchesEtag(condition, value.etag)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				http.Error(writer, "storage unavailable", http.StatusInternalServerError)
+				return
+			}
+		}
+		if !isUnchanged {
+			value, err = server.store.read(request.Context(), kind, id, now)
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			http.NotFound(writer, request)
 			return
@@ -229,20 +244,26 @@ func (server *Server) readBlob(kind string) http.HandlerFunc {
 		}
 		writer.Header().Set("Content-Type", "application/octet-stream")
 		if kind == "space" {
-			digest := sha256.Sum256(value.data)
-			etag := `"` + hex.EncodeToString(digest[:]) + `"`
-			writer.Header().Set("ETag", etag)
+			writer.Header().Set("ETag", value.etag)
 			writer.Header().Set("Last-Modified", value.updatedAt.Format(http.TimeFormat))
-			for _, candidate := range strings.Split(request.Header.Get("If-None-Match"), ",") {
-				candidate = strings.TrimSpace(candidate)
-				if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
-					writer.WriteHeader(http.StatusNotModified)
-					return
-				}
+			if isUnchanged || matchesEtag(condition, value.etag) {
+				writer.WriteHeader(http.StatusNotModified)
+				return
 			}
 		}
 		writer.Write(value.data)
 	}
+}
+
+// matchesEtag preserves the relay's existing weak and comma-separated validators.
+func matchesEtag(condition, etag string) bool {
+	for _, candidate := range strings.Split(condition, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
+			return true
+		}
+	}
+	return false
 }
 
 func (server *Server) reserveShare(writer http.ResponseWriter, request *http.Request) {
