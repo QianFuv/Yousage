@@ -3,7 +3,11 @@ import { expect, it, vi } from "vitest";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { BUILT_IN_THEMES } from "../../../tools/parity/upstream/packages/shared/src/themePalettes";
 import { toCanonicalThemeColor as originalCanonical } from "../../../tools/parity/upstream/apps/web/src/themePalette";
-import { toCanonicalThemeColor as desktopCanonical } from "../../vendor/themePalette";
+import {
+  themeColorToHex,
+  toCanonicalThemeColor as desktopCanonical,
+} from "../../vendor/themePalette";
+import { parseVsCodeThemeFile } from "../../vendor/vscodeThemeImport";
 vi.mock("@wailsio/runtime", async () => ({
   ...(await vi.importActual<typeof import("@wailsio/runtime")>(
     "@wailsio/runtime",
@@ -228,4 +232,81 @@ it("maps VS Code find highlights onto the search match roles", () => {
     desktopCanonical("#515c6a"),
   );
   expect(theme.colors.searchMatchBackground).toBe(desktopCanonical("#3a3d41"));
+});
+
+/**
+ * Measure the WCAG contrast ratio between two CSS colors.
+ *
+ * @param first - The first CSS color.
+ * @param second - The second CSS color.
+ * @returns The contrast ratio, from 1 to 21.
+ */
+function contrastRatio(first: string, second: string): number {
+  const luminance = (value: string) => {
+    const hex = themeColorToHex(value)!;
+    const [red, green, blue] = [1, 3, 5].map((offset) => {
+      const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+      return channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [darker, lighter] = [luminance(first), luminance(second)].sort(
+    (left, right) => left - right,
+  );
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Read the chroma and hue of a canonical OKLCH color.
+ *
+ * @param value - A color in the runtime's canonical `oklch(L C h)` form.
+ * @returns The chroma and hue components.
+ */
+function oklchParts(value: string): { chroma: number; hue: number } {
+  const [, chroma, hue] = /^oklch\(\S+ (\S+) (\S+)\)$/.exec(
+    desktopCanonical(value)!,
+  )!;
+  return { chroma: Number(chroma), hue: Number(hue) };
+}
+
+it.each([
+  ["dark", "#282828"],
+  ["light", "#ffffff"],
+] as const)(
+  "keeps a dim VS Code status color's hue on a %s canvas instead of replacing it",
+  (type, canvas) => {
+    const theme = parseVsCodeThemeFile({
+      name: "Gruvbox",
+      type,
+      colors: {
+        "editor.background": canvas,
+        "editorError.foreground": "#fb4934",
+        "editorWarning.foreground": "#b57614",
+      },
+    });
+    for (const [role, source] of [
+      ["error", "#fb4934"],
+      ["warning", "#b57614"],
+    ] as const) {
+      const imported = oklchParts(theme.colors[role]);
+      expect(
+        contrastRatio(theme.colors[role], theme.colors.canvas),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(imported.chroma).toBeGreaterThan(0.1);
+      expect(Math.abs(imported.hue - oklchParts(source).hue)).toBeLessThan(2);
+    }
+  },
+);
+it("keeps the derived status color when a VS Code theme hides its own", () => {
+  const theme = parseVsCodeThemeFile({
+    name: "Hidden squiggles",
+    type: "dark",
+    colors: {
+      "editor.background": "#101010",
+      "editorError.foreground": "#ff000000",
+    },
+  });
+  expect(oklchParts(theme.colors.error).chroma).toBeGreaterThan(0.1);
 });

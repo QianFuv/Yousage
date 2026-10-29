@@ -5,6 +5,7 @@ import {
   getThemeModes,
   isReservedThemeId,
   parseThemeFile,
+  readableThemeColorOn,
   themeColorToHex,
   themeIdFromName,
   THEME_FILE_VERSION,
@@ -342,6 +343,19 @@ export function parseVsCodeThemeFile(value: unknown): ThemeDefinition {
     if (isReadable(fallback)) return fallback;
     return relativeLuminance(surfaceRgb) < 0.179 ? "#ffffff" : "#000000";
   };
+  /** Status colors also fill controls such as destructive buttons, which
+   *  carry white text, so a dim one is lightened along its hue rather than
+   *  replaced by readableOn's black or white. One hidden in the canvas has no
+   *  hue to keep, so the derived color stands in. */
+  const readableStatusColor = (
+    fallback: string,
+    ...keys: ReadonlyArray<string>
+  ): string => {
+    const specified = solidOver(canvas, ...keys);
+    const base =
+      specified && standsApart(specified, canvasHex) ? specified : fallback;
+    return readableThemeColorOn(base, canvasHex, 4.5);
+  };
 
   const surfaceRaisedHex = raisedSurfaceCandidateHex ?? derived.surfaceRaised;
   // The checked switch track maps to messageAction, so resolve it before
@@ -422,13 +436,12 @@ export function parseVsCodeThemeFile(value: unknown): ThemeDefinition {
       derived.placeholder,
       "input.placeholderForeground",
     ),
-    error: readableOn(
-      canvasHex,
+    error: readableStatusColor(
       derived.error,
       "editorError.foreground",
       "errorForeground",
     ),
-    warning: readableOn(canvasHex, derived.warning, "editorWarning.foreground"),
+    warning: readableStatusColor(derived.warning, "editorWarning.foreground"),
     accentSurface:
       solidOver(
         canvas,

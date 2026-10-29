@@ -678,6 +678,44 @@ function solveOklchLightness(
 }
 
 /**
+ * Make a color readable on a surface by moving only its lightness, so a color
+ * that is too dim keeps its hue instead of collapsing to black or white. The
+ * result is the 8-bit color the solver measured, because the unrounded OKLCH
+ * can round to a neighbor just under the target once stored and read back.
+ *
+ * @param color - The CSS color to keep readable.
+ * @param surface - The CSS color the result is painted on.
+ * @param minContrast - The minimum WCAG contrast ratio to reach.
+ * @returns The original color when it already clears the target, otherwise
+ * the solved hex color; unparseable input is returned unchanged.
+ */
+export function readableThemeColorOn(
+  color: string,
+  surface: string,
+  minContrast: number,
+): string {
+  const parsedColor = parseThemeColor(color);
+  const parsedSurface = parseThemeColor(surface);
+  if (!parsedColor || !parsedSurface) return color;
+  const surfaceRgb = themeOklchToRgb(parsedSurface.color);
+  if (
+    themeContrastRatio(themeOklchToRgb(parsedColor.color), surfaceRgb) >=
+    minContrast
+  ) {
+    return color;
+  }
+  const direction =
+    themeRelativeLuminance(surfaceRgb) < 0.179 ? "lighter" : "darker";
+  const solved = solveOklchLightness(
+    parsedColor.color,
+    surfaceRgb,
+    minContrast,
+    direction,
+  );
+  return themeRgbToHexColor(themeOklchToRgb(solved));
+}
+
+/**
  * The status colors T3 Code shows without a theme, read from the app's own
  * tokens (red-500 / amber-500 families). Generated palettes fall back to
  * these instead of the flagship theme's, so an imported or created theme
