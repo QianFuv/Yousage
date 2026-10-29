@@ -5,7 +5,7 @@ import { totalTokens } from '../upstream/packages/provider-core/src/server/usage
 import { UsageAggregator, resolveModelAliases } from '../upstream/apps/server/src/usage/usageAggregation';
 import { enumerateHourStarts } from '../upstream/packages/shared/src/usageFormat';
 import { remainingPercent, elapsedShare, paceOf } from '../upstream/packages/shared/src/usageLimits';
-import { niceScale, buildPeriodColumns } from '../upstream/apps/web/src/components/usage/UsageProviderChart';
+import { buildPeriodColumns } from '../upstream/apps/web/src/components/usage/UsageProviderChart';
 import { mergeUsage } from '../upstream/packages/shared/src/usageMerge';
 import { collectLimitAccounts, collectLimitPools } from '../upstream/packages/shared/src/usageLimits';
 import { RECORD, RATES, TOTALS } from './fixtures';
@@ -58,9 +58,7 @@ describe('billing and time semantics', () => {
     expect(paceOf({ ...window, usedPercent: 55.1 }, now)).toBe('ahead');
     expect(paceOf({ ...window, usedPercent: 44.9 }, now)).toBe('under');
   });
-  it('uses independent provider bands and a human-readable scale', () => {
-    expect(niceScale(11, 4)).toEqual({ max: 15, ticks: [0, 5, 10, 15] });
-    expect(niceScale(0, 4)).toEqual({ max: 0, ticks: [0] });
+  it('uses independent provider bands', () => {
     const columns = buildPeriodColumns(['2026-10-01'], new Map([['2026-10-01', { byProvider: new Map([['codex', { costUsd: 2, totalTokens: 4 }], ['claude', { costUsd: 3, totalTokens: 6 }]]) }]]), 'cost');
     expect(columns[0].total).toBe(5);
     expect(columns[0].bands.filter((band) => band.value > 0).map((band) => band.value)).toEqual([2, 3]);

@@ -8,6 +8,11 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "rootDirs": [
+      "../tools/parity/upstream/apps/web/src/rpc",
+      "../tools/parity/upstream/apps/web/src/state",
+      "../tools/parity/src/bridges"
+    ],
     "types": ["vite/client", "vitest/globals"],
     "paths": {
       "@reference": ["./src/reference.d.ts"],
@@ -20,6 +25,9 @@
       "~/lib/color": ["../tools/parity/upstream/apps/web/src/lib/color.ts"],
       "~/lib/observeResize": [
         "../tools/parity/upstream/apps/web/src/lib/observeResize.ts"
+      ],
+      "~/lib/visibleAnimation": [
+        "../tools/parity/upstream/apps/web/src/lib/visibleAnimation.ts"
       ],
       "~/lib/windowControlsOverlay": [
         "../tools/parity/src/bridges/titlebar.tsx"

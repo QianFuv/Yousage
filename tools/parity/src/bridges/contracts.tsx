@@ -4,3 +4,5 @@ export const UsageDay = { make: (value: string) => value };
 export const ProviderDriverKind = { make: (value: string) => value };
 /** Original server.ts availability predicate, including omitted-field behavior. */
 export const isProviderAvailable = (snapshot: { availability?: string }): boolean => snapshot.availability !== 'unavailable';
+/** Project provider policy is outside the reference slice; only the pinned fallback selection calls it. */
+export const resolveProjectProviderInstanceEnabled = (): boolean => { throw new Error('Project provider policy is not bridged.'); };

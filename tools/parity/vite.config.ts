@@ -16,7 +16,9 @@ export default defineConfig({
       resolveId(source, importer) {
         if (source === '~/lib/utils' || (source.endsWith('/lib/utils') && importer?.includes('/upstream/'))) return path.join(ROOT, 'src/bridges/utils.tsx');
         if (source === '~/components/MorphIcon') return path.join(ROOT, 'upstream/apps/web/src/components/MorphIcon.tsx');
-        if (source === '~/lib/color' || source === '~/lib/observeResize') return path.join(ROOT, 'upstream/apps/web/src', source.slice(2) + '.ts');
+        if (source === '~/lib/color' || source === '~/lib/observeResize' || source === '~/lib/visibleAnimation') return path.join(ROOT, 'upstream/apps/web/src', source.slice(2) + '.ts');
+        if (source === './rpc/atomRegistry' && importer?.includes('/upstream/')) return path.join(ROOT, 'src/bridges/atomRegistry.tsx');
+        if (source === './state/server' && importer?.includes('/upstream/')) return path.join(ROOT, 'src/bridges/server.tsx');
         if (source === '~/lib/windowControlsOverlay') return path.join(ROOT, 'src/bridges/titlebar.tsx');
         if (source === '@t3tools/contracts') return path.join(ROOT, 'src/bridges/contracts.tsx');
         if (source === '@t3tools/client-runtime/state/provider-instance-display') return path.join(ROOT, 'src/bridges/instance.tsx');

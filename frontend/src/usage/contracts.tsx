@@ -186,3 +186,27 @@ export type UsageModelPriceOverride = {
 };
 export type UsagePriceOverrides = Record<string, UsageModelPriceOverride>;
 export type UsageModelAliases = Record<string, string>;
+export type ProjectId = string;
+export type ModelSelection = { instanceId: ProviderInstanceId; model: string };
+export type ServerSettings = Record<string, unknown>;
+export type EnvironmentTheme = {
+  id: string;
+  version?: 1;
+  name: string;
+  appearance: "light" | "dark";
+  canvas?: string;
+  accent?: string;
+  colors?: Record<string, string>;
+  variants?: {
+    light?: Record<string, string>;
+    dark?: Record<string, string>;
+  };
+};
+/** Desktop settings have no projects, so the pinned fallback selection never runs here. */
+export const resolveProjectProviderInstanceEnabled: (
+  settings: ServerSettings,
+  projectId: ProjectId | null,
+  instanceId: ProviderInstanceId,
+) => boolean = () => {
+  throw new Error("Project provider policy is outside the desktop contract.");
+};

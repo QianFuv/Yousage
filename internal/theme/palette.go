@@ -1,4 +1,4 @@
-// Vivid palette derivation is adapted from t3code 58d2532 (MIT).
+// Vivid palette derivation is adapted from t3code dac8b11 (MIT).
 package theme
 
 import (

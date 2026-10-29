@@ -1,8 +1,8 @@
 {
   "upstream": "https://github.com/pingdotgg/t3code",
-  "commit": "58d253231d83f669a2cdfefa5fe479751d22c582",
+  "commit": "dac8b11ddc25bd5da62a367fdb6c3de777ae2986",
   "sourcePath": "packages/shared/src/themePalettes.ts",
-  "sourceSha256": "a6fb0f8276608dfc8ba5edc94a786e9e6b436abb9604e38f8eff5f4898b92367",
+  "sourceSha256": "21b10dad58a61e86c563e48f75584a49ef61d423d426129e831c8c2c2090ddb8",
   "dataPath": "builtins.json",
   "dataDigestAlgorithm": "SHA256-UTF8-LF-v1",
   "dataSha256": "ce64df8ad62378d38d9e2defda5519aee4384c3f6036d8413d9d5f86d932eb43",
