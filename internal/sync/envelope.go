@@ -44,12 +44,14 @@ func encryptionCipher(key string) (cipher.AEAD, error) {
 }
 
 // Seal compresses JSON and encrypts it in the version-one authenticated envelope.
+// The compressed body shares the envelope buffer and is encrypted in place.
 func Seal(plaintext []byte, key, aad string) ([]byte, error) {
 	encryption, err := encryptionCipher(key)
 	if err != nil {
 		return nil, err
 	}
 	var compressed bytes.Buffer
+	compressed.Write(make([]byte, 13))
 	writer := gzip.NewWriter(&compressed)
 	if _, err = writer.Write(plaintext); err != nil {
 		return nil, err
@@ -57,12 +59,12 @@ func Seal(plaintext []byte, key, aad string) ([]byte, error) {
 	if err = writer.Close(); err != nil {
 		return nil, err
 	}
-	envelope := make([]byte, 13)
+	envelope := compressed.Bytes()
 	envelope[0] = 1
-	if _, err = rand.Read(envelope[1:]); err != nil {
+	if _, err = rand.Read(envelope[1:13]); err != nil {
 		return nil, errors.New("could not create encryption nonce")
 	}
-	return encryption.Seal(envelope, envelope[1:], compressed.Bytes(), []byte(aad)), nil
+	return encryption.Seal(envelope[:13], envelope[1:13], envelope[13:], []byte(aad)), nil
 }
 
 // Open authenticates and decompresses a version-one envelope with a bounded output.
