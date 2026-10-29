@@ -10,7 +10,7 @@ COPY tools/parity/ ./tools/parity/
 COPY frontend/ ./frontend/
 RUN pnpm --dir frontend build:web
 
-FROM golang:1.26.2 AS builder
+FROM golang:1.26.10 AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
