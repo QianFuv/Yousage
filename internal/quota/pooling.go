@@ -171,9 +171,11 @@ func contains(values []string, value string) bool {
 	return false
 }
 
+// PoolColumn carries a fixed account position and the usable quota its next reset restores.
 type PoolColumn struct {
-	AccountKey string  `json:"accountKey"`
-	Window     *Window `json:"window"`
+	AccountKey    string  `json:"accountKey"`
+	Window        *Window `json:"window"`
+	RefillPercent float64 `json:"refillPercent"`
 }
 type PoolReset struct {
 	AccountKey      string `json:"accountKey"`
@@ -224,7 +226,10 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 		orderReset := func(account PooledAccount) string {
 			for _, window := range account.Limits.Windows {
 				if poolKey(pool.Driver, window) == poolKey(pool.Driver, orderWindow) && iso(window.ResetsAt) != "" {
-					return iso(window.ResetsAt)
+					adjusted, _ := poolMember(account, window, now)
+					if reset := iso(adjusted.ResetsAt); reset != "" {
+						return reset
+					}
 				}
 			}
 			return "~"
@@ -241,13 +246,15 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 			return left.Key < right.Key
 		})
 		type member struct {
-			accountKey string
-			window     Window
+			accountKey    string
+			window        Window
+			refillPercent float64
 		}
 		keys := []string{}
 		members := map[string][]member{}
 		for _, account := range pool.Accounts {
-			for _, window := range account.Limits.Windows {
+			for _, reported := range account.Limits.Windows {
+				window, refillPercent := poolMember(account, reported, now)
 				key := poolKey(pool.Driver, window)
 				for _, existing := range members[key] {
 					if existing.accountKey == account.Key {
@@ -258,7 +265,7 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 				if _, exists := members[key]; !exists {
 					keys = append(keys, key)
 				}
-				members[key] = append(members[key], member{account.Key, window})
+				members[key] = append(members[key], member{account.Key, window, refillPercent})
 			}
 		}
 		sort.SliceStable(keys, func(first, second int) bool {
@@ -274,14 +281,16 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 			used, memberCount, timedUsed, elapsed, timedCount := 0.0, 0, 0.0, 0.0, 0
 			for _, account := range pool.Accounts {
 				var selected *Window
+				refillPercent := 0.0
 				for _, candidate := range members[key] {
 					if candidate.accountKey == account.Key {
 						copy := candidate.window
 						selected = &copy
+						refillPercent = candidate.refillPercent
 						break
 					}
 				}
-				window.Columns = append(window.Columns, PoolColumn{account.Key, selected})
+				window.Columns = append(window.Columns, PoolColumn{account.Key, selected, refillPercent})
 				if selected == nil {
 					continue
 				}
@@ -303,7 +312,7 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 			for resetIndex := range window.Resets {
 				for _, column := range window.Columns {
 					if column.AccountKey == window.Resets[resetIndex].AccountKey {
-						window.Resets[resetIndex].RestoresPercent = int(math.Floor(column.Window.UsedPercent/float64(memberCount) + 0.5))
+						window.Resets[resetIndex].RestoresPercent = int(math.Floor(column.RefillPercent/float64(memberCount) + 0.5))
 						break
 					}
 				}
@@ -323,6 +332,40 @@ func CollectPools(accounts []PooledAccount, now time.Time) []Pool {
 		}
 	}
 	return result
+}
+
+// poolMember suppresses session availability until an exhausted subscription's weekly limit resets.
+func poolMember(account PooledAccount, reported Window, now time.Time) (Window, float64) {
+	if reported.Kind != "session" {
+		return reported, reported.UsedPercent
+	}
+	for _, weekly := range account.Limits.Windows {
+		if weekly.UsedPercent < 100 || !((account.Driver == "claudeAgent" && weekly.Id == "seven_day") || (account.Driver == "codex" && weekly.Kind == "weekly")) {
+			continue
+		}
+		adjusted := reported
+		adjusted.UsedPercent, adjusted.ResetsAt, adjusted.WindowDurationMins = 100, "", nil
+		refillPercent := 0.0
+		weeklyReset, weeklyError := time.Parse(time.RFC3339Nano, weekly.ResetsAt)
+		sessionReset, sessionError := time.Parse(time.RFC3339Nano, reported.ResetsAt)
+		checkedAt, checkedError := time.Parse(time.RFC3339Nano, account.Limits.CheckedAt)
+		cutoff := now
+		if checkedAt.After(cutoff) {
+			cutoff = checkedAt
+		}
+		if weeklyError == nil && sessionError == nil && checkedError == nil && weeklyReset.After(cutoff) && sessionReset.After(cutoff) {
+			switch {
+			case !sessionReset.After(weeklyReset):
+				adjusted.ResetsAt, refillPercent = weekly.ResetsAt, 100
+			case reported.UsedPercent >= 100:
+				adjusted.ResetsAt, refillPercent = reported.ResetsAt, 100
+			default:
+				adjusted.ResetsAt, refillPercent = weekly.ResetsAt, 100-percent(reported.UsedPercent)
+			}
+		}
+		return adjusted, refillPercent
+	}
+	return reported, reported.UsedPercent
 }
 
 // poolKey pools Codex windows by kind because its ids are slots, not allowances.
