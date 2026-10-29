@@ -398,7 +398,7 @@
     {
       "ecosystem": "go",
       "name": "Go standard library",
-      "version": "go1.26.2",
+      "version": "go1.26.10",
       "license": "BSD-3-Clause",
       "source": "https://go.dev/LICENSE",
       "licenses": [
