@@ -38,6 +38,27 @@ export function usagePriceForm(
   };
 }
 
+/**
+ * Accept a price input change only while it still reads as a number in
+ * progress, or when it removes one contiguous run of characters, so a stray
+ * keystroke cannot turn a valid rate into text.
+ *
+ * @param previous - The input value before the change.
+ * @param next - The proposed input value.
+ * @returns Whether the change should be applied.
+ */
+export function isUsagePriceEdit(previous: string, next: string): boolean {
+  if (/^\s*(?:\d*\.?\d*|(?:\d+\.?\d*|\.\d+)e[+-]?\d*)\s*$/i.test(next))
+    return true;
+  if (next.length >= previous.length) return false;
+  let start = 0;
+  while (start < next.length && next[start] === previous[start]) start++;
+  return (
+    next.slice(start) ===
+    previous.slice(previous.length - (next.length - start))
+  );
+}
+
 /** Blank cache prices use the input rate; explicit zero means free. */
 export function parseUsagePriceForm(
   form: UsagePriceForm,

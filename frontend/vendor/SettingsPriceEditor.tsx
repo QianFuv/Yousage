@@ -28,7 +28,7 @@ import {
   TooltipTrigger,
   TooltipPopup,
 } from "../../tools/parity/upstream/apps/web/src/components/ui/tooltip";
-import { USAGE_PRICE_FIELDS } from "./usagePriceForm";
+import { isUsagePriceEdit, USAGE_PRICE_FIELDS } from "./usagePriceForm";
 import {
   isEmptyUsagePriceDraft,
   usageAliasCell,
@@ -579,13 +579,20 @@ export function SettingsPriceEditor({
                                     autoComplete="off"
                                     disabled={locked}
                                     font="mono"
-                                    onChange={(event) =>
-                                      editCell(
-                                        row,
-                                        field.key,
-                                        event.target.value,
+                                    onChange={(event) => {
+                                      if (
+                                        isUsagePriceEdit(
+                                          row.values[field.key] ??
+                                            (row.isNew ? "" : cell.value),
+                                          event.target.value,
+                                        )
                                       )
-                                    }
+                                        editCell(
+                                          row,
+                                          field.key,
+                                          event.target.value,
+                                        );
+                                    }}
                                   />
                                 </TableCell>
                               );

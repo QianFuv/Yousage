@@ -1,5 +1,5 @@
 /** Verify the desktop writer preserves independent target outcomes and original table semantics. */
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   writeUsagePrices,
   type UsagePriceTarget,
@@ -8,6 +8,7 @@ import {
   usagePriceTableChanges,
   usagePriceCell,
 } from "../../vendor/usagePriceTable";
+import { isUsagePriceEdit } from "../../vendor/usagePriceForm";
 
 const FIRST: UsagePriceTarget = {
   environmentId: "first",
@@ -91,4 +92,18 @@ it("reports ambiguous writes independently and retries only the caller's failed 
   });
   expect(write).toHaveBeenCalledTimes(1);
   expect(write.mock.calls[0]?.[0].environmentId).toBe("second");
+});
+
+describe("price input edits", () => {
+  it("accepts numbers in progress and rejects stray text", () => {
+    expect(isUsagePriceEdit("1", "1.")).toBe(true);
+    expect(isUsagePriceEdit("1.5", "1.5e")).toBe(true);
+    expect(isUsagePriceEdit("1.5", "")).toBe(true);
+    expect(isUsagePriceEdit("1.5", "1.5a")).toBe(false);
+    expect(isUsagePriceEdit("", "abc")).toBe(false);
+  });
+  it("lets a deletion clean up an already invalid value", () => {
+    expect(isUsagePriceEdit("1xy2", "1y2")).toBe(true);
+    expect(isUsagePriceEdit("1xy2", "1z2")).toBe(false);
+  });
 });
