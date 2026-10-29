@@ -83,7 +83,7 @@ func (server *Server) Close() error {
 	server.closeOnce.Do(func() {
 		close(server.stop)
 		<-server.done
-		server.closeError = server.store.database.Close()
+		server.closeError = server.store.close()
 	})
 	return server.closeError
 }

@@ -21,7 +21,9 @@ const spaceValidatorQuery = `SELECT etag, updated_at FROM blobs INDEXED BY blob_
 	AND (expires_at IS NULL OR expires_at>?)`
 
 type blobStore struct {
-	database *sql.DB
+	database                *sql.DB
+	readStatement           *sql.Stmt
+	spaceValidatorStatement *sql.Stmt
 }
 
 type blob struct {
@@ -30,6 +32,7 @@ type blob struct {
 	etag      string
 }
 
+// openStore upgrades the schema and prepares reusable reads for the connection pool.
 func openStore(directory string) (*blobStore, error) {
 	path, err := filepath.Abs(filepath.Join(directory, "relay.db"))
 	if err != nil {
@@ -54,7 +57,25 @@ func openStore(directory string) (*blobStore, error) {
 		database.Close()
 		return nil, err
 	}
-	return &blobStore{database: database}, nil
+	store := &blobStore{database: database}
+	store.readStatement, err = database.Prepare(`SELECT data, updated_at, coalesce(etag,'') FROM blobs
+		WHERE kind=? AND id=? AND data IS NOT NULL AND (expires_at IS NULL OR expires_at>?)`)
+	if err != nil {
+		database.Close()
+		return nil, err
+	}
+	store.spaceValidatorStatement, err = database.Prepare(spaceValidatorQuery)
+	if err != nil {
+		store.readStatement.Close()
+		database.Close()
+		return nil, err
+	}
+	return store, nil
+}
+
+// close releases the prepared reads and their database after requests have drained.
+func (store *blobStore) close() error {
+	return errors.Join(store.readStatement.Close(), store.spaceValidatorStatement.Close(), store.database.Close())
 }
 
 // initializeStore upgrades metadata without reading or rewriting existing ciphertext.
@@ -128,9 +149,7 @@ func initializeStore(database *sql.DB) error {
 func (store *blobStore) read(ctx context.Context, kind, id string, now time.Time) (blob, error) {
 	var value blob
 	var updatedAt int64
-	err := store.database.QueryRowContext(ctx, `SELECT data, updated_at, coalesce(etag,'') FROM blobs
-		WHERE kind=? AND id=? AND data IS NOT NULL AND (expires_at IS NULL OR expires_at>?)`,
-		kind, id, now.UnixNano()).Scan(&value.data, &updatedAt, &value.etag)
+	err := store.readStatement.QueryRowContext(ctx, kind, id, now.UnixNano()).Scan(&value.data, &updatedAt, &value.etag)
 	value.updatedAt = time.Unix(0, updatedAt).UTC()
 	if err == nil && kind == "space" && value.etag == "" {
 		value.etag = contentEtag(value.data)
@@ -150,7 +169,7 @@ func (store *blobStore) cacheSpaceValidator(ctx context.Context, id string, valu
 func (store *blobStore) readSpaceValidator(ctx context.Context, id string, now time.Time) (blob, error) {
 	var value blob
 	var updatedAt int64
-	err := store.database.QueryRowContext(ctx, spaceValidatorQuery, id, now.UnixNano()).Scan(&value.etag, &updatedAt)
+	err := store.spaceValidatorStatement.QueryRowContext(ctx, id, now.UnixNano()).Scan(&value.etag, &updatedAt)
 	value.updatedAt = time.Unix(0, updatedAt).UTC()
 	return value, err
 }

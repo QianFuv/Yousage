@@ -88,7 +88,7 @@ func TestLegacyStoreConcurrentOpen(t *testing.T) {
 		workers.Go(func() {
 			store, err := openStore(directory)
 			if err == nil {
-				err = store.database.Close()
+				err = store.close()
 			}
 			failures <- err
 		})
