@@ -1,4 +1,4 @@
 {
- "fixed": {"file_version":"0.1.10.0", "product_version":"0.1.10.0"},
- "info": {"0409":{"FileVersion":"0.1.10.0","ProductVersion":"0.1.10","CompanyName":"Yousage","FileDescription":"Usage monitoring and themes","ProductName":"Yousage","OriginalFilename":"yousage.exe"}}
+ "fixed": {"file_version":"0.1.11.0", "product_version":"0.1.11.0"},
+ "info": {"0409":{"FileVersion":"0.1.11.0","ProductVersion":"0.1.11","CompanyName":"Yousage","FileDescription":"Usage monitoring and themes","ProductName":"Yousage","OriginalFilename":"yousage.exe"}}
 }
