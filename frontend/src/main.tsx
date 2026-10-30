@@ -287,7 +287,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
         event.key.toLowerCase() === "r"
       ) {
         event.preventDefault();
-        if (route !== "settings") void data.refresh(true, true);
+        void data.refresh();
       } else if (event.key === "Escape") setIsClosing(false);
     };
     window.addEventListener("keydown", changed);

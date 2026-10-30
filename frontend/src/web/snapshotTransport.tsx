@@ -16,6 +16,8 @@ type ViewerMethod =
   | "GetBootstrap"
   | "RefreshUsage"
   | "RefreshLimits"
+  | "RequestRefresh"
+  | "GetRefreshState"
   | "OpenExternal"
   | "FrontendReady";
 
@@ -31,6 +33,8 @@ const PROBES: Record<ViewerMethod, () => Promise<unknown>> = {
   GetBootstrap: () => nativeApi.GetBootstrap(),
   RefreshUsage: () => nativeApi.RefreshUsage(1, "", [], {} as never),
   RefreshLimits: () => nativeApi.RefreshLimits([], {} as never),
+  RequestRefresh: () => nativeApi.RequestRefresh(),
+  GetRefreshState: () => nativeApi.GetRefreshState(),
   OpenExternal: () => nativeApi.OpenExternal(""),
   FrontendReady: () => nativeApi.FrontendReady(),
 };
@@ -132,8 +136,15 @@ export function createSnapshotTransport(
         };
       case "RefreshUsage":
       case "RefreshLimits":
+      case "RequestRefresh":
         await source.refetch();
         return null;
+      case "GetRefreshState":
+        return {
+          isRefreshing: false,
+          lastCompletedAt: snapshot.generatedAt,
+          lastError: "",
+        };
       case "OpenExternal":
         source.open(String(request.args[0]));
         return null;

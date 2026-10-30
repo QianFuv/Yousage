@@ -32,7 +32,7 @@ vi.mock("./controller", () => ({
         timestampFormat: "",
       },
     },
-    setUsageActive: () => () => {},
+    refreshState: { isRefreshing: false, lastCompletedAt: "", lastError: "" },
     refresh: async () => {},
     patchDisplay: async () => {},
   }),

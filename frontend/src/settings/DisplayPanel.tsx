@@ -32,7 +32,7 @@ const SHORTCUTS: readonly [string, readonly string[]][] = [
   [msg("Open settings"), ["Ctrl / ⌘", ","]],
   [msg("Usage statistics"), ["Ctrl / ⌘", "1"]],
   [msg("Quota monitoring"), ["Ctrl / ⌘", "2"]],
-  [msg("Refresh the active usage page"), ["Ctrl / ⌘", "R"]],
+  [msg("Refresh all pages now"), ["Ctrl / ⌘", "R"]],
   [msg("Open Appearance"), ["Ctrl / ⌘", "Alt", "A"]],
   [msg("Cycle System, Light and Dark"), ["Ctrl / ⌘", "Alt", "Shift", "A"]],
   [msg("Dismiss the close confirmation"), ["Esc"]],
@@ -140,7 +140,7 @@ export function DisplayPanel() {
           <SettingsRow
             title={t("Automatic refresh")}
             description={t(
-              "Refresh while Usage is active and visible. History refreshes when stale; limits wait five minutes after completion. Settings and minimized windows never start automatic queries.",
+              "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on. Ctrl+R refreshes now.",
             )}
             control={
               <Switch

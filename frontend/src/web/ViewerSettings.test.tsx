@@ -3,10 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ViewerSettings } from "./ViewerSettings";
 
-vi.mock("../usage/controller", () => ({
-  useData: () => ({ isBusy: false, refresh: async () => {} }),
-}));
-
 /**
  * Render the settings page.
  *
@@ -33,5 +29,12 @@ describe("ViewerSettings", () => {
 
   it("has no diagnostics entry without a host, as on the relay web page", () => {
     expect(render()).not.toContain("Diagnostics");
+  });
+
+  it("keeps freshness without a manual refresh button, since the viewer follows the relay", () => {
+    const html = render();
+    expect(html).toContain("Last updated");
+    expect(html).not.toContain("Check for a newer snapshot");
+    expect(html).not.toContain("<button");
   });
 });

@@ -879,6 +879,12 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
     await new Promise((resolve) => setTimeout(resolve, 100));
     return null;
   },
+  RequestRefresh: () => null,
+  GetRefreshState: () => ({
+    isRefreshing: false,
+    lastCompletedAt: new Date(REFERENCE_MS).toISOString(),
+    lastError: "",
+  }),
   ApplyPricing: (
     ids: string[],
     patch: {

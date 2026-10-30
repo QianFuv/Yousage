@@ -11,34 +11,46 @@ import {
 import { Events } from "@wailsio/runtime";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { SavedDisplay } from "../../bindings/yousage/internal/preferences/models";
-import { Request } from "../../bindings/yousage/internal/refresh/models";
 import type { UsageSnapshot } from "./data";
 import { notifyError } from "../notify";
 
+/** Global refresh progress published by the desktop scheduler. */
+export type RefreshState = {
+  /** Whether a global refresh cycle is running. */
+  isRefreshing: boolean;
+  /** RFC 3339 completion time of the last cycle, or empty before the first one. */
+  lastCompletedAt: string;
+  /** Sanitized failure of the last cycle, or empty when it fully succeeded. */
+  lastError: string;
+};
+const IDLE_REFRESH: RefreshState = {
+  isRefreshing: false,
+  lastCompletedAt: "",
+  lastError: "",
+};
+
 type DataContextValue = {
-  setUsageActive: (
-    isActive: boolean,
-    metric: "cost" | "tokens" | "limits",
-  ) => void;
   snapshot: UsageSnapshot | null;
   display: SavedDisplay;
   selected: Set<string> | null;
   setSelected: (selected: Set<string> | null) => void;
   error: string;
   isBusy: boolean;
+  refreshState: RefreshState;
   isSavingDisplay: boolean;
   reload: () => Promise<void>;
   patchDisplay: (patch: Partial<SavedDisplay["value"]>) => Promise<void>;
-  refresh: (
-    isManual: boolean,
-    isUsagePage: boolean,
-    afterPending?: boolean,
-    shouldRefreshAll?: boolean,
-  ) => Promise<void>;
+  refresh: () => Promise<void>;
 };
 const DATA_CONTEXT = createContext<DataContextValue | null>(null);
 
-/** Share saved view state and last-good summaries without starting periodic timers. */
+/**
+ * Share saved view state and last-good summaries. The desktop scheduler owns every
+ * automatic refresh; each page only reloads on `usage-invalidated`.
+ *
+ * @param props - The saved display and the routes that consume the shared data.
+ * @returns The data provider.
+ */
 export function DataProvider({
   initial,
   children,
@@ -55,27 +67,8 @@ export function DataProvider({
   const hasSnapshot = useRef(false);
   const [isSavingDisplay, setIsSavingDisplay] = useState(false);
   const preferenceWrites = useRef(0);
-  const [isBusy, setIsBusy] = useState(false);
-  const isRefreshing = useRef(false);
-  const isUsageActive = useRef(true);
-  const isNativeVisible = useRef(false);
-  const usageMetric = useRef<"cost" | "tokens" | "limits">("limits");
-  const setUsageActive = useCallback(
-    (isActive: boolean, metric: "cost" | "tokens" | "limits") => {
-      isUsageActive.current = isActive;
-      if (isActive) usageMetric.current = metric;
-    },
-    [],
-  );
+  const [refreshState, setRefreshState] = useState(IDLE_REFRESH);
   const sequence = useRef(0);
-  const pendingRefresh = useRef<null | {
-    isManual: boolean;
-    isUsagePage: boolean;
-    afterPending: boolean;
-    shouldRefreshAll: boolean;
-  }>(null);
-  const didRefreshAtLaunch = useRef(false);
-  const currentRefresh = useRef<DataContextValue["refresh"]>(async () => {});
   const queue = useRef(Promise.resolve());
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const reloadFlight = useRef<Promise<void> | null>(null);
@@ -114,18 +107,32 @@ export function DataProvider({
   useEffect(() => {
     void reload();
     const dispose = Events.On("usage-invalidated", () => void reload());
-    const disposeVisibility = Events.On("window-visibility", (event) => {
-      isNativeVisible.current = event.data === true;
-      if (isNativeVisible.current)
-        void currentRefresh.current(false, isUsageActive.current, true);
-    });
     return () => {
       dispose();
-      disposeVisibility();
       sequence.current++;
       shouldReload.current = false;
     };
   }, [reload, display.value.windowDays]);
+  /** Follow the scheduler's progress; a published change supersedes the initial read. */
+  useEffect(() => {
+    let hasEvent = false;
+    let isMounted = true;
+    const dispose = Events.On("refresh-state", (event) => {
+      hasEvent = true;
+      setRefreshState({ ...IDLE_REFRESH, ...(event.data as RefreshState) });
+    });
+    void nativeApi
+      .GetRefreshState()
+      .then((value) => {
+        if (isMounted && !hasEvent && value)
+          setRefreshState({ ...IDLE_REFRESH, ...value });
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+      dispose();
+    };
+  }, []);
   /** Serialize ordinary preferences using the latest acknowledged revision. */
   const patchDisplay = useCallback((patch: Partial<SavedDisplay["value"]>) => {
     preferenceWrites.current++;
@@ -155,106 +162,24 @@ export function DataProvider({
     queue.current = operation;
     return operation;
   }, []);
-  /** Gate automatic work on current visibility/route and coalesce explicit refreshes in Go. */
-  const refresh = useCallback(
-    async (
-      isManual: boolean,
-      isUsagePage: boolean,
-      afterPending = false,
-      shouldRefreshAll = false,
-    ) => {
-      if (!snapshot) return;
-      if (isRefreshing.current) {
-        pendingRefresh.current = {
-          isManual,
-          isUsagePage,
-          afterPending: true,
-          shouldRefreshAll,
-        };
-        return;
-      }
-      if (
-        !isManual &&
-        (document.visibilityState !== "visible" ||
-          !isNativeVisible.current ||
-          !isUsagePage ||
-          !isUsageActive.current ||
-          !displayRef.current.value.shouldAutoRefresh)
-      )
-        return;
-      isRefreshing.current = true;
-      setIsBusy(true);
-      setError("");
-      const targets =
-        selected === null
-          ? snapshot.environments.map(
-              (environment) => environment.environmentId,
-            )
-          : [...selected];
-      const request = Request.createFrom({
-        IsManual: isManual,
-        IsVisible:
-          document.visibilityState === "visible" && isNativeVisible.current,
-        IsUsagePage: isUsagePage,
-        IsAutoEnabled: displayRef.current.value.shouldAutoRefresh,
-        AfterPending: afterPending,
-      });
-      const refreshUsage = () =>
-        nativeApi.RefreshUsage(
-          displayRef.current.value.windowDays,
-          zone,
-          targets,
-          request,
-        );
-      try {
-        if (shouldRefreshAll) {
-          const failure = (
-            await Promise.allSettled([
-              nativeApi.RefreshLimits(targets, request),
-              refreshUsage(),
-            ])
-          ).find((result) => result.status === "rejected");
-          if (failure) throw failure.reason;
-        } else if (usageMetric.current === "limits")
-          await nativeApi.RefreshLimits(targets, request);
-        else await refreshUsage();
-      } catch (cause) {
-        notifyError(cause);
-      } finally {
-        await reload();
-        isRefreshing.current = false;
-        setIsBusy(false);
-        const next = pendingRefresh.current;
-        pendingRefresh.current = null;
-        if (next)
-          void currentRefresh.current(
-            next.isManual,
-            next.isUsagePage,
-            next.afterPending,
-            next.shouldRefreshAll,
-          );
-      }
-    },
-    [snapshot, selected, zone, reload],
-  );
-  currentRefresh.current = refresh;
-  /** Refresh usage and limits together once per launch, past cooldowns, when automatic refresh is on. */
-  useEffect(() => {
-    if (!snapshot || didRefreshAtLaunch.current) return;
-    didRefreshAtLaunch.current = true;
-    if (displayRef.current.value.shouldAutoRefresh)
-      void currentRefresh.current(true, true, false, true);
-  }, [snapshot]);
+  /** Ask the scheduler for one coalesced cycle now; results arrive as invalidations. */
+  const refresh = useCallback(async () => {
+    try {
+      await nativeApi.RequestRefresh();
+    } catch (cause) {
+      notifyError(cause);
+    }
+  }, []);
   return (
     <DATA_CONTEXT.Provider
       value={{
-        setUsageActive,
         snapshot,
         display,
         selected,
         setSelected,
         error,
-        isBusy,
+        isBusy: refreshState.isRefreshing,
+        refreshState,
         isSavingDisplay,
         reload,
         patchDisplay,

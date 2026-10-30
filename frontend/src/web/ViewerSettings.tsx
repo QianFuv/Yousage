@@ -1,8 +1,6 @@
 /** Settings page of the read-only viewer: snapshot freshness, the relay link and the app version. */
-import { FileTextIcon, RefreshCwIcon, Unlink2Icon } from "lucide-react";
+import { FileTextIcon, Unlink2Icon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-import { cn } from "../../../tools/parity/src/bridges/utils";
-import { useData } from "../usage/controller";
 import { t, useI18n } from "../i18n";
 import { PageBody, PageHeader, SettingsRow, SettingsSection } from "../ui";
 
@@ -53,7 +51,6 @@ export function ViewerSettings({
   onShowDiagnostics?: () => void;
 }) {
   useI18n();
-  const data = useData();
   return (
     <section aria-label={t("Settings")}>
       <PageHeader title={t("Settings")} />
@@ -62,32 +59,12 @@ export function ViewerSettings({
           <SettingsRow
             title={t("Last updated")}
             description={t(
-              "The desktop app uploads a new snapshot after each refresh.",
+              "The desktop app uploads a new snapshot after each refresh. This page checks for it every 30 seconds while shown.",
             )}
             control={
               <span className="text-sm font-medium tabular-nums">
                 {formatSnapshotTime(generatedAt, locale)}
               </span>
-            }
-          />
-          <SettingsRow
-            title={t("Check for a newer snapshot")}
-            description={t(
-              "Reads the relay again. It does not make the desktop refresh.",
-            )}
-            control={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={data.isBusy}
-                onClick={() => void data.refresh(true, true)}
-              >
-                <RefreshCwIcon
-                  aria-hidden
-                  className={cn(data.isBusy && "animate-spin")}
-                />
-                {t("Refresh")}
-              </Button>
             }
           />
         </SettingsSection>

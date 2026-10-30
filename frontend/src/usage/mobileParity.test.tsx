@@ -51,6 +51,7 @@ vi.mock("./controller", () => ({
     display: { value: { breakdown: "model", timestampFormat: "24-hour" } },
     patchDisplay: async () => {},
     isBusy: false,
+    refreshState: { isRefreshing: false, lastCompletedAt: "", lastError: "" },
     refresh: async () => {},
   }),
 }));

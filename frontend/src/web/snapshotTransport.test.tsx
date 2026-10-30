@@ -294,6 +294,17 @@ describe("snapshot transport", () => {
     expect(source.open).toHaveBeenCalledWith("https://example.com/");
   });
 
+  it("answers the global refresh with a relay refetch and the snapshot time", async () => {
+    const source = await install();
+    await nativeApi.RequestRefresh();
+    expect(source.refetch).toHaveBeenCalledTimes(1);
+    expect(await nativeApi.GetRefreshState()).toEqual({
+      isRefreshing: false,
+      lastCompletedAt: source.current().generatedAt,
+      lastError: "",
+    });
+  });
+
   it("refuses desktop-only actions", async () => {
     await install();
     await expect(

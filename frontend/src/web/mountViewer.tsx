@@ -177,6 +177,11 @@ export async function mountViewer(host: ViewerHost): Promise<() => void> {
     if (Object.keys(changes).length)
       dispatchEvent(DISPLAY_CHANGES_EVENT, changes);
     dispatchEvent("usage-invalidated", null);
+    dispatchEvent("refresh-state", {
+      isRefreshing: false,
+      lastCompletedAt: snapshot.generatedAt,
+      lastError: "",
+    });
   };
   /** Wait for this generation's page commit without accepting obsolete render evidence. */
   const acknowledge = async () => {

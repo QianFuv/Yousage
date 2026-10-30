@@ -84,7 +84,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Change link": "更换链接",
   "Changes apply to {destination}": "更改将应用于 {destination}",
   "ChatGPT shared usage": "ChatGPT 共享用量",
-  "Check for a newer snapshot": "检查新快照",
   "Check your connection and try again.": "请检查网络连接后重试。",
   "Choose files": "选择文件",
   "Choose the variants to remove. Selected owners will fall back to the standard palette.":
@@ -329,8 +328,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "No reset credit left.": "没有剩余的重置券。",
   "No reset credits banked": "没有可用的重置券",
   "No saved history has been scanned yet.": "尚未扫描到已保存的历史记录。",
-  "No usage report is available. Refresh or review the selected environments.":
-    "暂无用量报告，请刷新或检查所选环境。",
+  "No usage report is available. Review the selected environments.":
+    "暂无用量报告，请检查所选环境。",
   None: "无",
   "Not detected yet.": "尚未识别。",
   "Not detected. Install the provider or configure its standard location, then detect again.":
@@ -414,8 +413,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Read-only access": "只读访问",
   "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":
     "桌面端快照的只读视图，在这里做的更改不会保存。",
-  "Reads the relay again. It does not make the desktop refresh.":
-    "重新读取 relay 上的快照，不会让桌面端刷新。",
   "Ready to import {count} themes": "准备导入 {count} 个主题",
   "Receipt image copied.": "小票图片已复制。",
   "Recent redacted events stored on this device. Nothing is uploaded unless you share it.":
@@ -424,13 +421,12 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Recenter window": "窗口居中",
   "Redacted report copied.": "已复制脱敏报告。",
   "Redacted report exported.": "已导出脱敏报告。",
-  Refresh: "刷新",
-  "Refresh limits": "刷新额度",
   "Refresh report": "刷新报告",
-  "Refresh the active usage page": "刷新当前用量页面",
-  "Refresh usage": "刷新用量",
-  "Refresh while Usage is active and visible. History refreshes when stale; limits wait five minutes after completion. Settings and minimized windows never start automatic queries.":
-    "在用量页面打开且可见时自动刷新。历史记录过期时刷新；额度在上次完成五分钟后刷新。设置页面和最小化窗口不会自动查询。",
+  "Refresh all pages now": "立即刷新所有页面",
+  "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on. Ctrl+R refreshes now.":
+    "用量、额度和所有页面一起刷新：窗口显示时约每五分钟一次，最小化到托盘且开启同步时每十五分钟一次。按 Ctrl+R 立即刷新。",
+  "Refresh failed": "刷新失败",
+  "Refresh was cancelled.": "刷新已取消。",
   "Refreshing…": "正在刷新…",
   Relay: "Relay",
   "Relay address": "Relay 地址",
@@ -596,8 +592,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "即 relay 上设置的 YOUSAGE_RELAY_TOKEN。",
   "The current link stops working and its snapshot is deleted from the relay. Scan the new code on your phone.":
     "当前链接会立即失效，relay 上的快照也会被删除。请在手机上扫描新的二维码。",
-  "The desktop app uploads a new snapshot after each refresh.":
-    "桌面端每次刷新后都会上传新的快照。",
+  "The desktop app uploads a new snapshot after each refresh. This page checks for it every 30 seconds while shown.":
+    "桌面端每次刷新后都会上传新快照，本页面显示时每 30 秒检查一次。",
   "The key does not match the stored data. Copy the whole link or scan the code again.":
     "密钥与存储的数据不匹配。请复制完整链接或重新扫码。",
   "The line is where even spending would be.": "竖线表示均匀消耗时应处的位置。",
@@ -710,6 +706,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "未保存的数据来源、价格或主题草稿将被丢弃。",
   Update: "更新提示",
   "Update background": "更新提示背景",
+  "Updated {time}": "更新于 {time}",
+  "Usage or limits could not be fully refreshed. Last successful data is retained when available.":
+    "用量或额度未能完全刷新，已保留上次成功的数据（如有）。",
   "Update existing themes / replace matching collection":
     "更新已有主题 / 替换同名合集",
   "Update server to edit prices": "请更新服务端后再编辑价格",

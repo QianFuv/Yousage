@@ -8,20 +8,17 @@ import {
   useState,
 } from "react";
 import { Events } from "@wailsio/runtime";
-import { RefreshCwIcon } from "lucide-react";
 import {
   formatCount,
   formatPercent,
   formatTokens,
 } from "@t3tools/shared/usageFormat";
-import { cn } from "../../../tools/parity/src/bridges/utils";
-import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { providerPresentation } from "../../vendor/usageProviders";
 import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { msg, t } from "../i18n";
 import { notifyError } from "../notify";
-import { useData } from "../usage/controller";
+import { useRefreshStatus } from "../usage/refreshStatus";
 import type { UsageProviderKind } from "../usage/contracts";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
@@ -139,19 +136,16 @@ export function providerSpeedSummary(provider: SpeedProvider): {
  * @returns The speed page.
  */
 export function SpeedPage({ isActive }: { isActive: boolean }) {
-  const data = useData();
   const days = usePeriodDays();
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const [report, setReport] = useState<SpeedReport | null>(null);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const request = useRef(0);
   const hasReport = useRef(false);
 
   /** Read the selected window, ignoring answers to superseded selections. */
   const load = useCallback(async () => {
     const identity = ++request.current;
-    setIsLoading(true);
     try {
       const value = await nativeApi.GetSpeedReport(days, zone);
       if (identity !== request.current) return;
@@ -162,8 +156,6 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
       if (identity !== request.current) return;
       if (hasReport.current) notifyError(cause);
       else setError(String(cause));
-    } finally {
-      if (identity === request.current) setIsLoading(false);
     }
   }, [days, zone]);
 
@@ -173,28 +165,12 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
     return Events.On("usage-invalidated", () => void load());
   }, [isActive, load]);
 
-  const isBusy = data.isBusy || isLoading;
+  const refreshStatus = useRefreshStatus();
   return (
     <section className="speed-page" aria-label={t("Speed")}>
       <PageHeader
         title={t("Speed")}
-        status={data.isBusy ? t("Refreshing…") : !report ? t("Loading…") : null}
-        actions={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={isBusy ? t("Refreshing…") : t("Refresh usage")}
-            title={`${t("Refresh")} (Ctrl+R)`}
-            aria-busy={isBusy}
-            disabled={isBusy}
-            onClick={() => void data.refresh(true, true)}
-          >
-            <RefreshCwIcon
-              aria-hidden
-              className={cn(isBusy && "animate-spin")}
-            />
-          </Button>
-        }
+        status={!report ? t("Loading…") : refreshStatus}
       >
         <PeriodToggle label={t("Speed period")} />
       </PageHeader>

@@ -1,5 +1,5 @@
 /** Usage navigation presents observations; pricing, source and display configuration live in Settings. */
-import { useEffect, useRef, useState, useMemo, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import {
   enumerateDays,
   enumerateHourStarts,
@@ -19,9 +19,7 @@ const UsageStatsPanel = lazy(() =>
     default: module.UsageStatsPanel,
   })),
 );
-import { RefreshCwIcon } from "lucide-react";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
-import { cn } from "../../../tools/parity/src/bridges/utils";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
   Toggle,
@@ -32,6 +30,7 @@ import { hour12ForTimestampFormat } from "./host";
 import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
+import { useRefreshStatus } from "./refreshStatus";
 import { localizeEnvironmentError } from "./notices";
 import { PeriodToggle } from "./PeriodToggle";
 import { useIsReadOnly } from "../web/readOnly";
@@ -58,46 +57,10 @@ export function UsagePage({
       : data.display.value.metric === "tokens"
         ? "tokens"
         : "cost";
-  useEffect(
-    () => data.setUsageActive(isActive, metric),
-    [data.setUsageActive, isActive, metric],
-  );
-  const refreshRef = useRef(data.refresh);
-  refreshRef.current = data.refresh;
   const [limitsNow, setLimitsNow] = useState(Date.now);
-  const environmentKey =
-    data.snapshot?.environments
-      .filter(
-        (value) =>
-          data.selected === null || data.selected.has(value.environmentId),
-      )
-      .map((value) => `${value.environmentId}:${value.connected}`)
-      .join(";") ?? "";
-  const selectionKey =
-    data.selected === null ? "all" : [...data.selected].sort().join(";");
   useEffect(() => {
-    if (!isActive || !environmentKey) return;
-    setLimitsNow(Date.now());
-    void refreshRef.current(false, true);
-    /** Refresh on actual foreground activity; hidden/minimized settings never start automatic scans. */
-    const activity = () => {
-      if (document.visibilityState === "visible")
-        void refreshRef.current(false, true);
-    };
-    window.addEventListener("focus", activity);
-    document.addEventListener("visibilitychange", activity);
-    return () => {
-      window.removeEventListener("focus", activity);
-      document.removeEventListener("visibilitychange", activity);
-    };
-  }, [
-    isActive,
-    metric,
-    data.display.value.windowDays,
-    selectionKey,
-    environmentKey,
-    data.display.value.shouldAutoRefresh,
-  ]);
+    if (isActive) setLimitsNow(Date.now());
+  }, [isActive, data.snapshot]);
   const selected = useMemo(
     () =>
       data.snapshot?.environments.filter(
@@ -142,17 +105,17 @@ export function UsagePage({
     selected.every(
       (value) => !value.summary || value.summary.sources.length === 0,
     );
-  const statusLabel = data.isBusy
-    ? answered === 0
+  const refreshStatus = useRefreshStatus();
+  const statusLabel =
+    data.isBusy && answered === 0 && metric !== "limits"
       ? t("Scanning…")
-      : t("Refreshing…")
-    : data.snapshot
-      ? selected.length === 0
-        ? t("No environments selected")
-        : answered === 0 && metric !== "limits"
-          ? t("Unavailable")
-          : null
-      : t("Loading…");
+      : data.snapshot
+        ? selected.length === 0
+          ? t("No environments selected")
+          : answered === 0 && metric !== "limits" && !data.isBusy
+            ? t("Unavailable")
+            : refreshStatus
+        : t("Loading…");
   return (
     <section
       className="usage-page"
@@ -161,31 +124,6 @@ export function UsagePage({
       <PageHeader
         title={view === "limits" ? t("Quota") : t("Usage")}
         status={statusLabel}
-        actions={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={
-              data.isBusy
-                ? t("Refreshing…")
-                : metric === "limits"
-                  ? t("Refresh limits")
-                  : t("Refresh usage")
-            }
-            title={`${t("Refresh")} (Ctrl+R)`}
-            aria-busy={data.isBusy}
-            disabled={data.isBusy}
-            onClick={() => {
-              setLimitsNow(Date.now());
-              void data.refresh(true, true);
-            }}
-          >
-            <RefreshCwIcon
-              aria-hidden
-              className={cn(data.isBusy && "animate-spin")}
-            />
-          </Button>
-        }
       >
         {view === "statistics" && (
           <>
@@ -273,7 +211,7 @@ export function UsagePage({
                       : stillReporting > 0
                         ? t("Waiting for usage reports…")
                         : t(
-                            "No usage report is available. Refresh or review the selected environments.",
+                            "No usage report is available. Review the selected environments.",
                           )}
                   </EmptyState>
                   {commitMarker}
