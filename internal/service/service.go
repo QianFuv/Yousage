@@ -105,7 +105,10 @@ type Service struct {
 	rates             *refresh.Coordinator[RateSnapshot]
 	gate              quota.Gate
 	Emit              func(string, any)
-	Now               func() time.Time
+	// OnConnected requests an automatic refresh after a remote becomes ready.
+	// Configure it before starting connection workers; it must return promptly.
+	OnConnected func()
+	Now         func() time.Time
 }
 type connectionState struct {
 	preference ConnectionPreference

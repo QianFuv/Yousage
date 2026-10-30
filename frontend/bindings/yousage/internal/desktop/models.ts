@@ -37,6 +37,49 @@ export class Bootstrap {
     }
 }
 
+/**
+ * RefreshState reports global refresh progress without exposing provider data.
+ */
+export class RefreshState {
+    /**
+     * IsRefreshing is true from cycle start through the final invalidation.
+     */
+    "isRefreshing": boolean;
+
+    /**
+     * LastCompletedAt is the last cycle's UTC RFC3339 completion time, or empty.
+     */
+    "lastCompletedAt": string;
+
+    /**
+     * LastError is a fixed safe failure notice, cleared by a successful cycle.
+     */
+    "lastError": string;
+
+    /** Creates a new RefreshState instance. */
+    constructor($$source: Partial<RefreshState> = {}) {
+        if (!("isRefreshing" in $$source)) {
+            this["isRefreshing"] = false;
+        }
+        if (!("lastCompletedAt" in $$source)) {
+            this["lastCompletedAt"] = "";
+        }
+        if (!("lastError" in $$source)) {
+            this["lastError"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RefreshState instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RefreshState {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new RefreshState($$parsedSource as Partial<RefreshState>);
+    }
+}
+
 export class SavedSources {
     "revision": number;
     "value": preferences$0.Source[];

@@ -39,8 +39,8 @@ func TestClaudeScanFailureNoticesAndObservations(test *testing.T) {
 	service.Environment["YOUSAGE_FIXTURE_SECRET"] = secretMarker
 	service.Environment["YOUSAGE_FIXTURE_SCENARIO"] = "init-error"
 	for range 2 {
-		if _, err := service.scanLimits(ctx); err != nil {
-			test.Fatal(err)
+		if _, err := service.scanLimits(ctx); err == nil {
+			test.Fatal("probe failure was reported as success")
 		}
 		result, _, err := service.quotas(ctx)
 		if err != nil || len(result.Providers) != 1 {
@@ -76,8 +76,8 @@ func TestClaudeScanFailureNoticesAndObservations(test *testing.T) {
 	}
 	for _, scenario := range []string{"usage-auth", "usage-network-error", "usage-protocol"} {
 		service.Environment["YOUSAGE_FIXTURE_SCENARIO"] = scenario
-		if _, err := service.scanLimits(ctx); err != nil {
-			test.Fatal(err)
+		if _, err := service.scanLimits(ctx); err == nil {
+			test.Fatal("probe failure was reported as success")
 		}
 		result, _, err := service.quotas(ctx)
 		if err != nil || result.Error == "" || !strings.Contains(result.Error, "Last successful limits are retained.") || strings.Contains(result.Error, "No previous") {

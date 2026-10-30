@@ -2,26 +2,39 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 	"yousage/internal/refresh"
 )
 
-const backgroundRefreshInterval = 15 * time.Minute
+const (
+	visibleRefreshInterval    = 5 * time.Minute
+	backgroundRefreshInterval = 15 * time.Minute
+	refreshClockInterval      = 30 * time.Second
+)
 
-// backgroundRefreshOptions supplies sync eligibility. Configure callbacks before
-// ServiceStartup; callbacks must support concurrent reads. After changing sync
-// settings, call backgroundRefresh.reconcile to apply eligibility immediately.
-// The hook runs after all period and limits refresh attempts, including partial failures, so sync
-// can publish retained last-good values. It must return promptly.
-type backgroundRefreshOptions struct {
-	isSyncEnabled func() bool
-	timeZone      func() string
-	newTicker     func(time.Duration) backgroundRefreshTicker
-	onRefreshed   func()
+// RefreshState reports global refresh progress without exposing provider data.
+type RefreshState struct {
+	// IsRefreshing is true from cycle start through the final invalidation.
+	IsRefreshing bool `json:"isRefreshing"`
+	// LastCompletedAt is the last cycle's UTC RFC3339 completion time, or empty.
+	LastCompletedAt string `json:"lastCompletedAt"`
+	// LastError is a fixed safe failure notice, cleared by a successful cycle.
+	LastError string `json:"lastError"`
 }
 
-// backgroundRefreshTicker permits deterministic scheduling without a wall clock.
+// backgroundRefreshOptions must be configured before starting the controller.
+// Callbacks must support concurrent reads and return promptly.
+type backgroundRefreshOptions struct {
+	isSyncEnabled  func() bool
+	timeZone       func() string
+	newTicker      func(time.Duration) backgroundRefreshTicker
+	now            func() time.Time
+	onRefreshed    func()
+	onStateChanged func(RefreshState)
+}
+
 type backgroundRefreshTicker interface {
 	ticks() <-chan time.Time
 	stop()
@@ -32,27 +45,26 @@ type backgroundTicker struct{ *time.Ticker }
 func (ticker backgroundTicker) ticks() <-chan time.Time { return ticker.C }
 func (ticker backgroundTicker) stop()                   { ticker.Stop() }
 
-// backgroundRefreshController owns at most one serial worker, including while a
-// cancelled refresh finishes. Disabled sync creates neither a worker nor a ticker.
+// backgroundRefreshController owns one serial worker and one pending kick.
+// Eligibility changes never overlap or abandon a running cycle; close cancels it.
 type backgroundRefreshController struct {
 	mutex         sync.Mutex
 	context       context.Context
 	options       backgroundRefreshOptions
 	isAutoEnabled func() bool
-	refreshUsage  func(context.Context, int, string, []string, refresh.Request) error
-	refreshLimits func(context.Context, []string, refresh.Request) error
+	refreshCycle  func(context.Context, string, refresh.Request) error
 	isVisible     bool
 	isClosed      bool
+	pending       bool
+	isManual      bool
 	cancel        context.CancelFunc
 	done          chan struct{}
-	ticker        backgroundRefreshTicker
+	wake          chan struct{}
+	state         RefreshState
 }
 
-// newBackgroundRefreshController defaults to disabled sync and UTC without saved
-// settings. No work starts until visibility and eligibility are reconciled.
 func newBackgroundRefreshController(ctx context.Context, options backgroundRefreshOptions, isAutoEnabled func() bool,
-	refreshUsage func(context.Context, int, string, []string, refresh.Request) error,
-	refreshLimits func(context.Context, []string, refresh.Request) error) *backgroundRefreshController {
+	refreshCycle func(context.Context, string, refresh.Request) error) *backgroundRefreshController {
 	if options.isSyncEnabled == nil {
 		options.isSyncEnabled = func() bool { return false }
 	}
@@ -64,22 +76,30 @@ func newBackgroundRefreshController(ctx context.Context, options backgroundRefre
 			return backgroundTicker{time.NewTicker(interval)}
 		}
 	}
+	if options.now == nil {
+		options.now = time.Now
+	}
 	if options.onRefreshed == nil {
 		options.onRefreshed = func() {}
 	}
+	if options.onStateChanged == nil {
+		options.onStateChanged = func(RefreshState) {}
+	}
 	return &backgroundRefreshController{context: ctx, options: options, isAutoEnabled: isAutoEnabled,
-		refreshUsage: refreshUsage, refreshLimits: refreshLimits, isVisible: true}
+		refreshCycle: refreshCycle, isVisible: true, wake: make(chan struct{}, 1)}
 }
 
-// setVisibility applies the same effective visibility emitted to the frontend.
 func (controller *backgroundRefreshController) setVisibility(isVisible bool) {
 	controller.mutex.Lock()
 	defer controller.mutex.Unlock()
+	wasVisible := controller.isVisible
 	controller.isVisible = isVisible
+	if isVisible && !wasVisible && controller.shouldRunLocked() {
+		controller.pending = true
+	}
 	controller.reconcileLocked()
 }
 
-// reconcile applies sync and auto-refresh changes without waiting for a tick.
 func (controller *backgroundRefreshController) reconcile() {
 	controller.mutex.Lock()
 	defer controller.mutex.Unlock()
@@ -87,69 +107,117 @@ func (controller *backgroundRefreshController) reconcile() {
 }
 
 func (controller *backgroundRefreshController) shouldRunLocked() bool {
-	return !controller.isClosed && controller.context.Err() == nil && !controller.isVisible &&
-		controller.options.isSyncEnabled() && controller.isAutoEnabled()
+	return !controller.isClosed && controller.context.Err() == nil && controller.isAutoEnabled() &&
+		(controller.isVisible || controller.options.isSyncEnabled())
+}
+
+// request coalesces kicks, preserving manual intent even when auto refresh is off.
+func (controller *backgroundRefreshController) request(isManual bool) error {
+	controller.mutex.Lock()
+	defer controller.mutex.Unlock()
+	if controller.isClosed || controller.context.Err() != nil {
+		return errors.New("refresh is unavailable while the application is closing")
+	}
+	if !isManual && !controller.shouldRunLocked() {
+		return nil
+	}
+	controller.pending = true
+	controller.isManual = controller.isManual || isManual
+	controller.reconcileLocked()
+	return nil
 }
 
 func (controller *backgroundRefreshController) reconcileLocked() {
-	if !controller.shouldRunLocked() {
+	if controller.isClosed || controller.context.Err() != nil {
 		if controller.cancel != nil {
 			controller.cancel()
-			controller.ticker.stop()
 		}
 		return
 	}
-	if controller.done != nil {
-		return
+	if controller.done == nil && (controller.shouldRunLocked() || controller.isManual) {
+		ctx, cancel := context.WithCancel(controller.context)
+		controller.cancel = cancel
+		controller.done = make(chan struct{})
+		controller.pending = true
+		go controller.run(ctx)
 	}
-	ctx, cancel := context.WithCancel(controller.context)
-	controller.cancel = cancel
-	controller.done = make(chan struct{})
-	controller.ticker = controller.options.newTicker(backgroundRefreshInterval)
-	go controller.run(ctx, controller.ticker)
+	select {
+	case controller.wake <- struct{}{}:
+	default:
+	}
 }
 
-// run waits a full interval before querying, rechecks flags on every tick, and
-// never starts another cycle until every published window, limits, and the hook have returned.
-func (controller *backgroundRefreshController) run(ctx context.Context, ticker backgroundRefreshTicker) {
-	defer func() {
-		controller.mutex.Lock()
-		defer controller.mutex.Unlock()
-		ticker.stop()
-		controller.cancel()
-		close(controller.done)
-		controller.done, controller.cancel, controller.ticker = nil, nil, nil
-		controller.reconcileLocked()
-	}()
+// run checks wall time on a short heartbeat. Go timers use monotonic time, which
+// may pause during sleep on some platforms; a resumed app checks overdue work
+// within one heartbeat without replaying missed intervals or probing every tick.
+func (controller *backgroundRefreshController) run(ctx context.Context) {
+	ticker := controller.options.newTicker(refreshClockInterval)
+	defer ticker.stop()
+	var completedAt time.Time
 	for {
+		controller.mutex.Lock()
+		canRun := controller.shouldRunLocked()
+		if ctx.Err() != nil || (!canRun && !controller.isManual) {
+			controller.cancel()
+			close(controller.done)
+			controller.done, controller.cancel = nil, nil
+			controller.pending, controller.isManual = false, false
+			controller.mutex.Unlock()
+			return
+		}
+		interval := backgroundRefreshInterval
+		if controller.isVisible {
+			interval = visibleRefreshInterval
+		}
+		now := controller.options.now().Round(0)
+		isDue := completedAt.IsZero() || !now.Before(completedAt.Add(interval))
+		shouldRefresh := controller.pending || (canRun && isDue)
+		request := refresh.Request{IsManual: controller.isManual, IsBackground: true, IsAutoEnabled: canRun}
+		controller.pending, controller.isManual = false, false
+		controller.mutex.Unlock()
+		if shouldRefresh {
+			controller.updateState(true, time.Time{}, "")
+			err := controller.refreshCycle(ctx, controller.options.timeZone(), request)
+			completedAt = controller.options.now().Round(0)
+			message := ""
+			if err != nil {
+				message = "Usage or limits could not be fully refreshed. Last successful data is retained when available."
+			}
+			if ctx.Err() != nil {
+				message = "Refresh was cancelled."
+			}
+			controller.updateState(false, completedAt, message)
+			if ctx.Err() == nil {
+				controller.options.onRefreshed()
+			}
+			continue
+		}
 		select {
 		case <-ctx.Done():
-			return
+		case <-controller.wake:
 		case <-ticker.ticks():
-			controller.mutex.Lock()
-			shouldRun := ctx.Err() == nil && controller.shouldRunLocked()
-			controller.mutex.Unlock()
-			if !shouldRun {
-				return
-			}
-			request := refresh.Request{IsBackground: true, IsAutoEnabled: true}
-			zone := controller.options.timeZone()
-			for _, days := range []int{1, 7, 30, 90} {
-				_ = controller.refreshUsage(ctx, days, zone, nil, request)
-				if ctx.Err() != nil {
-					return
-				}
-			}
-			_ = controller.refreshLimits(ctx, nil, request)
-			if ctx.Err() != nil {
-				return
-			}
-			controller.options.onRefreshed()
 		}
 	}
 }
 
-// close cancels scheduling and joins the worker before services are torn down.
+func (controller *backgroundRefreshController) updateState(isRefreshing bool, completedAt time.Time, lastError string) {
+	controller.mutex.Lock()
+	controller.state.IsRefreshing = isRefreshing
+	if !isRefreshing {
+		controller.state.LastCompletedAt = completedAt.UTC().Format(time.RFC3339)
+		controller.state.LastError = lastError
+	}
+	state := controller.state
+	controller.mutex.Unlock()
+	controller.options.onStateChanged(state)
+}
+
+func (controller *backgroundRefreshController) snapshot() RefreshState {
+	controller.mutex.Lock()
+	defer controller.mutex.Unlock()
+	return controller.state
+}
+
 func (controller *backgroundRefreshController) close() {
 	controller.mutex.Lock()
 	controller.isClosed = true

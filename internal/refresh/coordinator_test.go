@@ -3,6 +3,7 @@ package refresh
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -110,7 +111,7 @@ func TestCooldownAtCompletionFailureRetentionAndManualBypass(t *testing.T) {
 	if err != nil || snapshot.Value != 42 || snapshot.CompletedAt != now {
 		t.Fatal(snapshot, err)
 	}
-	now = now.Add(4 * time.Minute)
+	now = now.Add(30 * time.Second)
 	if _, err := coordinator.Run(ctx, "local", automatic(), success); !errors.Is(err, ErrSkipped) {
 		t.Fatal("cooldown started at request rather than completion", err)
 	}
@@ -243,5 +244,50 @@ func TestConfigurationRefreshWaitsPastAnInterveningOldRequest(t *testing.T) {
 	snapshot, err := coordinator.Run(ctx, "local", Request{IsManual: true, AfterPending: true}, func(context.Context) (int, error) { didReadNewConfiguration = true; return 3, nil })
 	if err != nil || !didReadNewConfiguration || snapshot.Value != 3 {
 		t.Fatal("new configuration joined old work", snapshot, err)
+	}
+}
+
+// TestLimitsCooldownDoesNotSkipScheduledRound reproduces a probe four minutes before a scheduled tick.
+func TestLimitsCooldownDoesNotSkipScheduledRound(t *testing.T) {
+	coordinator := New[int](LimitsPolicy)
+	defer coordinator.Close()
+	now := time.Date(2026, 10, 30, 18, 53, 43, 0, time.UTC)
+	coordinator.clock = func() time.Time { return now }
+	calls := 0
+	operation := func(context.Context) (int, error) { calls++; return calls, nil }
+	if _, err := coordinator.Run(context.Background(), "limits", Request{IsManual: true}, operation); err != nil {
+		t.Fatal(err)
+	}
+	request := Request{IsBackground: true, IsAutoEnabled: true}
+	now = now.Add(30 * time.Second)
+	if _, err := coordinator.Run(context.Background(), "limits", request, operation); !errors.Is(err, ErrSkipped) {
+		t.Fatal("rapid automatic probe was not throttled")
+	}
+	now = time.Date(2026, 10, 30, 18, 57, 48, 0, time.UTC)
+	if _, err := coordinator.Run(context.Background(), "limits", request, operation); err != nil || calls != 2 {
+		t.Fatal("scheduled limits round was skipped", err, calls)
+	}
+}
+
+// TestAutomaticCycleJoinsPendingWithoutAnotherProbe preserves completion ordering.
+func TestAutomaticCycleJoinsPendingWithoutAnotherProbe(t *testing.T) {
+	coordinator := New[int](LimitsPolicy)
+	defer coordinator.Close()
+	started, release := make(chan struct{}), make(chan struct{})
+	first := make(chan error, 1)
+	go func() {
+		_, err := coordinator.Run(context.Background(), "limits", Request{IsManual: true}, func(context.Context) (int, error) { close(started); <-release; return 42, nil })
+		first <- err
+	}()
+	<-started
+	var once sync.Once
+	ctx := &interleavingContext{Context: context.Background(), onDone: func() { once.Do(func() { close(release) }) }}
+	snapshot, err := coordinator.Run(ctx, "limits", Request{IsBackground: true, IsAutoEnabled: true, WaitForPending: true}, func(context.Context) (int, error) { t.Error("joined cycle probed again"); return 0, nil })
+	once.Do(func() { close(release) })
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	if err != nil || snapshot.Value != 42 {
+		t.Fatal("automatic cycle did not wait for existing work", snapshot, err)
 	}
 }

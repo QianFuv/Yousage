@@ -98,6 +98,10 @@ type deferredUsageInvalidationKey struct{}
 
 // RefreshLimits returns after limits work and schedules coalesced local history and rates.
 func (service *Service) RefreshLimits(ctx context.Context, selected []string, request refresh.Request) error {
+	return service.refreshLimits(ctx, selected, request, true)
+}
+
+func (service *Service) refreshLimits(ctx context.Context, selected []string, request refresh.Request, shouldFollowup bool) error {
 	configuration, err := service.Configuration(ctx)
 	if err != nil {
 		return err
@@ -111,7 +115,9 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 	if isSelected(service.LocalId) {
 		operations["local"] = func(owner context.Context) (bool, error) {
 			value, err := service.scanLimits(owner)
-			service.startLimitsFollowup(request)
+			if shouldFollowup {
+				service.startLimitsFollowup(request)
+			}
 			return value, err
 		}
 	}
@@ -146,9 +152,12 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 		pending.Add(1)
 		go func() {
 			defer pending.Done()
-			_, err := service.limits.Run(ctx, identity, request, operation)
-			if identity == "local" && errors.Is(err, refresh.ErrSkipped) {
+			snapshot, err := service.limits.Run(ctx, identity, request, operation)
+			if shouldFollowup && identity == "local" && errors.Is(err, refresh.ErrSkipped) {
 				service.startLimitsFollowup(request)
+			}
+			if request.WaitForPending && errors.Is(err, refresh.ErrSkipped) {
+				err = snapshot.Error
 			}
 			if err != nil && !errors.Is(err, refresh.ErrSkipped) {
 				failures <- err
@@ -321,6 +330,14 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 		_, err = service.Store.WriteSetting(ctx, "local-quotas", revision, next)
 		if err == nil {
 			service.recordQuotaSamples(ctx, configuration.Value.Providers, providers, isFresh)
+			if next.Error != "" {
+				return errors.New("some limits probes failed; last successful limits are retained when available")
+			}
+			for _, source := range next.Sources {
+				if source.Error != "" {
+					return errors.New("some limits sources failed; last successful limits are retained when available")
+				}
+			}
 		}
 		return err
 	})

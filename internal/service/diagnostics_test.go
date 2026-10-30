@@ -50,8 +50,8 @@ func TestClaudeDiagnosticScanHook(test *testing.T) {
 		test.Fatal(err)
 	}
 	service.SetDiagnostics(store)
-	if _, err := service.scanLimits(ctx); err != nil {
-		test.Fatal(err)
+	if _, err := service.scanLimits(ctx); err == nil {
+		test.Fatal("probe failure was reported as success")
 	}
 	first, err := store.Report()
 	if err != nil {
@@ -77,8 +77,8 @@ func TestClaudeDiagnosticScanHook(test *testing.T) {
 	if _, err := service.Store.WriteSetting(ctx, "local-quotas", revision, previous); err != nil {
 		test.Fatal(err)
 	}
-	if _, err := service.scanLimits(ctx); err != nil {
-		test.Fatal(err)
+	if _, err := service.scanLimits(ctx); err == nil {
+		test.Fatal("probe failure was reported as success")
 	}
 	result, _, err := service.quotas(ctx)
 	if err != nil || !reflect.DeepEqual(result.Providers[0].Limits, accepted) {
@@ -123,8 +123,8 @@ func TestClaudeDiagnosticScanHook(test *testing.T) {
 	if err := os.Mkdir(filepath.Join(logDirectory, "go.jsonl"), 0700); err != nil {
 		test.Fatal(err)
 	}
-	if _, err := service.scanLimits(ctx); err != nil {
-		test.Fatal("log failure changed probe result", err)
+	if _, err := service.scanLimits(ctx); err == nil {
+		test.Fatal("probe failure was hidden when logging failed")
 	}
 	result, _, err = service.quotas(ctx)
 	if err != nil || !reflect.DeepEqual(result.Providers[0].Limits, accepted) {

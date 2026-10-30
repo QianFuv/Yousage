@@ -52,6 +52,7 @@ type App struct {
 	usage                   *dataservice.Service
 	syncEngine              *datasync.Engine
 	backgroundRefresh       *backgroundRefreshController
+	refreshMutex            sync.Mutex
 	backgroundOptions       backgroundRefreshOptions
 	windowMutex             sync.Mutex
 	normalBounds            preferences.WindowBounds
@@ -143,21 +144,25 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 		usage.Close()
 		return err
 	}
-	service.backgroundRefresh = newBackgroundRefreshController(ctx, service.backgroundOptions, func() bool {
+	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
+	service.backgroundOptions.onStateChanged = func(state RefreshState) { service.nativeApp.Event.Emit("refresh-state", state) }
+	controller := newBackgroundRefreshController(ctx, service.backgroundOptions, func() bool {
 		display, err := usage.Preferences.Display(ctx)
 		return err == nil && display.Value.ShouldAutoRefresh
-	}, usage.RefreshUsage, usage.RefreshLimits)
-	if service.window != nil {
-		service.backgroundRefresh.setVisibility(service.window.IsVisible() && !service.window.IsMinimised())
-	}
-	usage.Emit = func(name string, value any) { service.nativeApp.Event.Emit(name, value) }
-	usage.ReconcileConnections()
+	}, usage.RefreshCycle)
+	usage.OnConnected = func() { _ = controller.request(false) }
 	if display, err := usage.Preferences.Display(ctx); err == nil {
 		service.setCloseToTray(display.Value.ShouldCloseToTray)
 		service.windowMutex.Lock()
 		service.isWaitingInTray = display.Value.ShouldStartMinimized && !hasNativeSmokeArgument()
 		service.windowMutex.Unlock()
 	}
+	if service.window != nil {
+		controller.setVisibility(service.window.IsVisible() && !service.window.IsMinimised())
+	} else {
+		controller.setVisibility(!service.isWaitingInTray)
+	}
+	usage.ReconcileConnections()
 	watcher, cancel := context.WithCancel(ctx)
 	service.themeCancel = cancel
 	service.themeDone = make(chan struct{})
@@ -174,6 +179,9 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 		}
 	}()
 	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventStartup, Outcome: diagnostics.OutcomeSucceeded})
+	service.refreshMutex.Lock()
+	service.backgroundRefresh = controller
+	service.refreshMutex.Unlock()
 	return nil
 }
 
@@ -203,6 +211,28 @@ func (service *App) ServiceShutdown() error {
 	service.logMutex.Lock()
 	defer service.logMutex.Unlock()
 	return service.logFile.Close()
+}
+
+// RequestRefresh promptly queues a global manual refresh, including when automatic refresh is disabled.
+func (service *App) RequestRefresh() error {
+	service.refreshMutex.Lock()
+	controller := service.backgroundRefresh
+	service.refreshMutex.Unlock()
+	if controller == nil {
+		return errors.New("refresh is not ready")
+	}
+	return controller.request(true)
+}
+
+// GetRefreshState returns global refresh status, or zero before startup initializes it.
+func (service *App) GetRefreshState() RefreshState {
+	service.refreshMutex.Lock()
+	controller := service.backgroundRefresh
+	service.refreshMutex.Unlock()
+	if controller == nil {
+		return RefreshState{}
+	}
+	return controller.snapshot()
 }
 
 // GetUsage returns the requested live/cached environment aggregates.

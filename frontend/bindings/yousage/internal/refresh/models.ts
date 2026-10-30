@@ -5,6 +5,9 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+/**
+ * Request describes refresh intent and coalescing behavior.
+ */
 export class Request {
     "IsManual": boolean;
     "IsVisible": boolean;
@@ -16,6 +19,11 @@ export class Request {
      * IsBackground permits automatic refresh while hidden or outside Usage.
      */
     "IsBackground": boolean;
+
+    /**
+     * WaitForPending joins existing work without forcing an additional probe.
+     */
+    "WaitForPending": boolean;
 
     /** Creates a new Request instance. */
     constructor($$source: Partial<Request> = {}) {
@@ -36,6 +44,9 @@ export class Request {
         }
         if (!("IsBackground" in $$source)) {
             this["IsBackground"] = false;
+        }
+        if (!("WaitForPending" in $$source)) {
+            this["WaitForPending"] = false;
         }
 
         Object.assign(this, $$source);

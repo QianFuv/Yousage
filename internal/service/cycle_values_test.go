@@ -234,8 +234,8 @@ func TestScanLimitsRecordsOnlyFreshProbes(test *testing.T) {
 	}
 	first := series[0].Samples[0]
 	service.Environment["YOUSAGE_CODEX_SCENARIO"] = "rpc-error"
-	if _, err := service.scanLimits(ctx); err != nil {
-		test.Fatal(err)
+	if _, err := service.scanLimits(ctx); err == nil {
+		test.Fatal("probe failure was reported as success")
 	}
 	if _, err := service.Store.ReadSetting(ctx, "quota-samples", &series); err != nil || len(series[0].Samples) != 1 || series[0].Samples[0].CheckedAt != first.CheckedAt {
 		test.Fatal("failed probe created a sample", err)

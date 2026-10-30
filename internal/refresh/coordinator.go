@@ -13,13 +13,18 @@ var ErrSkipped = errors.New("automatic refresh skipped")
 type Policy struct{ StaleAfter, CompletionCooldown, ManualFloor time.Duration }
 
 var HistoryPolicy = Policy{StaleAfter: time.Minute}
-var LimitsPolicy = Policy{CompletionCooldown: 5 * time.Minute}
+
+// LimitsPolicy protects rapid retries while remaining below the global refresh cadence.
+var LimitsPolicy = Policy{CompletionCooldown: time.Minute}
 var RatesPolicy = Policy{StaleAfter: 24 * time.Hour, ManualFloor: time.Minute}
 
+// Request describes refresh intent and coalescing behavior.
 type Request struct {
 	IsManual, IsVisible, IsUsagePage, IsAutoEnabled, AfterPending bool
 	// IsBackground permits automatic refresh while hidden or outside Usage.
 	IsBackground bool
+	// WaitForPending joins existing work without forcing an additional probe.
+	WaitForPending bool
 }
 type Snapshot[T any] struct {
 	Value                                 T
@@ -68,7 +73,7 @@ func (coordinator *Coordinator[T]) Run(ctx context.Context, key string, request 
 	}
 	if pending := held.pending; pending != nil {
 		coordinator.mutex.Unlock()
-		if !request.IsManual && !request.AfterPending {
+		if !request.IsManual && !request.AfterPending && !request.WaitForPending {
 			return Snapshot[T]{}, ErrSkipped
 		}
 		select {

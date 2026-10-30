@@ -76,6 +76,9 @@ func (service *Service) connectionLoop(ctx context.Context, preference Connectio
 			state.client = client
 			state.error = ""
 			service.mutex.Unlock()
+			if service.OnConnected != nil {
+				service.OnConnected()
+			}
 			service.emit("usage-invalidated", nil)
 			err = client.Subscribe(ctx, func(raw json.RawMessage) error {
 				service.mutex.Lock()
@@ -287,7 +290,7 @@ func (service *Service) RefreshUsage(ctx context.Context, days int, zone string,
 			continue
 		}
 		start(func() error {
-			_, err := service.history.Run(ctx, "remote:"+identity+":"+windowKey(window), request, func(owner context.Context) (bool, error) {
+			snapshot, err := service.history.Run(ctx, "remote:"+identity+":"+windowKey(window), request, func(owner context.Context) (bool, error) {
 				service.mutex.Lock()
 				state := service.connections[identity]
 				var client *remote.Client
@@ -334,6 +337,9 @@ func (service *Service) RefreshUsage(ctx context.Context, days int, zone string,
 				return true, rateError
 			})
 			if errors.Is(err, refresh.ErrSkipped) {
+				if request.WaitForPending {
+					return snapshot.Error
+				}
 				return nil
 			}
 			return err

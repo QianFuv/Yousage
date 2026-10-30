@@ -8,6 +8,7 @@ export {
 
 export {
     Bootstrap,
+    RefreshState,
     SavedSources,
     ThemeFileInput,
     TrayLabels

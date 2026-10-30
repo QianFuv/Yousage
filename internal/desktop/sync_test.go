@@ -153,8 +153,8 @@ func TestDesktopRefreshCompletionTriggersSyncAndSaveReconcilesBackground(test *t
 	app.backgroundRefresh = newBackgroundRefreshController(app.context, backgroundRefreshOptions{
 		isSyncEnabled: func() bool { return engine.Settings().IsEnabled },
 		timeZone:      func() string { return engine.Settings().TimeZone },
-		newTicker:     backgroundTickerFactory(test, created), onRefreshed: engine.Trigger,
-	}, func() bool { return true }, app.usage.RefreshUsage, app.usage.RefreshLimits)
+		newTicker:     backgroundTickerFactory(test, created),
+	}, func() bool { return true }, func(context.Context, string, refresh.Request) error { return nil })
 	app.backgroundRefresh.setVisibility(false)
 	if _, err = app.SaveSync(datasync.SaveInput{IsEnabled: true, RelayUrl: "https://relay.example", Token: "synthetic-token"}); err != nil {
 		test.Fatal(err)

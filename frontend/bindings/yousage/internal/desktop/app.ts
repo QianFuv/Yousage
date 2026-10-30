@@ -191,11 +191,20 @@ export function GetReceipt(days: number, timeZone: string): $CancellablePromise<
 }
 
 /**
+ * GetRefreshState returns global refresh status, or zero before startup initializes it.
+ */
+export function GetRefreshState(): $CancellablePromise<$models.RefreshState> {
+    return $Call.ByID(179581928).then(($result: any) => {
+        return $$createType12($result);
+    });
+}
+
+/**
  * GetSources returns saved source choices independently of quota enablement.
  */
 export function GetSources(): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(3891224558).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType13($result);
     });
 }
 
@@ -204,7 +213,7 @@ export function GetSources(): $CancellablePromise<$models.SavedSources> {
  */
 export function GetSpeedReport(days: number, timeZone: string): $CancellablePromise<service$0.SpeedReport> {
     return $Call.ByID(1696078537, days, timeZone).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType14($result);
     });
 }
 
@@ -213,7 +222,7 @@ export function GetSpeedReport(days: number, timeZone: string): $CancellableProm
  */
 export function GetSync(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(4074763935).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType15($result);
     });
 }
 
@@ -222,7 +231,7 @@ export function GetSync(): $CancellablePromise<sync$0.State> {
  */
 export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
     return $Call.ByID(2994566643, days, timeZone).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType16($result);
     });
 }
 
@@ -245,7 +254,7 @@ export function OpenExternal(destination: string): $CancellablePromise<void> {
  */
 export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
     return $Call.ByID(3805514037, origin, label, bootstrap, isReadOnly).then(($result: any) => {
-        return $$createType16($result);
+        return $$createType17($result);
     });
 }
 
@@ -254,7 +263,7 @@ export function PairEnvironment(origin: string, label: string, bootstrap: string
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(4260808657).then(($result: any) => {
-        return $$createType18($result);
+        return $$createType19($result);
     });
 }
 
@@ -263,7 +272,7 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  */
 export function PreviewShare(request: sync$0.ShareRequest): $CancellablePromise<sync$0.SharePayload> {
     return $Call.ByID(352551935, request).then(($result: any) => {
-        return $$createType19($result);
+        return $$createType20($result);
     });
 }
 
@@ -272,7 +281,7 @@ export function PreviewShare(request: sync$0.ShareRequest): $CancellablePromise<
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3937500892, paths).then(($result: any) => {
-        return $$createType18($result);
+        return $$createType19($result);
     });
 }
 
@@ -306,11 +315,18 @@ export function RefreshUsage(days: number, timeZone: string, selected: string[],
 }
 
 /**
+ * RequestRefresh promptly queues a global manual refresh, including when automatic refresh is disabled.
+ */
+export function RequestRefresh(): $CancellablePromise<void> {
+    return $Call.ByID(2341435952);
+}
+
+/**
  * RevokeShare removes a published share and its local record.
  */
 export function RevokeShare(id: string): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2387546301, id).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType15($result);
     });
 }
 
@@ -319,7 +335,7 @@ export function RevokeShare(id: string): $CancellablePromise<sync$0.State> {
  */
 export function RotatePairing(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2621478377).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType15($result);
     });
 }
 
@@ -355,7 +371,7 @@ export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellableProm
  */
 export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(430430537, saved).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType13($result);
     });
 }
 
@@ -364,7 +380,7 @@ export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$m
  */
 export function SaveSync(input: sync$0.SaveInput): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2010684434, input).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType15($result);
     });
 }
 
@@ -417,7 +433,7 @@ export function SyncAppearance(isDark: boolean, red: number, green: number, blue
  */
 export function SyncNow(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2065172309).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType15($result);
     });
 }
 
@@ -441,11 +457,12 @@ const $$createType8 = service$0.SavedConfiguration.createFrom;
 const $$createType9 = preferences$0.SavedDisplay.createFrom;
 const $$createType10 = service$0.LossReport.createFrom;
 const $$createType11 = service$0.Receipt.createFrom;
-const $$createType12 = $models.SavedSources.createFrom;
-const $$createType13 = service$0.SpeedReport.createFrom;
-const $$createType14 = sync$0.State.createFrom;
-const $$createType15 = service$0.Snapshot.createFrom;
-const $$createType16 = service$0.ConnectionPreference.createFrom;
-const $$createType17 = $models.ThemeFileInput.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = sync$0.SharePayload.createFrom;
+const $$createType12 = $models.RefreshState.createFrom;
+const $$createType13 = $models.SavedSources.createFrom;
+const $$createType14 = service$0.SpeedReport.createFrom;
+const $$createType15 = sync$0.State.createFrom;
+const $$createType16 = service$0.Snapshot.createFrom;
+const $$createType17 = service$0.ConnectionPreference.createFrom;
+const $$createType18 = $models.ThemeFileInput.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = sync$0.SharePayload.createFrom;
