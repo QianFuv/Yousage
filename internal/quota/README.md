@@ -5,6 +5,9 @@
 额度与历史费用相互独立：
 
 - **Codex**：`initialize` / `account/read` / `account/rateLimits/read`，不发起模型请求。
+  额度读取返回 JSON-RPC 错误时，在原有截止时间内间隔 100 毫秒最多重试一次；错误只保留数字代码和
+  归类（authentication / rate-limited / network / server / unknown），不保存原始消息或 stderr。
+  本地超时与取消单独报告，不会显示为 RPC 错误。
 - **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
 
 百分比会被截断到有效范围；Codex 主额度不包含 Spark 等模型专属额度；重置时间保留 Provider 的原始单位；

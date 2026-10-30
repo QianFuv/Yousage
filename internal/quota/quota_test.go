@@ -101,14 +101,18 @@ func TestOptionalQuotaFieldsRejectExplicitNullAndWrongShapes(t *testing.T) {
 }
 
 func TestCodexNativeHandshakeDeadlineAndAccountIdentity(t *testing.T) {
-	for _, scenario := range []string{"success", "quota-hang", "api-key", "rpc-error"} {
+	for _, scenario := range []string{"success", "quota-hang", "api-key", "rpc-error", "rpc-recover", "rpc-then-hang"} {
 		t.Run(scenario, func(t *testing.T) {
 			directory := t.TempDir()
 			pidFile := filepath.Join(directory, "pids")
 			requestFile := filepath.Join(directory, "requests")
-			options := NativeOptions{IsEnabled: true, ProbeLimit: time.Second, EnrichmentLimit: 100 * time.Millisecond, Process: managedprocess.Options{Executable: codexExecutable, Directory: directory, Environment: append(os.Environ(), "YOUSAGE_CODEX_SCENARIO="+scenario, "YOUSAGE_PID_FILE="+pidFile, "YOUSAGE_REQUEST_FILE="+requestFile)}}
+			options := NativeOptions{IsEnabled: true, ProbeLimit: 2 * time.Second, EnrichmentLimit: 500 * time.Millisecond, Process: managedprocess.Options{Executable: codexExecutable, Directory: directory, Environment: append(os.Environ(), "YOUSAGE_CODEX_SCENARIO="+scenario, "YOUSAGE_PID_FILE="+pidFile, "YOUSAGE_REQUEST_FILE="+requestFile)}}
+			started := time.Now()
 			account := ProbeCodex(context.Background(), options)
-			if scenario == "success" {
+			if elapsed := time.Since(started); elapsed > 3*time.Second {
+				t.Fatal("probe exceeded its bounded deadline", elapsed)
+			}
+			if scenario == "success" || scenario == "rpc-recover" {
 				if account.Email != "fixture@example.invalid" || account.Limits.Unavailable != nil || len(account.Limits.Windows) != 1 || account.Limits.Windows[0].UsedPercent != 25 {
 					t.Fatal(account)
 				}
@@ -124,6 +128,22 @@ func TestCodexNativeHandshakeDeadlineAndAccountIdentity(t *testing.T) {
 			data, err := os.ReadFile(requestFile)
 			if err != nil {
 				t.Fatal(err)
+			}
+			wantRequests := 1
+			if strings.HasPrefix(scenario, "rpc-") {
+				wantRequests = 2
+			}
+			if scenario == "api-key" {
+				wantRequests = 0
+			}
+			if requests := strings.Count(string(data), `"method":"account/rateLimits/read"`); requests != wantRequests {
+				t.Fatalf("rate-limit requests = %d, want %d", requests, wantRequests)
+			}
+			if scenario == "rpc-error" && account.Limits.Unavailable.Message != "Codex could not read usage (JSON-RPC -32603; server)." {
+				t.Fatal("RPC category/code lost or private message escaped")
+			}
+			if (scenario == "quota-hang" || scenario == "rpc-then-hang") && account.Limits.Unavailable.Message != "Codex usage probe timed out." {
+				t.Fatal("local deadline was not distinguished from RPC failure")
 			}
 			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 			if len(lines) < 3 {
@@ -198,4 +218,34 @@ func TestNativeResetRejectsChangedSelectedAccount(t *testing.T) {
 		pids = append(pids, pid)
 	}
 	assertProcessTreeStopped(t, pids)
+}
+
+// TestCodexErrorClassificationRedactsUntrustedMessages checks the complete safe error boundary.
+func TestCodexErrorClassificationRedactsUntrustedMessages(t *testing.T) {
+	for _, test := range []struct {
+		code              int
+		message, category string
+	}{
+		{-32001, "unauthorized token=secret fixture@example.invalid", "authentication"},
+		{-32001, "rate limit https://user:secret@example.invalid", "rate-limited"},
+		{-32001, "network connection C:/private/account", "network"},
+		{-32603, "private unknown message", "server"},
+		{-32001, "opaque secret fixture@example.invalid", "unknown"},
+	} {
+		category := codexErrorCategory(test.code, test.message)
+		if category != test.category {
+			t.Errorf("category=%s, want %s", category, test.category)
+		}
+		failure := &codexRPCError{code: test.code, category: category}
+		expected := "Codex could not read usage (JSON-RPC " + strconv.Itoa(test.code) + "; " + test.category + ")."
+		if codexProbeFailure(failure, "") != expected {
+			t.Fatal("unsafe RPC failure")
+		}
+	}
+	if codexProbeFailure(context.DeadlineExceeded, "") != "Codex usage probe timed out." {
+		t.Fatal("deadline lost")
+	}
+	if codexProbeFailure(context.Canceled, "") != "Codex usage probe was cancelled." {
+		t.Fatal("cancellation lost")
+	}
 }

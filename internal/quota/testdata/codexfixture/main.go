@@ -55,6 +55,7 @@ func main() {
 	}
 	encoder := json.NewEncoder(os.Stdout)
 	scanner := bufio.NewScanner(os.Stdin)
+	quotaRequests := 0
 	for scanner.Scan() {
 		file, _ := os.OpenFile(os.Getenv("YOUSAGE_REQUEST_FILE"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if file != nil {
@@ -79,12 +80,13 @@ func main() {
 			}
 			result = map[string]any{"account": map[string]string{"type": kind, "email": "fixture@example.invalid", "planType": "plus"}}
 		case "account/rateLimits/read":
-			if scenario == "quota-hang" {
+			quotaRequests++
+			if scenario == "quota-hang" || (scenario == "rpc-then-hang" && quotaRequests > 1) {
 				time.Sleep(time.Hour)
 				return
 			}
-			if scenario == "rpc-error" {
-				_ = encoder.Encode(map[string]any{"id": id, "error": map[string]any{"code": -32001, "message": "secret error must not escape"}})
+			if scenario == "rpc-error" || ((scenario == "rpc-recover" || scenario == "rpc-then-hang") && quotaRequests == 1) {
+				_ = encoder.Encode(map[string]any{"id": id, "error": map[string]any{"code": -32603, "message": "internal server error secret fixture@example.invalid https://user:secret@example.invalid C:/private/account"}})
 				continue
 			}
 			_ = encoder.Encode(map[string]any{"id": 9999, "result": map[string]bool{"unmatched": true}})

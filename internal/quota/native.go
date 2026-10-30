@@ -28,7 +28,8 @@ type nativeFrame struct {
 	Id     json.RawMessage `json:"id"`
 	Result json.RawMessage `json:"result"`
 	Error  *struct {
-		Code int `json:"code"`
+		Code    int    `json:"code"`
+		Message string `json:"message"`
 	} `json:"error"`
 	Method string          `json:"method"`
 	Params json.RawMessage `json:"params"`
@@ -37,6 +38,50 @@ type incoming struct {
 	frame nativeFrame
 	err   error
 }
+
+// codexRPCError contains only a numeric protocol code and an allowlisted category.
+type codexRPCError struct {
+	code     int
+	category string
+}
+
+func (failure *codexRPCError) Error() string {
+	return "Codex could not read usage (JSON-RPC " + strconv.Itoa(failure.code) + "; " + failure.category + ")."
+}
+
+// codexErrorCategory consumes untrusted text without retaining any part of it.
+func codexErrorCategory(code int, message string) string {
+	message = strings.ToLower(message)
+	switch {
+	case strings.Contains(message, "unauthorized"), strings.Contains(message, "authentication"), strings.Contains(message, "unauthenticated"), strings.Contains(message, "sign in"), code == 401:
+		return "authentication"
+	case strings.Contains(message, "rate limit"), strings.Contains(message, "rate_limit"), strings.Contains(message, "too many requests"), code == 429:
+		return "rate-limited"
+	case strings.Contains(message, "network"), strings.Contains(message, "connection"), strings.Contains(message, "dns"), strings.Contains(message, "timed out"), strings.Contains(message, "timeout"):
+		return "network"
+	case strings.Contains(message, "internal server"), strings.Contains(message, "service unavailable"), code == -32603, code >= 500 && code <= 599:
+		return "server"
+	default:
+		return "unknown"
+	}
+}
+
+func codexProbeFailure(err error, fallback string) string {
+	var rpcError *codexRPCError
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return "Codex usage probe timed out."
+	case errors.Is(err, context.Canceled):
+		return "Codex usage probe was cancelled."
+	case errors.As(err, &rpcError):
+		return rpcError.Error()
+	case errors.Is(err, io.EOF):
+		return "Codex exited before it could report usage."
+	default:
+		return fallback
+	}
+}
+
 type codexSession struct {
 	managed  managedprocess.Process
 	frames   chan incoming
@@ -125,7 +170,7 @@ func (session *codexSession) request(ctx context.Context, id int, method string,
 				continue
 			}
 			if frame.Error != nil {
-				return nil, errors.New("Codex could not read usage (JSON-RPC " + strconv.Itoa(frame.Error.Code) + ").")
+				return nil, &codexRPCError{code: frame.Error.Code, category: codexErrorCategory(frame.Error.Code, frame.Error.Message)}
 			}
 			if frame.Result == nil {
 				return nil, errors.New("invalid Codex response")
@@ -147,7 +192,8 @@ func (session *codexSession) initialize(ctx context.Context, version string) err
 	return json.NewEncoder(session.managed.Input).Encode(map[string]string{"method": "initialized"})
 }
 
-// ProbeCodex reads account identity and main subscription limits without sending a model turn.
+// ProbeCodex reads identity and limits without model turns. A rate-limits RPC
+// error receives at most one retry within the original enrichment deadline.
 func ProbeCodex(ctx context.Context, options NativeOptions) Account {
 	checkedAt := checked(time.Now())
 	account := Account{Limits: unavailable(checkedAt, "unsupported", "")}
@@ -169,12 +215,12 @@ func ProbeCodex(ctx context.Context, options NativeOptions) Account {
 		return failure("Codex could not be started to read usage.")
 	}
 	defer session.close()
-	if session.initialize(deadline, options.Version) != nil {
-		return failure("Codex did not answer the initialization request.")
+	if err := session.initialize(deadline, options.Version); err != nil {
+		return failure(codexProbeFailure(err, "Codex did not answer the initialization request."))
 	}
 	data, err := session.request(deadline, 2, "account/read", map[string]any{})
 	if err != nil {
-		return failure("Codex could not read account identity.")
+		return failure(codexProbeFailure(err, "Codex could not read account identity."))
 	}
 	var identity struct {
 		Account *struct {
@@ -197,15 +243,19 @@ func ProbeCodex(ctx context.Context, options NativeOptions) Account {
 	quotaContext, quotaCancel := context.WithTimeout(deadline, enrichment)
 	defer quotaCancel()
 	data, err = session.request(quotaContext, 3, "account/rateLimits/read", nil)
+	var rpcError *codexRPCError
+	if errors.As(err, &rpcError) && quotaContext.Err() == nil {
+		timer := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-quotaContext.Done():
+			err = quotaContext.Err()
+		case <-timer.C:
+			data, err = session.request(quotaContext, 4, "account/rateLimits/read", nil)
+		}
+		timer.Stop()
+	}
 	if err != nil {
-		message := "Codex did not answer the usage request."
-		if errors.Is(err, io.EOF) {
-			message = "Codex exited before it could report usage."
-		}
-		if strings.HasPrefix(err.Error(), "Codex could not read usage (JSON-RPC ") {
-			message = err.Error()
-		}
-		return failure(message)
+		return failure(codexProbeFailure(err, "Codex did not answer the usage request."))
 	}
 	limits, err := MapCodex(data, checkedAt)
 	if err != nil {
