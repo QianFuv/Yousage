@@ -57,18 +57,15 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Back: "返回",
   "Back to usage": "返回用量",
   Behavior: "行为",
-  "Best rated": "评分最高",
   "Blank cache rates use the input price. Enter 0 for free tokens. A mapped model’s usage counts as the model it maps to.":
     "缓存单价留空时使用输入单价；填 0 表示免费。映射后的模型用量计入目标模型。",
   Breakdown: "明细",
-  "Browse theme catalogue": "浏览主题目录",
   "Cache hit": "缓存命中率",
   "Cache read": "缓存读取",
   "Cache savings": "缓存节省",
   "Cache write": "缓存写入",
   "Cached input": "缓存输入",
   Cancel: "取消",
-  "Cancel download": "取消下载",
   "Canceled.": "已取消。",
   "Change link": "更换链接",
   "Changes apply to {destination}": "更改将应用于 {destination}",
@@ -179,7 +176,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Documentation: "文档",
   "Documentation opened.": "已打开文档。",
   Done: "完成",
-  "Downloading…": "正在下载…",
   Effects: "效果",
   "Enable {label}": "启用 {label}",
   "Enter a model ID.": "请输入模型 ID。",
@@ -269,13 +265,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "More actions for {name}": "{name} 的更多操作",
   "More usage in this cycle is needed before the value can be bounded.":
     "本周期需要更多用量才能确定价值区间。",
-  "Most downloaded": "下载最多",
-  "Most relevant": "最相关",
   "Move the window back onto the primary display.": "将窗口移回主显示器。",
   Muted: "弱化背景",
   "Muted Foreground": "弱化文字",
   "New model ID": "新模型 ID",
-  Newest: "最新",
   "No activity in this window.": "此时间段内没有活动。",
   "No custom prices or mappings. Add a row to set one.":
     "暂无自定义价格或映射，添加一行即可设置。",
@@ -303,32 +296,11 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "On pace with the window": "与时间窗口节奏一致",
   "On your computer, open Settings → Sync & sharing, turn on Sync to phone and copy the phone link. Paste it here.":
     "在电脑上打开 设置 → 同步与分享，开启“同步到手机”并复制手机链接，然后粘贴到这里。",
-  "One or more color themes in that extension could not be imported safely.":
-    "该扩展中有主题无法安全导入。",
   "Only usage recorded on this device is counted.": "仅统计本设备记录的用量。",
   "Only usage recorded on the source desktop is counted.":
     "仅统计来源桌面端记录的用量。",
   Open: "打开",
   "Open Appearance": "打开外观设置",
-  "Open VSX returned an unexpectedly large detail response.":
-    "Open VSX 返回的详情数据过大。",
-  "Open VSX returned an unexpectedly large manifest.":
-    "Open VSX 返回的清单过大。",
-  "Open VSX returned an unexpectedly large response.":
-    "Open VSX 返回的数据过大。",
-  "Open VSX returned an unreadable response.":
-    "Open VSX 返回了无法读取的响应。",
-  "Open VSX returned an unreadable search response.":
-    "Open VSX 返回了无法读取的搜索结果。",
-  "Open VSX returned malformed theme details.":
-    "Open VSX 返回的主题详情格式错误。",
-  "Open VSX returned unreadable theme details.":
-    "Open VSX 返回的主题详情无法读取。",
-  "Open VSX search is unavailable right now.": "Open VSX 搜索暂不可用。",
-  "Open VSX theme details are unavailable right now.":
-    "Open VSX 主题详情暂不可用。",
-  "Open VSX theme details are unavailable.": "Open VSX 主题详情不可用。",
-  "Open VSX took too long to respond.": "Open VSX 响应超时。",
   "Open settings": "打开设置",
   "Open sync settings": "打开同步设置",
   Optional: "可选",
@@ -349,9 +321,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Premium: "加价",
   "Preparing preview…": "正在生成预览…",
   Preview: "预览",
-  "Preview import": "预览导入",
   "Preview pasted theme": "预览粘贴的主题",
-  "Preview update": "预览更新",
   Prices: "价格",
   "Prices & mappings": "价格与映射",
   "Prices not loaded": "价格未加载",
@@ -423,8 +393,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Scan to open the shared page": "扫码打开分享页",
   "Scan with your phone to open the dashboard.": "用手机扫码打开用量面板。",
   "Scanning…": "正在扫描…",
-  "Search Open VSX themes": "搜索 Open VSX 主题",
-  "Searching…": "正在搜索…",
   Secondary: "次要背景",
   "Secondary Foreground": "次要背景文字",
   "Secondary Label": "次要标签",
@@ -490,45 +458,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Terminal Selection": "终端选区",
   "Test connection": "测试连接",
   "Text Muted": "次要文字",
-  "That Open VSX checksum response is invalid.": "Open VSX 返回的校验和无效。",
-  "That Open VSX extension has no readable manifest.":
-    "该 Open VSX 扩展没有可读取的清单。",
-  "That Open VSX extension manifest is too large.":
-    "该 Open VSX 扩展的清单过大。",
-  "That Open VSX extension package could not be opened.":
-    "无法打开该 Open VSX 扩展包。",
-  "That Open VSX theme could not be downloaded.": "无法下载该 Open VSX 主题。",
-  "That Open VSX theme failed its integrity check.":
-    "该 Open VSX 主题未通过完整性校验。",
-  "That Open VSX theme has an invalid checksum.":
-    "该 Open VSX 主题的校验和无效。",
-  "That Open VSX theme has no readable checksum.":
-    "该 Open VSX 主题没有可读取的校验和。",
   "That credit was already redeemed.": "该重置券已被使用。",
-  "That extension contains too many color themes to import safely.":
-    "该扩展包含的主题过多，无法安全导入。",
-  "That extension does not contain color themes.": "该扩展不包含颜色主题。",
-  "That extension has no compatible color themes.":
-    "该扩展没有兼容的颜色主题。",
-  "That extension package does not match its advertised license.":
-    "该扩展包与其声明的许可证不符。",
-  "That extension package does not match the selected Open VSX theme.":
-    "该扩展包与所选的 Open VSX 主题不符。",
-  "That extension package expands beyond the safe import limit.":
-    "该扩展包解压后超出安全导入上限。",
-  "That extension package has an invalid ZIP directory.":
-    "该扩展包的 ZIP 目录无效。",
-  "That extension package has an unsafe compression ratio.":
-    "该扩展包的压缩比不安全。",
-  "That extension package has no ZIP directory.": "该扩展包没有 ZIP 目录。",
-  "That extension package has too many files.": "该扩展包的文件过多。",
-  "That extension package has unsupported ZIP64 metadata.":
-    "该扩展包含不受支持的 ZIP64 元数据。",
-  "That extension references too many theme files.":
-    "该扩展引用的主题文件过多。",
   "That theme collection is invalid.": "该主题合集无效。",
-  "That theme extension is too large to import safely.":
-    "该主题扩展过大，无法安全导入。",
   'The color for "{role}" must be a literal CSS color such as oklch(0.62 0.2 280).':
     "“{role}”的颜色必须是 CSS 颜色字面量，例如 oklch(0.62 0.2 280)。",
   "The YOUSAGE_RELAY_TOKEN set on the relay.":
@@ -579,12 +510,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Theme ids may only contain lowercase letters, numbers, and hyphens.":
     "主题 ID 只能包含小写字母、数字和连字符。",
   "Theme import preview": "主题导入预览",
-  "Theme includes are nested too deeply.": "主题引用嵌套过深。",
-  "Theme includes contain a cycle.": "主题引用存在循环。",
-  "Theme path escapes the extension package.": "主题路径超出了扩展包范围。",
-  "Theme path is not a safe relative package path.":
-    "主题路径不是安全的相对路径。",
-  "Theme search sort": "主题搜索排序",
   "Theme variants must be an object.": "主题变体必须是对象。",
   'Theme variants must not repeat the base appearance "{appearance}".':
     "主题变体不能重复基础外观“{appearance}”。",
@@ -594,8 +519,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "此操作只能在桌面端进行。",
   "This address uses plain HTTP, so the relay token travels unencrypted. Use HTTPS, for example through a cloudflared tunnel.":
     "此地址使用明文 HTTP，relay 令牌会以未加密的方式传输。请改用 HTTPS，例如通过 cloudflared 隧道。",
-  "This collection conflicts with a theme outside the collection. No themes were changed.":
-    "该合集与合集外的主题冲突，未做任何更改。",
   "This device": "本机",
   "This link is incomplete": "链接不完整",
   "This model already has a row. Edit its prices there.":
@@ -638,8 +561,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Updated {time}": "更新于 {time}",
   "Usage or limits could not be fully refreshed. Last successful data is retained when available.":
     "用量或额度未能完全刷新，已保留上次成功的数据（如有）。",
-  "Update existing themes / replace matching collection":
-    "更新已有主题 / 替换同名合集",
+  "Update existing themes": "更新已有主题",
   "Update server to edit prices": "请更新服务端后再编辑价格",
   "Update server to map models": "请更新服务端后再映射模型",
   "Uploading…": "正在上传…",
@@ -676,17 +598,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "in {duration}": "{duration}后",
   "invalid theme JSON.": "主题 JSON 无效。",
   left: "剩余",
-  "manifest unavailable": "清单不可用",
   "new model": "新模型",
   "next expires in {duration}": "下一张{duration}后过期",
-  "not a VS Code color theme": "不是 VS Code 颜色主题",
   now: "现在",
   "resets in {duration}": "{duration}后重置",
   "resets momentarily": "1 分钟内重置",
   "resets now": "即将重置",
   "theme files must be no larger than 256 KiB.": "主题文件不能超过 256 KiB。",
   "{count} banked": "{count} 张可用",
-  "{count} downloads": "{count} 次下载",
   "{count} environments": "{count} 个环境",
   "{count} reset credit banked": "{count} 张可用重置券",
   "{count} reset credits banked": "{count} 张可用重置券",
@@ -696,12 +615,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "已排除 {count} 条未定价记录，实际价值可能更高。",
   "{count} usable observations": "{count} 次有效观测",
   "{count} variants": "{count} 个变体",
-  "{description} has unreadable size metadata.":
-    "{description}的大小信息无法读取。",
-  "{description} is missing from the extension package.":
-    "扩展包中缺少{description}。",
-  "{description} is not valid JSON.": "{description}不是有效的 JSON。",
-  "{description} is too large.": "{description}过大。",
   "{field} is required on {environment}.": "{environment} 上必须填写{field}。",
   "{field} price for {model}": "{model} 的{field}价格",
   "{hour} today": "今天 {hour}",

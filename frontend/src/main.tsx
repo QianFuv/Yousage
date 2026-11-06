@@ -462,7 +462,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
             <div hidden={route !== "settings" || section !== "appearance"}>
               <ThemePanel
                 onDirtyChange={setIsThemeDirty}
-                isActive={route === "settings" && section === "appearance"}
                 droppedFiles={droppedThemes}
               />
             </div>

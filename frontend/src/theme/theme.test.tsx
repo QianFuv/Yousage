@@ -166,7 +166,7 @@ it("parses JSONC as a complete bounded batch before mutation", () => {
     parseThemeBatch([{ name: "large.json", text: "{}", size: 256 * 1024 + 1 }]),
   ).toThrow("256 KiB");
 });
-it("preserves update metadata, distinguishes copies and refuses foreign collection conflicts", () => {
+it("preserves update metadata and distinguishes copies", () => {
   const original = {
     ...BUILT_IN_THEMES[0],
     id: "fixture-import",
@@ -180,11 +180,6 @@ it("preserves update metadata, distinguishes copies and refuses foreign collecti
   expect(copies[1].id).not.toBe(original.id);
   expect(copies[1].label).not.toBe(original.label);
   expect(copies[0]).toEqual(original);
-  const foreign = { ...original, collection: undefined };
-  expect(() =>
-    mergedImport([foreign], [original], true, original.collection.id),
-  ).toThrow("outside");
-  expect(foreign.collection).toBeUndefined();
 });
 it("normalizes comma-separated font fallbacks without losing quoted families", () => {
   expect(fontFamilyList('Segoe UI, Inter, "Noto Sans"')).toBe(

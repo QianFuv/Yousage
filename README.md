@@ -48,9 +48,9 @@ Yousage 是一个本地运行的 AI 编程工具用量监控桌面应用。它�
 
 设置分为六个部分，未保存的草稿在切换页面后保留：
 
-- **外观**：内置与自定义主题、主题合集、亮色 / 暗色分别选择、颜色编辑器与取色检查器；
-  支持导入 T3 Code / VS Code 主题 JSON（含 JSONC）、拖入文件、粘贴，
-  以及浏览 Open VSX 主题市场；可调整字体、对比度、毛玻璃和动画。
+- **外观**：内置与自定义主题、主题合集、亮色 / 暗色分别选择；
+  自定义主题通过导入 T3 Code / VS Code 主题 JSON（含 JSONC）添加，支持选择文件、拖入文件和粘贴；
+  可调整字体、对比度、毛玻璃和动画。
 - **显示与行为**：界面语言（简体中文 / 英文 / 跟随系统）、100%–200% 界面缩放、
   12 / 24 小时制、自动刷新、恢复窗口位置、关闭到托盘、开机自启、启动时最小化、窗口居中。
 - **数据来源**：自动识别已安装的 Provider，分别启用历史记录与额度监控；
@@ -153,5 +153,5 @@ Yousage 的用量统计、额度合并、主题引擎和部分界面组件参考
 [T3 Code](https://github.com/pingdotgg/t3code)（MIT 许可证）的设计与实现，感谢 T3 Code
 团队的开源工作。Yousage 是独立项目，与 T3 Code 官方没有关联，也不代表其认可。
 
-同时感谢 [Wails](https://wails.io)、[models.dev](https://models.dev)、
-[culori](https://culorijs.org) 和 [Open VSX](https://open-vsx.org) 等项目。
+同时感谢 [Wails](https://wails.io)、[models.dev](https://models.dev)
+和 [culori](https://culorijs.org) 等项目。

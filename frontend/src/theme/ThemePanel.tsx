@@ -1,10 +1,9 @@
-/** Complete desktop theme library with bounded JSON and Open VSX imports. */
+/** Complete desktop theme library with bounded custom JSON imports. */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   MonitorIcon,
   MoonIcon,
   RotateCcwIcon,
-  SearchIcon,
   SunIcon,
   UploadIcon,
 } from "lucide-react";
@@ -45,10 +44,6 @@ import {
   pairVsCodeThemes,
   resolveThemeLabelCollisions,
 } from "../../vendor/vscodeThemeImport";
-import {
-  type OpenVsxThemeExtension,
-  type OpenVsxThemeSort,
-} from "../../vendor/openVsxThemes";
 import { CATPPUCCIN_MOCHA_THEME } from "./catppuccinMocha";
 import { ThemeWireframe } from "../../vendor/ThemeWireframe";
 import {
@@ -67,6 +62,7 @@ import {
   Dialog,
   DialogFooter,
   DialogHeader,
+  DialogPanel,
   DialogPopup,
   DialogTitle,
   DialogDescription,
@@ -76,7 +72,6 @@ import "./theme.css";
 type ImportDraft = {
   themes: ThemeDefinition[];
   revision: number;
-  attribution?: OpenVsxThemeExtension;
 };
 
 /** Keep a collection visible when its previously selected variant has been removed. */
@@ -213,19 +208,10 @@ export function mergedImport(
   existing: readonly ThemeDefinition[],
   incoming: readonly ThemeDefinition[],
   shouldReplace: boolean,
-  collectionId?: string,
 ): ThemeDefinition[] {
-  const result = existing.filter(
-    (theme) => !collectionId || theme.collection?.id !== collectionId,
-  );
+  const result = [...existing];
   for (const theme of incoming) {
     const position = result.findIndex((candidate) => candidate.id === theme.id);
-    if (position >= 0 && collectionId)
-      throw new Error(
-        t(
-          "This collection conflicts with a theme outside the collection. No themes were changed.",
-        ),
-      );
     if (position >= 0 && shouldReplace) {
       result[position] = {
         ...theme,
@@ -254,11 +240,9 @@ export function mergedImport(
 /** Show independent mode/half ownership, original palette previews, imports, collections, fonts and effects. */
 export function ThemePanel({
   onDirtyChange,
-  isActive = true,
   droppedFiles = [],
 }: {
   onDirtyChange?: (isDirty: boolean) => void;
-  isActive?: boolean;
   droppedFiles?: ThemeFileInput[];
 }) {
   const context = useAppearance();
@@ -266,13 +250,7 @@ export function ThemePanel({
   const [paste, setPaste] = useState("");
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [shouldReplace, setShouldReplace] = useState(true);
-  const [query, setQuery] = useState("");
-  const [isMarketOpen, setIsMarketOpen] = useState(false);
-  const [sort, setSort] = useState<OpenVsxThemeSort>("downloadCount");
-  const [extensions, setExtensions] = useState<OpenVsxThemeExtension[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const download = useRef<AbortController | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [fontNames, setFontNames] = useState<string[]>([]);
   const [fontDraft, setFontDraft] = useState(preferences.typography);
   const [collectionVariants, setCollectionVariants] = useState<
@@ -306,6 +284,7 @@ export function ThemePanel({
       const themes = parseThemeBatch(files);
       if (themes.length) {
         setDraft({ themes, revision: context.snapshot.revision });
+        setIsImportOpen(true);
       }
     } catch (cause) {
       notifyError(cause);
@@ -314,93 +293,29 @@ export function ThemePanel({
   useEffect(() => {
     if (droppedFiles.length) prepare(droppedFiles);
   }, [droppedFiles]);
-  useEffect(() => {
-    if (!isActive || !isMarketOpen) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      setIsSearching(true);
-      void import("../../vendor/openVsxThemes")
-        .then((module) =>
-          module.searchOpenVsxThemes(query, {
-            signal: controller.signal,
-            sortBy: sort,
-          }),
-        )
-        .then((value) => {
-          if (!controller.signal.aborted) setExtensions([...value]);
-        })
-        .catch((cause) => {
-          if (!controller.signal.aborted) notifyError(cause);
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setIsSearching(false);
-        });
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query, sort, isActive, isMarketOpen]);
-  useEffect(() => () => download.current?.abort(), []);
-  /** Verify an extension and hold the complete collection as a draft before replacing anything. */
-  async function downloadExtension(extension: OpenVsxThemeExtension) {
-    download.current?.abort();
-    const controller = new AbortController();
-    download.current = controller;
-    setIsDownloading(true);
-    const revision = context.snapshot.revision;
-    const timer = setTimeout(() => controller.abort(), 60_000);
-    try {
-      const { importOpenVsxThemeExtension } =
-        await import("../../vendor/openVsxThemes");
-      const themes = await importOpenVsxThemeExtension(
-        extension,
-        controller.signal,
-      );
-      setDraft({ themes: [...themes], revision, attribution: extension });
-    } finally {
-      clearTimeout(timer);
-      setIsDownloading(false);
-    }
-  }
-  /** Persist batch updates, selection and license provenance atomically under the captured revision. */
+  /** Persist the imported batch atomically under the captured revision. */
   async function commitImport() {
     if (!draft) return;
-    const collectionId = draft.attribution?.collectionId;
     const themes = mergedImport(
       context.snapshot.value.customThemes.map(frontendTheme),
       draft.themes,
       shouldReplace,
-      shouldReplace ? collectionId : undefined,
     );
-    const attributions = [...(context.snapshot.value.attributions ?? [])];
-    if (draft.attribution) {
-      const extension = draft.attribution;
-      const index = attributions.findIndex(
-        (value) => value.collectionId === extension.collectionId,
-      );
-      const attribution = models.Attribution.createFrom({
-        collectionId: extension.collectionId,
-        name: extension.name,
-        publisher: extension.publisher,
-        version: extension.version,
-        license: extension.license,
-        url: extension.sourceUrl ?? extension.manifestUrl,
-      });
-      if (index >= 0) attributions[index] = attribution;
-      else attributions.push(attribution);
-    }
     await context.save(
       nativeLibrary({
         ...context.snapshot.value,
         customThemes: themes,
-        attributions,
       }),
       draft.revision,
     );
+    closeImport();
+    notify(t("Themes imported."));
+  }
+  /** Close the import dialog and discard its unsaved paste and preview. */
+  function closeImport() {
+    setIsImportOpen(false);
     setDraft(null);
     setPaste("");
-    notify(t("Themes imported."));
   }
   /** Delete only selected custom members, retaining missing raw owners for published themes that may return. */
   async function removeThemes(ids: string[]) {
@@ -554,18 +469,28 @@ export function ThemePanel({
           <SectionHeading
             title={t("Themes")}
             action={
-              <Button
-                variant="ghost"
-                size="xs"
-                disabled={context.isBusy}
-                onClick={() =>
-                  void action(() =>
-                    context.patch({ lightOwner: "", darkOwner: "" }),
-                  )
-                }
-              >
-                {t("Clear mix")}
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setIsImportOpen(true)}
+                >
+                  <UploadIcon aria-hidden />
+                  {t("Import themes")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={context.isBusy}
+                  onClick={() =>
+                    void action(() =>
+                      context.patch({ lightOwner: "", darkOwner: "" }),
+                    )
+                  }
+                >
+                  {t("Clear mix")}
+                </Button>
+              </>
             }
           />
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-4">
@@ -1035,231 +960,116 @@ export function ThemePanel({
             />
           ))}
         </SettingsSection>
-        <SettingsSection title={t("Import themes")}>
-          <SettingsRow
-            title={t("Theme files")}
-            description={t(
-              "T3 Code and VS Code JSON. Files and pasted data are limited to 256 KiB. You can also drop files into the window.",
-            )}
-            control={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  void action(async () =>
-                    prepare(await nativeApi.PickThemeFiles()),
-                  )
-                }
-              >
-                <UploadIcon aria-hidden />
-                {t("Choose files")}
-              </Button>
-            }
-          />
-          <SettingsRow title={t("Paste JSON")}>
-            <textarea
-              aria-label={t("Paste theme JSON")}
-              value={paste}
-              onChange={(event) => setPaste(event.target.value)}
-              placeholder='{ "name": "My theme", … }'
-              className="h-32 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/24 dark:bg-input/32"
-            />
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!paste.trim()}
-                onClick={() =>
-                  prepare([
-                    {
-                      name: "Pasted theme",
-                      text: paste,
-                      size: new TextEncoder().encode(paste).length,
-                    },
-                  ])
-                }
-              >
-                {t("Preview pasted theme")}
-              </Button>
-            </div>
-          </SettingsRow>
-          {draft && (
-            <div
-              role="region"
-              aria-label={t("Theme import preview")}
-              className="settings-row flex flex-col gap-3 bg-primary/[0.04]"
-            >
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-sm font-medium">
-                  {t("Ready to import {count} themes", {
-                    count: draft.themes.length,
-                  })}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {draft.themes.map((theme) => theme.label).join(", ")}
-                </p>
-                {draft.attribution && (
-                  <p className="text-xs text-muted-foreground">
-                    {draft.attribution.publisher} · {draft.attribution.version}{" "}
-                    · {draft.attribution.license}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch
-                    size="sm"
-                    checked={shouldReplace}
-                    onCheckedChange={setShouldReplace}
-                  />
-                  {t("Update existing themes / replace matching collection")}
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDraft(null)}
-                  >
-                    {t("Discard import")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={context.isBusy}
-                    onClick={() => void action(commitImport)}
-                  >
-                    {t("Import themes")}
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("Turn off to keep both when IDs collide.")}
-              </p>
-            </div>
-          )}
-        </SettingsSection>
-        <SettingsSection
-          title="Open VSX"
-          action={
-            isSearching ? (
-              <span role="status" className="text-xs text-muted-foreground">
-                {t("Searching…")}
-              </span>
-            ) : undefined
-          }
+        <Dialog
+          open={isImportOpen}
+          onOpenChange={(isOpen) => {
+            if (isOpen) setIsImportOpen(true);
+            else closeImport();
+          }}
         >
-          <SettingsRow>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-48 flex-1">
-                <SearchIcon
-                  aria-hidden
-                  className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  size="sm"
-                  className="[&_input]:ps-8"
-                  aria-label={t("Search Open VSX themes")}
-                  value={query}
-                  onChange={(event) => {
-                    setIsMarketOpen(true);
-                    setQuery(event.target.value);
-                  }}
-                  placeholder="Dracula, Catppuccin, Nord, Tokyo Night"
-                />
-              </div>
-              <OptionSelect
-                label={t("Theme search sort")}
-                value={sort}
-                options={SORT_OPTIONS.map((option) => ({
-                  ...option,
-                  label: t(option.label),
-                }))}
-                onChange={(next) => {
-                  setIsMarketOpen(true);
-                  setSort(next);
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {["Dracula", "Catppuccin", "Nord", "Tokyo Night"].map(
-                (suggestion) => (
-                  <Button
-                    key={suggestion}
-                    variant="secondary"
-                    size="xs"
-                    className="rounded-full"
-                    onClick={() => {
-                      setIsMarketOpen(true);
-                      setQuery(suggestion);
-                    }}
-                  >
-                    {suggestion}
-                  </Button>
-                ),
-              )}
-              {!isMarketOpen && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setIsMarketOpen(true)}
-                >
-                  {t("Browse theme catalogue")}
-                </Button>
-              )}
-            </div>
-          </SettingsRow>
-          {extensions.map((extension) => (
-            <SettingsRow
-              key={extension.id}
-              title={<span className="font-medium">{extension.name}</span>}
-              description={
-                <>
-                  {extension.description && (
-                    <span className="line-clamp-2">
-                      {extension.description}
-                    </span>
-                  )}
-                  <span className="text-2xs">
-                    {extension.publisher} · {extension.version} ·{" "}
-                    {extension.license} ·{" "}
-                    {t("{count} downloads", {
-                      count: extension.downloadCount.toLocaleString(),
-                    })}
-                  </span>
-                </>
-              }
-              control={
+          <DialogPopup className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{t("Import themes")}</DialogTitle>
+              <DialogDescription>
+                {t(
+                  "T3 Code and VS Code JSON. Files and pasted data are limited to 256 KiB. You can also drop files into the window.",
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogPanel>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-medium">{t("Theme files")}</h3>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={isDownloading}
                   onClick={() =>
-                    void action(() => downloadExtension(extension))
+                    void action(async () =>
+                      prepare(await nativeApi.PickThemeFiles()),
+                    )
                   }
                 >
-                  {collections.some(
-                    (collection) => collection.id === extension.collectionId,
-                  )
-                    ? t("Preview update")
-                    : t("Preview import")}
+                  <UploadIcon aria-hidden />
+                  {t("Choose files")}
                 </Button>
-              }
-            />
-          ))}
-          {isDownloading && (
-            <SettingsRow
-              title={t("Downloading…")}
-              control={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => download.current?.abort()}
+              </div>
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">{t("Paste JSON")}</h3>
+                <textarea
+                  aria-label={t("Paste theme JSON")}
+                  value={paste}
+                  onChange={(event) => setPaste(event.target.value)}
+                  placeholder='{ "name": "My theme", … }'
+                  className="h-32 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/24 dark:bg-input/32"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!paste.trim()}
+                    onClick={() =>
+                      prepare([
+                        {
+                          name: "Pasted theme",
+                          text: paste,
+                          size: new TextEncoder().encode(paste).length,
+                        },
+                      ])
+                    }
+                  >
+                    {t("Preview pasted theme")}
+                  </Button>
+                </div>
+              </div>
+              {draft && (
+                <div
+                  role="region"
+                  aria-label={t("Theme import preview")}
+                  className="flex flex-col gap-3 rounded-lg border border-border bg-primary/[0.04] p-3"
                 >
-                  {t("Cancel download")}
-                </Button>
-              }
-            />
-          )}
-        </SettingsSection>
+                  <div className="flex flex-col gap-0.5">
+                    <h3 className="text-sm font-medium">
+                      {t("Ready to import {count} themes", {
+                        count: draft.themes.length,
+                      })}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {draft.themes.map((theme) => theme.label).join(", ")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <Switch
+                        size="sm"
+                        checked={shouldReplace}
+                        onCheckedChange={setShouldReplace}
+                      />
+                      {t("Update existing themes")}
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDraft(null)}
+                      >
+                        {t("Discard import")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={context.isBusy}
+                        onClick={() => void action(commitImport)}
+                      >
+                        {t("Import themes")}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("Turn off to keep both when IDs collide.")}
+                  </p>
+                </div>
+              )}
+            </DialogPanel>
+          </DialogPopup>
+        </Dialog>
         {(context.snapshot.value.attributions ?? []).length > 0 && (
           <SettingsSection title={t("Imported theme licenses")}>
             {context.snapshot.value.attributions.map((value) => (
@@ -1275,13 +1085,6 @@ export function ThemePanel({
     </section>
   );
 }
-
-const SORT_OPTIONS: readonly { value: OpenVsxThemeSort; label: string }[] = [
-  { value: "downloadCount", label: msg("Most downloaded") },
-  { value: "rating", label: msg("Best rated") },
-  { value: "timestamp", label: msg("Newest") },
-  { value: "relevance", label: msg("Most relevant") },
-];
 
 /**
  * Icon-only reset-to-default action.
