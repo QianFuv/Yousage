@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM node:24.15.0-bookworm-slim AS web
 WORKDIR /src
-RUN corepack enable && corepack prepare pnpm@10.32.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
 COPY tools/parity/package.json tools/parity/pnpm-lock.yaml ./tools/parity/
 COPY frontend/package.json frontend/pnpm-lock.yaml ./frontend/
 RUN pnpm --dir tools/parity install --frozen-lockfile \

@@ -2,7 +2,7 @@
   "name": "yousage-parity-reference",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.32.0",
+  "packageManager": "pnpm@12.16.1",
   "scripts": {
     "sync": "node scripts/sync-upstream.mjs",
     "verify:sources": "node scripts/verify-sources.mjs",
