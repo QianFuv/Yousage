@@ -1,4 +1,4 @@
-/** Desktop routes share saved appearance and a root-mounted editor across navigation. */
+/** Desktop routes share saved appearance across navigation. */
 import {
   useCallback,
   useEffect,
@@ -101,11 +101,6 @@ const PricingPanel = lazy(() =>
 const ThemePanel = lazy(() =>
   import("./theme/ThemePanel").then((module) => ({
     default: module.ThemePanel,
-  })),
-);
-const RootThemeEditor = lazy(() =>
-  import("./theme/ThemePanel").then((module) => ({
-    default: module.RootThemeEditor,
   })),
 );
 import "./style.css";
@@ -214,17 +209,12 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
   const [status, setStatus] = useState("");
   const closeState = useRef({ isDirty: false, isPending: false });
   closeState.current = {
-    isDirty:
-      pricingState.isDirty ||
-      sourcesState.isDirty ||
-      isThemeDirty ||
-      appearance.editorState.isDirty,
+    isDirty: pricingState.isDirty || sourcesState.isDirty || isThemeDirty,
     isPending:
       data.isSavingDisplay ||
       pricingState.isPending ||
       sourcesState.isPending ||
-      appearance.isBusy ||
-      appearance.editorState.isPending,
+      appearance.isBusy,
   };
   useEffect(() => {
     /** Reveal a window hidden in the tray before asking about its drafts. */
@@ -338,7 +328,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
   const sectionState: Partial<Record<SettingsSection, boolean>> = {
     pricing: pricingState.isDirty,
     sources: sourcesState.isDirty,
-    appearance: isThemeDirty || appearance.editorState.isDirty,
+    appearance: isThemeDirty,
   };
   return (
     <div className="desktop-layout">
@@ -499,11 +489,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
           )}
         </Suspense>
       </main>
-      {appearance.editor && (
-        <Suspense fallback={null}>
-          <RootThemeEditor />
-        </Suspense>
-      )}
       <AlertDialog
         open={isClosing}
         onOpenChange={(isOpen) => {

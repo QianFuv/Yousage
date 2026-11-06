@@ -1,9 +1,8 @@
-/** Complete desktop theme library, bounded imports and root-mounted original editor. */
+/** Complete desktop theme library with bounded JSON and Open VSX imports. */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   MonitorIcon,
   MoonIcon,
-  PlusIcon,
   RotateCcwIcon,
   SearchIcon,
   SunIcon,
@@ -33,9 +32,7 @@ import { parse as parseJsonc } from "jsonc-parser";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import type { ThemeFileInput } from "../../bindings/yousage/internal/desktop/models";
 import * as models from "../../bindings/yousage/internal/theme/models";
-import { ThemeEditorPanel } from "../../vendor/ThemeEditorPanel";
 import {
-  getCustomThemes,
   getThemeDefinition,
   getThemeModes,
   parseThemeFile,
@@ -252,67 +249,6 @@ export function mergedImport(
     });
   }
   return result;
-}
-
-/** Keep the movable, resizable inspector/editor alive while the page route changes. */
-export function RootThemeEditor() {
-  const context = useAppearance();
-  const session = context.editor;
-  if (!session) return null;
-  const editing = session.editing
-    ? (getCustomThemes().find((theme) => theme.id === session.editing!.id) ??
-      null)
-    : null;
-  return (
-    <ThemeEditorPanel
-      key={session.identity}
-      open
-      editingTheme={editing}
-      seedTheme={session.seed ?? session.editing}
-      seedName={session.name}
-      initialAppearance={context.appearance}
-      restoreTheme={context.restore}
-      onDraftStateChange={context.setEditorState}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) context.closeEditor();
-      }}
-      onSaved={async (theme, { created, mergedAppearance }) => {
-        if (session.editing) {
-          const saved = context.snapshot.value.customThemes.find(
-            (value) => value.id === session.editing!.id,
-          );
-          if (
-            !saved ||
-            serializeThemeFile(frontendTheme(saved)) !== session.signature
-          ) {
-            context.restore();
-            throw new Error(
-              t(
-                "This theme changed while the editor was open. Reopen the saved theme before replacing it.",
-              ),
-            );
-          }
-        }
-        const preferences = { ...context.snapshot.value.preferences };
-        if (created || mergedAppearance) {
-          preferences.baseThemeId = theme.id;
-          preferences.lightOwner = "";
-          preferences.darkOwner = "";
-          if (getThemeModes(theme).length === 1)
-            preferences.mode = theme.appearance;
-        }
-        await context.save(
-          nativeLibrary({
-            ...context.snapshot.value,
-            preferences,
-            customThemes: getCustomThemes(),
-          }),
-          context.snapshot.revision,
-        );
-        return true;
-      }}
-    />
-  );
 }
 
 /** Show independent mode/half ownership, original palette previews, imports, collections, fonts and effects. */
@@ -609,22 +545,6 @@ export function ThemePanel({
             {t("Dark")}
           </Toggle>
         </ToggleGroup>
-        <Button
-          size="sm"
-          onClick={() =>
-            context.openEditor({
-              editing: null,
-              seed: getThemeDefinition(
-                (context.appearance === "light"
-                  ? preferences.lightOwner
-                  : preferences.darkOwner) || preferences.baseThemeId,
-              ),
-            })
-          }
-        >
-          <PlusIcon aria-hidden />
-          {t("Create theme")}
-        </Button>
       </PageHeader>
       <PageBody>
         {context.snapshot.error && (
@@ -744,37 +664,12 @@ export function ThemePanel({
                             {mode === "light" ? t("Light") : t("Dark")}
                           </span>
                         ))}
-                        <ActionMenu
-                          label={t("More actions for {name}", {
-                            name: card.label,
-                          })}
-                        >
-                          <ActionMenuItem
-                            onClick={() =>
-                              context.openEditor({
-                                editing: null,
-                                seed: definition ?? null,
-                                name: t("{name} copy", {
-                                  name: card.label.slice(0, 40),
-                                }),
-                              })
-                            }
+                        {definition && (
+                          <ActionMenu
+                            label={t("More actions for {name}", {
+                              name: card.label,
+                            })}
                           >
-                            {t("Duplicate")}
-                          </ActionMenuItem>
-                          {isCustom && (
-                            <ActionMenuItem
-                              onClick={() =>
-                                context.openEditor({
-                                  editing: definition!,
-                                  seed: null,
-                                })
-                              }
-                            >
-                              {t("Edit")}
-                            </ActionMenuItem>
-                          )}
-                          {definition && (
                             <ActionMenuItem
                               onClick={() =>
                                 void action(async () => {
@@ -790,8 +685,6 @@ export function ThemePanel({
                             >
                               {t("Export")}
                             </ActionMenuItem>
-                          )}
-                          {definition && (
                             <ActionMenuItem
                               onClick={() =>
                                 void action(async () => {
@@ -804,16 +697,16 @@ export function ThemePanel({
                             >
                               {t("Copy JSON")}
                             </ActionMenuItem>
-                          )}
-                          {isCustom && (
-                            <ActionMenuItem
-                              variant="destructive"
-                              onClick={() => requestRemoval([definition!])}
-                            >
-                              {t("Remove")}
-                            </ActionMenuItem>
-                          )}
-                        </ActionMenu>
+                            {isCustom && (
+                              <ActionMenuItem
+                                variant="destructive"
+                                onClick={() => requestRemoval([definition])}
+                              >
+                                {t("Remove")}
+                              </ActionMenuItem>
+                            )}
+                          </ActionMenu>
+                        )}
                       </div>
                     </div>
                     {definition?.collection && (

@@ -1,4 +1,4 @@
-/** Saved theme authority and transient editor state shared above every application route. */
+/** Saved theme authority shared above every application route. */
 import { t } from "../i18n";
 import {
   createContext,
@@ -21,23 +21,12 @@ import {
   parseThemeHalves,
   resolveThemeAppearance,
   resolveThemeHalf,
-  serializeThemeFile,
   setEnvironmentThemes,
   type ThemeDefinition,
 } from "../../vendor/themePalette";
 
 export type AppearanceSnapshot = models.LibrarySnapshot;
 export type AppearancePreferences = models.AppearancePreferences;
-type EditorInput = {
-  editing: ThemeDefinition | null;
-  seed: ThemeDefinition | null;
-  name?: string;
-};
-type EditorSession = EditorInput & {
-  identity: number;
-  revision: number;
-  signature: string | null;
-};
 type AppearanceContextValue = {
   snapshot: AppearanceSnapshot;
   appearance: "light" | "dark";
@@ -49,12 +38,6 @@ type AppearanceContextValue = {
   ) => Promise<AppearanceSnapshot>;
   patch: (patch: Partial<AppearancePreferences>) => Promise<void>;
   select: (identity: string, half?: "light" | "dark") => Promise<void>;
-  editor: EditorSession | null;
-  editorState: { isDirty: boolean; isPending: boolean };
-  setEditorState: (isDirty: boolean, isPending: boolean) => void;
-  openEditor: (session: EditorInput) => void;
-  closeEditor: () => void;
-  restore: () => void;
 };
 const APPEARANCE_CONTEXT = createContext<AppearanceContextValue | null>(null);
 
@@ -95,7 +78,6 @@ export function nativeLibrary(value: unknown): models.LibraryValue {
 export function applySavedAppearance(
   snapshot: AppearanceSnapshot,
   isSystemDark: boolean,
-  shouldApplyPalette = true,
 ): "light" | "dark" {
   const value = snapshot.value.preferences;
   loadSavedCustomThemes(snapshot.value.customThemes.map(frontendTheme));
@@ -110,13 +92,11 @@ export function applySavedAppearance(
     value.mode as "system" | "light" | "dark",
     halves,
   );
-  if (shouldApplyPalette) {
-    document.documentElement.classList.toggle("dark", appearance === "dark");
-    applyThemePalette(
-      resolveThemeHalf(value.baseThemeId, halves, appearance),
-      appearance,
-    );
-  }
+  document.documentElement.classList.toggle("dark", appearance === "dark");
+  applyThemePalette(
+    resolveThemeHalf(value.baseThemeId, halves, appearance),
+    appearance,
+  );
   const root = document.documentElement;
   root.style.fontSize = `${value.typography.interfaceSize}px`;
   root.style.setProperty(
@@ -154,7 +134,7 @@ export function applySavedAppearance(
   return appearance;
 }
 
-/** Keep saved state, root-mounted drafts, native OS events and atomic asynchronous mutations together. */
+/** Keep saved state, native OS events and atomic asynchronous mutations together. */
 export function AppearanceProvider({
   initial,
   isSystemDark: initialSystemDark,
@@ -173,19 +153,6 @@ export function AppearanceProvider({
   const [isBusy, setIsBusy] = useState(false);
   const busy = useRef(false);
   const [error, setError] = useState("");
-  const [editorState, updateEditorState] = useState({
-    isDirty: false,
-    isPending: false,
-  });
-  const setEditorState = useCallback(
-    (isDirty: boolean, isPending: boolean) =>
-      updateEditorState({ isDirty, isPending }),
-    [],
-  );
-  const [editor, setEditor] = useState<EditorSession | null>(null);
-  const currentEditor = useRef(editor);
-  currentEditor.current = editor;
-  const editorSequence = useRef(0);
   const patchQueue = useRef(Promise.resolve());
   const [appearance, setAppearance] = useState<"light" | "dark">(() =>
     applySavedAppearance(initial, initialSystemDark),
@@ -198,9 +165,8 @@ export function AppearanceProvider({
   useEffect(() => {
     loadSavedCustomThemes(snapshot.value.customThemes.map(frontendTheme));
     setEnvironmentThemes(snapshot.published.themes.map(frontendTheme));
-    if (!editor) restore();
-    else applySavedAppearance(snapshot, isSystemDark, false);
-  }, [snapshot, restore, editor, isSystemDark]);
+    restore();
+  }, [snapshot, restore, isSystemDark]);
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const changed = () =>
@@ -232,7 +198,7 @@ export function AppearanceProvider({
       media.removeEventListener("change", changed);
     };
   }, []);
-  /** Persist exactly one library/selection transaction; failure restores the latest saved mirror and keeps drafts open. */
+  /** Persist exactly one library/selection transaction; failure restores the latest saved mirror. */
   const save = useCallback(
     async (value: models.LibraryValue, expectedRevision?: number) => {
       if (busy.current)
@@ -257,17 +223,9 @@ export function AppearanceProvider({
           const next = await nativeApi.GetAppearance();
           current.current = next;
           setSnapshot(next);
-          applySavedAppearance(
-            next,
-            systemDark.current,
-            !currentEditor.current,
-          );
+          applySavedAppearance(next, systemDark.current);
         } catch {
-          applySavedAppearance(
-            current.current,
-            systemDark.current,
-            !currentEditor.current,
-          );
+          applySavedAppearance(current.current, systemDark.current);
         }
         throw new Error(message);
       } finally {
@@ -277,7 +235,7 @@ export function AppearanceProvider({
     },
     [],
   );
-  /** Save ordinary preference changes immediately without modifying unsaved editor palettes. */
+  /** Save ordinary preference changes immediately. */
   const patch = useCallback(
     (patchValue: Partial<AppearancePreferences>) => {
       const operation = patchQueue.current
@@ -332,23 +290,6 @@ export function AppearanceProvider({
     },
     [patch],
   );
-  /** End only the draft session and restore the actual saved appearance. */
-  const closeEditor = useCallback(() => {
-    setEditor(null);
-    updateEditorState({ isDirty: false, isPending: false });
-    restore();
-  }, [restore]);
-  /** Create a distinct draft with its actual optimistic revision, even when an editor is already open. */
-  const openEditor = useCallback(
-    (session: EditorInput) =>
-      setEditor({
-        ...session,
-        identity: ++editorSequence.current,
-        revision: current.current.revision,
-        signature: session.editing ? serializeThemeFile(session.editing) : null,
-      }),
-    [],
-  );
   return (
     <APPEARANCE_CONTEXT.Provider
       value={{
@@ -359,12 +300,6 @@ export function AppearanceProvider({
         save,
         patch,
         select,
-        editor,
-        editorState,
-        setEditorState,
-        openEditor,
-        closeEditor,
-        restore,
       }}
     >
       {children}
@@ -372,7 +307,7 @@ export function AppearanceProvider({
   );
 }
 
-/** Require a root appearance provider so navigation never discards editor state. */
+/** Require the root appearance provider shared by every route. */
 export function useAppearance(): AppearanceContextValue {
   const value = useContext(APPEARANCE_CONTEXT);
   if (!value) throw new Error("Appearance provider is missing");
