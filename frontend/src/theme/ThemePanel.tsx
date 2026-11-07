@@ -44,7 +44,6 @@ import {
   pairVsCodeThemes,
   resolveThemeLabelCollisions,
 } from "../../vendor/vscodeThemeImport";
-import { CATPPUCCIN_MOCHA_THEME } from "./catppuccinMocha";
 import { ThemeWireframe } from "../../vendor/ThemeWireframe";
 import {
   getThemeCardDefinition,
@@ -365,7 +364,7 @@ export function ThemePanel({
   const published = context.snapshot.published.themes
     .map(frontendTheme)
     .filter((theme) => !customs.some((custom) => custom.id === theme.id));
-  const definitions = [CATPPUCCIN_MOCHA_THEME, ...customs, ...published];
+  const definitions = [...customs, ...published];
   const cards = [
     ...STANDARD_THEME_CARDS,
     ...definitions.map(getThemeCardDefinition),

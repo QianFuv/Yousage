@@ -22,7 +22,6 @@ import {
   type ThemeDefinition,
   type ThemeVariants,
 } from "@t3tools/shared/themePalettes";
-import { CATPPUCCIN_MOCHA_THEME } from "../src/theme/catppuccinMocha";
 
 export {
   EMBER_THEME,
@@ -1314,10 +1313,8 @@ export function updateThemeColorFamily(
   }
 }
 
-const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
-  ...BUILT_IN_THEMES,
-  CATPPUCCIN_MOCHA_THEME,
-];
+const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> =
+  BUILT_IN_THEMES;
 
 export function getThemeDefinition(
   theme: ThemePreference,
