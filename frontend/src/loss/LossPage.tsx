@@ -286,9 +286,6 @@ function LossEvents({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const shown = isExpanded ? events : events.slice(0, COLLAPSED_EVENTS);
-  const isEstimateShown = shown.some(
-    (event) => event.costUsd > 0 && event.precision === "estimated",
-  );
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -383,11 +380,6 @@ function LossEvents({
           </tbody>
         </table>
       </div>
-      {isEstimateShown && (
-        <p className="text-xs text-muted-foreground">
-          ≈ {t("Estimated from cache hit rates")}
-        </p>
-      )}
       {events.length > COLLAPSED_EVENTS && (
         <div>
           <Button

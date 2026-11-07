@@ -546,32 +546,17 @@ describe("loss events", () => {
     }
   });
 
-  it("explains the estimate mark in visible text only when a shown event is estimated", () => {
+  it("marks estimated amounts with a hover hint instead of a footnote", () => {
     const estimated = render(
       <LossContent
         report={lossReport([lossEvent({ precision: "estimated" })])}
       />,
     );
     for (const text of [estimated.phone, estimated.desktop])
-      expect(text).toContain("≈ Estimated from cache hit rates");
-
-    const exact = render(<LossContent report={lossReport([lossEvent()])} />);
-    expect(exact.phone).not.toContain("Estimated from cache hit rates");
-
-    const hiddenEstimate = render(
-      <LossContent
-        report={lossReport([
-          ...Array.from({ length: 20 }, (_, index) =>
-            lossEvent({ atMs: index }),
-          ),
-          lossEvent({ precision: "estimated", atMs: 99 }),
-        ])}
-      />,
+      expect(text).not.toContain("Estimated from cache hit rates");
+    expect(estimated.markup).toContain(
+      'title="Estimated from cache hit rates">≈</span>',
     );
-    expect(hiddenEstimate.phone).not.toContain(
-      "Estimated from cache hit rates",
-    );
-    expect(hiddenEstimate.phone).toContain("Show all 21 events");
   });
 });
 
