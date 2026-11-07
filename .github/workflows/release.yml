@@ -361,16 +361,15 @@ jobs:
               assert headers["WWW-Authenticate"] == "Bearer"
               assert headers["Cache-Control"] == "no-store"
           assert request("/api/auth", bearer=TOKEN)[0] == 204
-          for prefix in ("v", "s"):
-              status, headers, body = request(f"/{prefix}/{'A' * 22}")
-              assert status == 200
-              assert "script-src 'self'" in headers["Content-Security-Policy"]
-              assert headers["Referrer-Policy"] == "no-referrer"
-              assert headers["X-Content-Type-Options"] == "nosniff"
-              assets = re.findall(rb'(?:src|href)="(/assets/[^" ]+)"', body)
-              assert assets, "Built frontend assets are missing"
-              for asset in assets:
-                  assert request(asset.decode())[0] == 200
+          status, headers, body = request(f"/v/{'A' * 22}")
+          assert status == 200
+          assert "script-src 'self'" in headers["Content-Security-Policy"]
+          assert headers["Referrer-Policy"] == "no-referrer"
+          assert headers["X-Content-Type-Options"] == "nosniff"
+          assets = re.findall(rb'(?:src|href)="(/assets/[^" ]+)"', body)
+          assert assets, "Built frontend assets are missing"
+          for asset in assets:
+              assert request(asset.decode())[0] == 200
           space_id = secrets.token_urlsafe(16)
           path = f"/api/spaces/{space_id}"
           envelope = b"\x01" + secrets.token_bytes(64)
@@ -384,21 +383,12 @@ jobs:
           finally:
               assert request(path, "DELETE", bearer=TOKEN)[0] == 204
           assert request(path)[0] == 404
-          status, _, body = request(
-              "/api/shares/reserve?ttlDays=1", "POST", bearer=TOKEN
-          )
-          assert status == 201
-          path = f"/api/shares/{json.loads(body)['id']}"
-          try:
-              assert request(path)[0] == 404
-              assert request(path, "PUT", envelope, TOKEN)[0] == 204
-              assert request(path, "PUT", envelope, TOKEN)[0] == 409
-              status, headers, body = request(path)
-              assert status == 200 and body == envelope
-              assert headers["Cache-Control"] == "no-store"
-          finally:
-              assert request(path, "DELETE", bearer=TOKEN)[0] == 204
-          assert request(path)[0] == 404
+          for method, retired in (
+              ("GET", f"/s/{'A' * 22}"),
+              ("POST", "/api/shares/reserve?ttlDays=1"),
+              ("GET", f"/api/shares/{'A' * 22}"),
+          ):
+              assert request(retired, method, bearer=TOKEN)[0] in (404, 405)
           print("Relay image smoke checks passed")
           PY
       - name: Save relay image
