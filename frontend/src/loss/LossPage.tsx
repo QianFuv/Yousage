@@ -14,7 +14,7 @@ import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { formatDateTimeShort, formatDuration, msg, t } from "../i18n";
 import { notifyError } from "../notify";
 import { RefreshButton, useRefreshStatus } from "../usage/refreshStatus";
-import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
+import { PeriodMenu, PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
 import { SeriesChart } from "../usage/SeriesChart";
 import {
@@ -74,6 +74,7 @@ export function LossPage({ isActive }: { isActive: boolean }) {
         title={t("Loss")}
         status={!report ? t("Loading…") : refreshStatus}
         actions={<RefreshButton />}
+        phoneControls={<PeriodMenu label={t("Loss period")} />}
       >
         <PeriodToggle label={t("Loss period")} />
       </PageHeader>

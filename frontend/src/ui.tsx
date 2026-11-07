@@ -24,12 +24,15 @@ export function PageHeader({
   parent,
   status,
   actions,
+  phoneControls,
   children,
 }: {
   title: ReactNode;
   parent?: string;
   status?: ReactNode;
   actions?: ReactNode;
+  /** Compact replacements for the controls on phones, kept beside the title. */
+  phoneControls?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -44,20 +47,34 @@ export function PageHeader({
             />
           </>
         )}
-        <h1 className="truncate font-medium text-foreground">{title}</h1>
-        {status && (
-          <span className="ms-1 truncate text-xs text-muted-foreground">
-            {status}
-          </span>
-        )}
+        <div className="flex min-w-0 items-baseline gap-1.5 max-md:flex-col max-md:items-start max-md:gap-0.5">
+          <h1 className="truncate font-medium text-foreground max-md:text-lg max-md:font-semibold">
+            {title}
+          </h1>
+          {status && (
+            <span className="truncate text-xs text-muted-foreground md:ms-1">
+              {status}
+            </span>
+          )}
+        </div>
       </div>
       {children && (
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-md:order-last max-md:basis-full max-md:justify-start">
+        <div
+          className={cn(
+            "flex min-w-0 flex-wrap items-center justify-end gap-2 max-md:order-last max-md:basis-full max-md:justify-start",
+            phoneControls && "max-md:hidden",
+          )}
+        >
           {children}
         </div>
       )}
-      {actions && (
+      {(actions || phoneControls) && (
         <div className="flex shrink-0 items-center gap-2 md:-ms-2">
+          {phoneControls && (
+            <div className="flex items-center gap-1.5 md:hidden">
+              {phoneControls}
+            </div>
+          )}
           {actions}
         </div>
       )}

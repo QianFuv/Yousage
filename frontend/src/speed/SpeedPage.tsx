@@ -20,7 +20,7 @@ import { msg, t } from "../i18n";
 import { notifyError } from "../notify";
 import { RefreshButton, useRefreshStatus } from "../usage/refreshStatus";
 import type { UsageProviderKind } from "../usage/contracts";
-import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
+import { PeriodMenu, PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
 import { SeriesChart } from "../usage/SeriesChart";
 import { Metric } from "../usage/UsageStatsPanel";
@@ -169,6 +169,7 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
         title={t("Speed")}
         status={!report ? t("Loading…") : refreshStatus}
         actions={<RefreshButton />}
+        phoneControls={<PeriodMenu label={t("Speed period")} />}
       >
         <PeriodToggle label={t("Speed period")} />
       </PageHeader>

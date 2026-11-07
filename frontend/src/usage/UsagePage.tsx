@@ -32,7 +32,8 @@ import { t } from "../i18n";
 import { useData } from "./controller";
 import { RefreshButton, useRefreshStatus } from "./refreshStatus";
 import { localizeEnvironmentError } from "./notices";
-import { PeriodToggle } from "./PeriodToggle";
+import { PeriodMenu, PeriodToggle } from "./PeriodToggle";
+import { ChoiceMenu } from "./ChoiceMenu";
 import { useIsReadOnly } from "../web/readOnly";
 import { ViewerCommitMarker } from "../web/renderAcknowledgment";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
@@ -125,6 +126,24 @@ export function UsagePage({
         title={view === "limits" ? t("Quota") : t("Usage")}
         status={statusLabel}
         actions={<RefreshButton />}
+        phoneControls={
+          view === "statistics" && (
+            <>
+              <ChoiceMenu
+                label={t("Usage metric")}
+                value={metric === "tokens" ? "tokens" : "cost"}
+                choices={[
+                  { value: "cost", label: t("Cost") },
+                  { value: "tokens", label: t("Tokens") },
+                ]}
+                onChange={(value) =>
+                  void data.patchDisplay({ metric: value }).catch(() => {})
+                }
+              />
+              <PeriodMenu label={t("Usage period")} />
+            </>
+          )
+        }
       >
         {view === "statistics" && (
           <>

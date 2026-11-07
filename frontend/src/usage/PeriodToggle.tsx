@@ -5,6 +5,7 @@ import {
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/toggle-group";
 import { msg, t } from "../i18n";
 import { useData } from "./controller";
+import { ChoiceMenu } from "./ChoiceMenu";
 
 /** Period choices matching the original Usage page labels. */
 export const PERIOD_OPTIONS = [
@@ -48,5 +49,28 @@ export function PeriodToggle({ label }: { label: string }) {
         </Toggle>
       ))}
     </ToggleGroup>
+  );
+}
+
+/**
+ * Compact phone form of {@link PeriodToggle}: the selected period on a small menu button.
+ *
+ * @param props - Accessible name of the selector.
+ * @returns The period menu.
+ */
+export function PeriodMenu({ label }: { label: string }) {
+  const data = useData();
+  return (
+    <ChoiceMenu
+      label={label}
+      value={String(data.display.value.windowDays)}
+      choices={PERIOD_OPTIONS.map((option) => ({
+        value: String(option.days),
+        label: t(option.label),
+      }))}
+      onChange={(value) =>
+        void data.patchDisplay({ windowDays: Number(value) }).catch(() => {})
+      }
+    />
   );
 }

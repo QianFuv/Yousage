@@ -53,6 +53,7 @@ vi.mock("./controller", () => ({
 }));
 vi.mock("./PeriodToggle", () => ({
   PeriodToggle: () => null,
+  PeriodMenu: () => null,
   usePeriodDays: () => 7,
 }));
 vi.mock("../../bindings/yousage/internal/desktop/app", () => ({
