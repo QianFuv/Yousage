@@ -159,7 +159,7 @@ Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`（keystore 文件的 Base64�
 3. 原生主题文件选择与取消、拖入主题 JSON、诊断报告保存对话框的选择与取消。
 4. 复制数值和脱敏报告并粘贴到其他程序，内容正确。
 5. Tab / Shift+Tab、对话框关闭后的焦点、Alt+Tab。
-6. 滚动各页面；不同窗口大小、字体、100%–200% 界面缩放，
+6. 滚动各页面；不同窗口大小、界面字号、100%–200% 界面缩放，
    以及 Windows 显示缩放 100% / 125% / 150% / 200%。
 7. 最大化、最小化、恢复，重启后的窗口位置与最大化状态；可能时测试拔出显示器和混合 DPI。
 8. 留下数据来源 / 价格 / 主题草稿后关闭：取消保留草稿，放弃后关闭；正在写入的操作不会丢失。
@@ -167,3 +167,15 @@ Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`（keystore 文件的 Base64�
 10. 正常退出后，应用进程及其 WebView 子进程全部结束。
 
 不要为了测试界面而消耗真实的重置券。
+
+## 字体子集
+
+界面统一使用 `frontend/src/fonts/` 中的 JetBrainsLxgwNerdMono 子集（Regular / Bold 各一个 WOFF2）。
+子集只包含 ASCII、常用符号区段和前端源码实际出现的字符，由 `build/subset-font.py` 从本机安装的完整 TTF 生成：
+
+```bash
+uv run --no-project --with fonttools --with brotli python build/subset-font.py
+```
+
+新增或修改中文文案后若出现子集外的字符，`frontend/src/fonts/fonts.test.tsx` 会失败，按上面的命令重新生成即可。
+字体本身没有的字符记录在 `fallback.txt`，由系统字体显示。
