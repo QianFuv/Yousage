@@ -372,7 +372,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Sidebar Row Hover": "侧边栏行悬停",
   "Sidebar Row Selected": "侧边栏行选中",
   "Signed in": "登录位置",
-  "Smooth fonts": "字体平滑",
   "Snapshot uploaded.": "快照已上传。",
   "Some environment prices are unavailable.": "部分环境的价格不可用。",
   "Some environments are still reporting. Totals include {count} available environments.":

@@ -869,23 +869,6 @@ export function ThemePanel({
             }
           />
           <SettingsRow
-            title={t("Smooth fonts")}
-            control={
-              <Switch
-                aria-label={t("Smooth fonts")}
-                checked={fontDraft.smoothing}
-                onCheckedChange={(isChecked) => {
-                  const typography = models.Typography.createFrom({
-                    ...fontDraft,
-                    smoothing: isChecked,
-                  });
-                  setFontDraft(typography);
-                  void action(() => context.patch({ typography }));
-                }}
-              />
-            }
-          />
-          <SettingsRow
             title={t("Preview")}
             control={
               <Button

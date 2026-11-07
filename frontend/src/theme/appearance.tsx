@@ -127,10 +127,6 @@ export function applySavedAppearance(
     "--panel-animation-duration",
     `${window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : value.motionMs}ms`,
   );
-  root.style.setProperty(
-    "-webkit-font-smoothing",
-    value.typography.smoothing ? "antialiased" : "auto",
-  );
   return appearance;
 }
 

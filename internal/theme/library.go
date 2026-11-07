@@ -22,7 +22,6 @@ type Typography struct {
 	Code          string `json:"code"`
 	InterfaceSize int    `json:"interfaceSize"`
 	CodeSize      int    `json:"codeSize"`
-	Smoothing     bool   `json:"smoothing"`
 }
 type AppearancePreferences struct {
 	Mode               string            `json:"mode"`

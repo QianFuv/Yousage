@@ -300,7 +300,6 @@ export class Typography {
     "code": string;
     "interfaceSize": number;
     "codeSize": number;
-    "smoothing": boolean;
 
     /** Creates a new Typography instance. */
     constructor($$source: Partial<Typography> = {}) {
@@ -315,9 +314,6 @@ export class Typography {
         }
         if (!("codeSize" in $$source)) {
             this["codeSize"] = 0;
-        }
-        if (!("smoothing" in $$source)) {
-            this["smoothing"] = false;
         }
 
         Object.assign(this, $$source);

@@ -633,7 +633,6 @@ let snapshot: LibrarySnapshot = {
         code: "",
         interfaceSize: 16,
         codeSize: 14,
-        smoothing: false,
       },
       contrast: 100,
       glassOpacity: 80,
