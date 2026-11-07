@@ -27,21 +27,23 @@ export function orderProviders<Row extends { provider: string }>(
 }
 
 /**
- * One provider in a summary column: color dot, icon, name and count, its value, and a detail line.
+ * One provider in a summary column: its identity and value, then its facts.
  *
- * @param props - Provider, formatted count, value and detail.
+ * The name is never truncated and the value never wraps. Facts such as the request
+ * count and shares stay whole and wrap onto further lines as a unit, so longer numbers,
+ * wider fonts, larger interface sizes and narrow phone screens only add lines.
+ *
+ * @param props - Provider, its headline value and its facts, the count first.
  * @returns The provider row.
  */
 export function ProviderSummaryRow({
   provider,
-  count,
   value,
-  detail,
+  facts,
 }: {
   provider: UsageProviderKind;
-  count: string;
   value: string;
-  detail: string;
+  facts: readonly string[];
 }) {
   const presentation = providerPresentation(provider);
   return (
@@ -58,18 +60,20 @@ export function ProviderSummaryRow({
             displayName={presentation.label}
             iconClassName="size-4"
           />
-          <span className="flex min-w-0 flex-wrap items-baseline gap-1.5">
-            <span>{presentation.label}</span>
-            <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
-              {count}
-            </span>
-          </span>
+          <span className="min-w-0 wrap-anywhere">{presentation.label}</span>
         </span>
-        <span className="shrink-0 text-sm font-medium tabular-nums">
+        <span className="shrink-0 text-sm font-medium whitespace-nowrap tabular-nums">
           {value}
         </span>
       </div>
-      <span className="text-xs text-muted-foreground">{detail}</span>
+      <ul className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+        {facts.map((fact, index) => (
+          <li key={index} className="whitespace-nowrap">
+            {fact}
+            {index < facts.length - 1 && <span aria-hidden> ·</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

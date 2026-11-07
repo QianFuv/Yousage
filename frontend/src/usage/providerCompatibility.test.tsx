@@ -168,7 +168,7 @@ describe("provider presentation fallback", () => {
     );
     expect(rows.map((row) => row.provider)).toEqual(["claude", FUTURE]);
     const markup = renderToStaticMarkup(
-      <ProviderSummaryRow provider={FUTURE} count="1" value="$2" detail="d" />,
+      <ProviderSummaryRow provider={FUTURE} value="$2" facts={["1", "d"]} />,
     );
     expect(markup).toContain(FUTURE);
   });

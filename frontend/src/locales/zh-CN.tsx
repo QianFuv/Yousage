@@ -475,8 +475,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{percent}% left": "剩余 {percent}%",
   "{percent}% of the window left": "时间窗口剩余 {percent}%",
   "{share} of cost": "占费用 {share}",
-  "{share} of cost · {tokens} tokens": "占费用 {share} · {tokens} Token",
-  "{share} of tokens · {cost}": "占 Token {share} · {cost}",
   "{tokens} tokens have no known price": "{tokens} Token 没有已知价格",
   "{spent} API-equivalent used of {value} this cycle, {confidence}":
     "本周期已用等值 API {spent}，预计总价值 {value}，{confidence}",
@@ -492,8 +490,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Extra spend · {count} events": "额外花费 · {count} 次事件",
   "{count} rewrite": "重写 {count} 次",
   "{count} rewrites": "重写 {count} 次",
-  "{share} of extra spend · {tokens} tokens":
-    "占额外花费 {share} · {tokens} Token",
   "Show all {count} events": "显示全部 {count} 条",
   "Show fewer": "收起",
   "Showing data from {time}": "正在显示 {time} 的数据",
@@ -514,7 +510,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{count} request": "{count} 次请求",
   "{value} ms": "{value} 毫秒",
   "{value} s": "{value} 秒",
-  "TTFT {ttft} · generation {rate}": "首字 {ttft} · 生成 {rate}",
   "Latency and context": "延迟与上下文",
   "Median TTFT": "首字耗时中位数",
   "P90 TTFT": "首字耗时 P90",
@@ -582,4 +577,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Platform: "平台",
   "Quota hubs": "额度中心",
   "Recent logs": "近期日志",
+  "TTFT {ttft}": "首字 {ttft}",
+  "Generation {rate}": "生成 {rate}",
+  "{share} of extra spend": "占额外花费 {share}",
+  "{share} of tokens": "占 Token {share}",
+  "{tokens} tokens": "{tokens} Token",
 };

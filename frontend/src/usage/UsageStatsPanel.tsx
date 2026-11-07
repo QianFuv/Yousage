@@ -45,6 +45,7 @@ import {
   PopoverTrigger,
 } from "../../../tools/parity/upstream/apps/web/src/components/ui/popover";
 import { InlineButton } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
+import { ProviderSummaryRow } from "./ProviderSummaryRow";
 import type { EnvironmentUsageStatus } from "./data";
 import type { UsageProviderKind } from "./contracts";
 
@@ -176,47 +177,34 @@ export function UsageStatsPanel({
             const share =
               metric === "cost" ? totals.costShare : totals.tokenShare;
             return (
-              <div key={provider} className="flex flex-col gap-1">
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-                    <span
-                      aria-hidden
-                      className="size-2 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor: providerPresentation(provider).color,
-                      }}
-                    />
-                    <ProviderMark provider={provider} className="size-4" />
-                    <span className="flex min-w-0 flex-wrap items-baseline gap-1.5">
-                      <span>{providerPresentation(provider).label}</span>
-                      <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
-                        {t(
-                          totals.sessions === 1
-                            ? msg("{count} session")
-                            : msg("{count} sessions"),
-                          { count: formatCount(totals.sessions) },
-                        )}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums">
-                    {metric === "cost"
-                      ? formatUsd(totals.costUsd)
-                      : formatTokens(totals.totalTokens)}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {metric === "cost"
-                    ? t("{share} of cost · {tokens} tokens", {
-                        share: formatPercent(share),
-                        tokens: formatTokens(totals.totalTokens),
-                      })
-                    : t("{share} of tokens · {cost}", {
-                        share: formatPercent(share),
-                        cost: formatUsd(totals.costUsd),
-                      })}
-                </span>
-              </div>
+              <ProviderSummaryRow
+                key={provider}
+                provider={provider}
+                value={
+                  metric === "cost"
+                    ? formatUsd(totals.costUsd)
+                    : formatTokens(totals.totalTokens)
+                }
+                facts={[
+                  t(
+                    totals.sessions === 1
+                      ? msg("{count} session")
+                      : msg("{count} sessions"),
+                    { count: formatCount(totals.sessions) },
+                  ),
+                  ...(metric === "cost"
+                    ? [
+                        t("{share} of cost", { share: formatPercent(share) }),
+                        t("{tokens} tokens", {
+                          tokens: formatTokens(totals.totalTokens),
+                        }),
+                      ]
+                    : [
+                        t("{share} of tokens", { share: formatPercent(share) }),
+                        formatUsd(totals.costUsd),
+                      ]),
+                ]}
+              />
             );
           })}
         </div>

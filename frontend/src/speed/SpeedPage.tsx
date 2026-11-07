@@ -102,31 +102,28 @@ function formatLatency(milliseconds: number): string {
  * without inventing a rate or first-token time.
  *
  * @param provider - Provider statistics.
- * @returns The request count and detail text.
+ * @returns The request count first, then first-token time and generation speed.
  */
-export function providerSpeedSummary(provider: SpeedProvider): {
-  count: string;
-  detail: string;
-} {
+export function providerSpeedFacts(provider: SpeedProvider): string[] {
   if (provider.requests === 0)
-    return {
-      count: t("{count} without timing", {
+    return [
+      t("{count} without timing", {
         count: formatCount(provider.unmeasuredRequests),
       }),
-      detail: t("Not measured"),
-    };
-  return {
-    count: t(
+      t("Not measured"),
+    ];
+  return [
+    t(
       provider.requests === 1
         ? msg("{count} request")
         : msg("{count} requests"),
       { count: formatCount(provider.requests) },
     ),
-    detail: t("TTFT {ttft} · generation {rate}", {
-      ttft: formatLatency(provider.medianTtftMs),
+    t("TTFT {ttft}", { ttft: formatLatency(provider.medianTtftMs) }),
+    t("Generation {rate}", {
       rate: formatSpeed(provider.decodeTokensPerSecond),
     }),
-  };
+  ];
 }
 
 /**
@@ -221,7 +218,7 @@ export function SpeedContent({ report }: { report: SpeedReport }) {
               key={provider.provider}
               provider={provider.provider}
               value={formatSpeed(provider.tokensPerSecond)}
-              {...providerSpeedSummary(provider)}
+              facts={providerSpeedFacts(provider)}
             />
           ))}
         </div>

@@ -150,7 +150,7 @@ describe("Pi provider presentation", () => {
     );
     expect(rows.map((row) => row.provider)).toEqual(["codex", "pi", "unknown"]);
     const markup = renderToStaticMarkup(
-      <ProviderSummaryRow provider="pi" count="1" value="—" detail="detail" />,
+      <ProviderSummaryRow provider="pi" value="—" facts={["1", "detail"]} />,
     );
     expect(markup).toContain("Pi");
     expect(markup).toContain("#4d9f8a");

@@ -123,14 +123,18 @@ export function LossContent({ report }: { report: LossReport }) {
             <ProviderSummaryRow
               key={provider.provider}
               provider={provider.provider}
-              count={rewriteCount(provider.events)}
               value={formatUsd(provider.costUsd)}
-              detail={t("{share} of extra spend · {tokens} tokens", {
-                share: formatPercent(
-                  totalUsd > 0 ? provider.costUsd / totalUsd : 0,
-                ),
-                tokens: formatTokens(provider.tokens),
-              })}
+              facts={[
+                rewriteCount(provider.events),
+                t("{share} of extra spend", {
+                  share: formatPercent(
+                    totalUsd > 0 ? provider.costUsd / totalUsd : 0,
+                  ),
+                }),
+                t("{tokens} tokens", {
+                  tokens: formatTokens(provider.tokens),
+                }),
+              ]}
             />
           ))}
         </div>
