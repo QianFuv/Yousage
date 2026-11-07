@@ -1,11 +1,6 @@
 /** About Yousage and its local diagnostics report, exported only by an explicit native action. */
 import { useEffect, useState } from "react";
-import {
-  CopyIcon,
-  DownloadIcon,
-  ExternalLinkIcon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { CopyIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import { t } from "../i18n";
 import { notify, notifyError } from "../notify";
@@ -16,13 +11,8 @@ import {
   SettingsRow,
   SettingsSection,
 } from "../ui";
+import { ProjectAbout } from "./ProjectAbout";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
-
-/** Public project page of Yousage. */
-export const PROJECT_URL = "https://github.com/QianFuv/Yousage";
-
-/** Where problems with Yousage are reported. */
-export const ISSUES_URL = `${PROJECT_URL}/issues`;
 
 /** The whitelisted fields of the backend diagnostics report. */
 type DiagnosticSummary = {
@@ -75,10 +65,6 @@ export function DiagnosticsPanel({ nativeStatus }: { nativeStatus: string }) {
       notifyError(cause);
     }
   }
-  /** Open a Yousage project page in the system browser. */
-  function open(url: string) {
-    void nativeApi.OpenExternal(url).catch(notifyError);
-  }
   const summary = report ? parseDiagnosticReport(report) : null;
   const count = (value: number | undefined) =>
     summary?.metadataAvailable && value !== undefined ? String(value) : "—";
@@ -87,51 +73,9 @@ export function DiagnosticsPanel({ nativeStatus }: { nativeStatus: string }) {
       <PageHeader parent={t("Settings")} title={t("About & diagnostics")} />
       <PageBody width="narrow">
         {nativeStatus && <Notice tone="error">{nativeStatus}</Notice>}
-        <SettingsSection title={t("About")}>
-          <SettingsRow
-            title="Yousage"
-            description={t(
-              "Local usage monitor for AI coding tools: token usage, API-equivalent cost, subscription quotas, cache loss and output speed.",
-            )}
-            control={
-              version && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {t("Version {version}", { version })}
-                </span>
-              )
-            }
-          />
-          <SettingsRow
-            title={t("Project page")}
-            description="github.com/QianFuv/Yousage"
-            control={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => open(PROJECT_URL)}
-              >
-                <ExternalLinkIcon aria-hidden />
-                {t("Open")}
-              </Button>
-            }
-          />
-          <SettingsRow
-            title={t("Report a problem")}
-            description={t(
-              "Open an issue on GitHub. Attach the diagnostics report below when it helps.",
-            )}
-            control={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => open(ISSUES_URL)}
-              >
-                <ExternalLinkIcon aria-hidden />
-                {t("Open")}
-              </Button>
-            }
-          />
-        </SettingsSection>
+        <ProjectAbout
+          version={version && t("Version {version}", { version })}
+        />
         <SettingsSection
           title={t("Diagnostics")}
           action={

@@ -1,8 +1,9 @@
-/** Settings page of the read-only viewer: snapshot freshness, the relay link and the app version. */
+/** Settings page of the read-only viewer: snapshot freshness, the relay link and About Yousage. */
 import { FileTextIcon, Unlink2Icon } from "lucide-react";
 import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { t, useI18n } from "../i18n";
 import { PageBody, PageHeader, SettingsRow, SettingsSection } from "../ui";
+import { ProjectAbout } from "../settings/ProjectAbout";
 
 /** The relay a viewer reads from, and how to replace its link when the host allows it. */
 export type ViewerConnection = {
@@ -57,6 +58,12 @@ export function ViewerSettings({
       <PageBody width="narrow">
         <SettingsSection title={t("Data")}>
           <SettingsRow
+            title={t("Read-only view")}
+            description={t(
+              "Read-only view of a snapshot from the desktop app. Changes made here are not saved.",
+            )}
+          />
+          <SettingsRow
             title={t("Last updated")}
             description={t(
               "The desktop app uploads a new snapshot after each refresh. This page checks for it every 30 seconds while shown.",
@@ -108,21 +115,11 @@ export function ViewerSettings({
             />
           </SettingsSection>
         )}
-        <SettingsSection title={t("About")}>
-          <SettingsRow
-            title="Yousage"
-            description={t(
-              "Read-only view of a snapshot from the desktop app. Changes made here are not saved.",
-            )}
-            control={
-              appVersion && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {t("Desktop {version}", { version: appVersion })}
-                </span>
-              )
-            }
-          />
-        </SettingsSection>
+        <ProjectAbout
+          version={
+            appVersion && t("Desktop {version}", { version: appVersion })
+          }
+        />
       </PageBody>
     </section>
   );

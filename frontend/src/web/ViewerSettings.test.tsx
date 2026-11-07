@@ -1,4 +1,4 @@
-/** The viewer settings offer local diagnostics only when the host provides them. */
+/** The viewer settings offer local diagnostics only when the host provides them, and the same About as the desktop. */
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ViewerSettings } from "./ViewerSettings";
@@ -35,6 +35,14 @@ describe("ViewerSettings", () => {
     const html = render();
     expect(html).toContain("Last updated");
     expect(html).not.toContain("Check for a newer snapshot");
-    expect(html).not.toContain("<button");
+    expect(html).not.toMatch(/<button[^>]*>[^<]*Refresh/);
+  });
+
+  it("introduces Yousage with its project page like the desktop About", () => {
+    const html = render();
+    expect(html).toContain("Yousage");
+    expect(html).toContain("github.com/QianFuv/Yousage");
+    expect(html).toContain("Report a problem");
+    expect(html).toContain("Desktop test");
   });
 });

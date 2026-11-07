@@ -576,8 +576,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Version {version}": "版本 {version}",
   "Project page": "项目主页",
   "Report a problem": "问题反馈",
-  "Open an issue on GitHub. Attach the diagnostics report below when it helps.":
-    "在 GitHub 上提交 Issue，必要时附上下方的诊断报告。",
+  "Open an issue on GitHub. Attach the diagnostics report when it helps.":
+    "在 GitHub 上提交 Issue，必要时附上诊断报告。",
+  "Read-only view": "只读查看",
   Platform: "平台",
   "Quota hubs": "额度中心",
   "Recent logs": "近期日志",
