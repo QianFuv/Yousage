@@ -135,7 +135,7 @@ func TestLegacyDisplayKeepsNewDefaultsAndNormalizesNativeScale(test *testing.T) 
 		test.Fatal(err)
 	}
 	saved, err := New(store).Display(ctx)
-	if err != nil || saved.Value.Zoom != 1 || !saved.Value.ShouldRestoreWindow || !saved.Value.ShouldCloseToTray || saved.Value.TimestampFormat != "locale" || saved.Value.Breakdown != "model" || saved.Value.ShouldAutoRefresh || saved.Value.Metric != "tokens" || saved.Value.Language != "system" || saved.Value.ShouldStartMinimized {
+	if err != nil || saved.Value.Zoom != 1 || !saved.Value.ShouldCloseToTray || saved.Value.TimestampFormat != "locale" || saved.Value.Breakdown != "model" || saved.Value.ShouldAutoRefresh || saved.Value.Metric != "tokens" || saved.Value.Language != "system" || saved.Value.ShouldStartMinimized {
 		test.Fatal("legacy display overwrote independent defaults", saved, err)
 	}
 	saved.Value.ShouldStartMinimized = true

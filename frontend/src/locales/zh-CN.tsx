@@ -241,7 +241,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Monospace size": "等宽字号",
   Monthly: "每月",
   "More actions for {name}": "{name} 的更多操作",
-  "Move the window back onto the primary display.": "将窗口移回主显示器。",
   Muted: "弱化背景",
   "Muted Foreground": "弱化文字",
   "New model ID": "新模型 ID",
@@ -306,8 +305,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Ready to import {count} themes": "准备导入 {count} 个主题",
   "Recent redacted events stored on this device. Nothing is uploaded unless you share it.":
     "保存在本设备上的近期脱敏事件。除非你主动分享，否则不会上传。",
-  Recenter: "居中",
-  "Recenter window": "窗口居中",
   "Redacted report copied.": "已复制脱敏报告。",
   "Redacted report exported.": "已导出脱敏报告。",
   "Refresh report": "刷新报告",
@@ -327,8 +324,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Remove row": "删除此行",
   "Remove selected themes": "删除所选主题",
   "Remove variants…": "删除变体…",
-  "Reopen with the previous size, position and maximized state.":
-    "重新打开时恢复上次的大小、位置和最大化状态。",
   "Reset applied. Your windows have cleared.": "重置成功，额度窗口已清空。",
   "Reset interface font": "重置界面字体",
   "Reset interface size": "重置界面字号",
@@ -342,7 +337,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Reset {label}": "重置{label}",
   Resets: "重置时间",
   "Resets {time}": "{time} 重置",
-  "Restore window": "恢复窗口",
   Restores: "恢复",
   "Retry failed saves": "重试保存失败的项",
   "Review data sources": "检查数据来源",

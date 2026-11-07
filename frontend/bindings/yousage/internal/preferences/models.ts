@@ -14,7 +14,6 @@ export class Display {
     "metric": string;
     "windowDays": number;
     "shouldAutoRefresh": boolean;
-    "shouldRestoreWindow": boolean;
     "shouldCloseToTray": boolean;
     "shouldStartMinimized": boolean;
     "timestampFormat": string;
@@ -34,9 +33,6 @@ export class Display {
         }
         if (!("shouldAutoRefresh" in $$source)) {
             this["shouldAutoRefresh"] = false;
-        }
-        if (!("shouldRestoreWindow" in $$source)) {
-            this["shouldRestoreWindow"] = false;
         }
         if (!("shouldCloseToTray" in $$source)) {
             this["shouldCloseToTray"] = false;

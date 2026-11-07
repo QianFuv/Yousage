@@ -11,7 +11,6 @@ import {
 } from "../ui";
 import { msg, t } from "../i18n";
 import { notifyError } from "../notify";
-import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { Switch } from "../../../tools/parity/upstream/apps/web/src/components/ui/switch";
 
 const LANGUAGE_OPTIONS = [
@@ -153,21 +152,6 @@ export function DisplayPanel() {
             }
           />
           <SettingsRow
-            title={t("Restore window")}
-            description={t(
-              "Reopen with the previous size, position and maximized state.",
-            )}
-            control={
-              <Switch
-                aria-label={t("Restore window")}
-                checked={value.shouldRestoreWindow}
-                onCheckedChange={(isChecked) =>
-                  change({ shouldRestoreWindow: isChecked })
-                }
-              />
-            }
-          />
-          <SettingsRow
             title={t("Launch at login")}
             description={t("Start Yousage when you sign in to this computer.")}
             control={
@@ -207,21 +191,6 @@ export function DisplayPanel() {
                   change({ shouldCloseToTray: isChecked })
                 }
               />
-            }
-          />
-          <SettingsRow
-            title={t("Recenter window")}
-            description={t("Move the window back onto the primary display.")}
-            control={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  void nativeApi.RecenterWindow().catch(notifyError)
-                }
-              >
-                {t("Recenter")}
-              </Button>
             }
           />
         </SettingsSection>

@@ -131,14 +131,12 @@ func (service *App) restoreWindow() {
 		area = preferences.WindowBounds{X: rect.X, Y: rect.Y, Width: rect.Width, Height: rect.Height}
 	}
 	saved := preferences.WindowBounds{X: area.X + (area.Width-1280)/2, Y: area.Y + (area.Height-900)/2, Width: 1280, Height: 900}
-	display, err := service.usage.Preferences.Display(service.context)
-	if err == nil && display.Value.ShouldRestoreWindow {
-		var previous preferences.WindowBounds
-		revision, err := service.store.ReadSetting(service.context, "window-bounds", &previous)
-		if err == nil && revision > 0 && previous.Width > 0 && previous.Height > 0 {
-			saved = previous
-		}
+	var previous preferences.WindowBounds
+	revision, err := service.store.ReadSetting(service.context, "window-bounds", &previous)
+	if err == nil && revision > 0 && previous.Width > 0 && previous.Height > 0 {
+		saved = previous
 	}
+	display, err := service.usage.Preferences.Display(service.context)
 	zoom := 1.0
 	if err == nil {
 		zoom = display.Value.Zoom
@@ -246,15 +244,6 @@ func (service *App) applyWindowLimits() {
 	minWidth, minHeight, effectiveZoom := windowLimits(zoom, area)
 	service.window.SetMinSize(minWidth, minHeight)
 	service.window.SetZoom(effectiveZoom)
-}
-
-// RecenterWindow recovers an offscreen window without changing saved scale or display preferences.
-func (service *App) RecenterWindow() {
-	service.window.Restore()
-	if screen := service.nativeApp.Screen.GetPrimary(); screen != nil {
-		service.window.SetScreen(screen)
-	}
-	service.captureBounds()
 }
 
 // SetCloseBridge activates only after a mounted frontend subscribes to closing requests.

@@ -21,7 +21,6 @@ let display = {
   revision: 0,
   value: {
     zoom: 1,
-    shouldRestoreWindow: true,
     shouldCloseToTray: true,
     shouldStartMinimized: false,
     timestampFormat: "locale",
@@ -779,7 +778,6 @@ const NO_EFFECT = new Set([
   "FrontendReady",
   "OpenDocumentation",
   "OpenExternal",
-  "RecenterWindow",
   "SetCloseBridge",
   "SetTrayLabels",
   "ShowWindow",

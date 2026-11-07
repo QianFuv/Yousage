@@ -140,7 +140,7 @@ const reportParityJSON = `{
   "formatVersion": 1, "generatedAt": "2026-10-20T00:00:00Z", "appVersion": "synthetic",
   "timeZone": "UTC",
   "display": {"revision": 13, "value": {"zoom": 1.25, "metric": "tokens", "windowDays": 7,
-    "shouldAutoRefresh": true, "shouldRestoreWindow": true, "shouldCloseToTray": true,
+    "shouldAutoRefresh": true, "shouldCloseToTray": true,
     "shouldStartMinimized": true, "timestampFormat": "24h", "breakdown": "model", "language": "zh-CN"}},
   "appearance": {"revision": 17, "value": {"preferences": {"mode": "dark", "baseThemeId": "system",
     "typography": {"interfaceSize": 17, "codeSize": 15}, "contrast": 110, "glassOpacity": 85,

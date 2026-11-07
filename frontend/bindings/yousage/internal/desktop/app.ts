@@ -259,13 +259,6 @@ export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.The
 }
 
 /**
- * RecenterWindow recovers an offscreen window without changing saved scale or display preferences.
- */
-export function RecenterWindow(): $CancellablePromise<void> {
-    return $Call.ByID(4244914996);
-}
-
-/**
  * RecordFrontendDiagnostic accepts two fixed categories, with at most ten events
  * in any rolling minute. It never records arbitrary frontend text or errors.
  */
