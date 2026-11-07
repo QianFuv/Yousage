@@ -51,7 +51,6 @@ import {
   ThemePreviewCircles,
 } from "../../vendor/ThemePreviewCircles";
 import {
-  fontFamilyList,
   frontendTheme,
   nativeLibrary,
   useAppearance,
@@ -250,7 +249,6 @@ export function ThemePanel({
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [shouldReplace, setShouldReplace] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [fontNames, setFontNames] = useState<string[]>([]);
   const [fontDraft, setFontDraft] = useState(preferences.typography);
   const [collectionVariants, setCollectionVariants] = useState<
     Record<string, string>
@@ -340,25 +338,6 @@ export function ThemePanel({
       context.snapshot.revision,
     );
     notify(t("Selected themes removed."));
-  }
-  /** Request local-font access when supported; manual family input always remains available. */
-  async function discoverFonts() {
-    const queryFonts = (
-      window as Window & {
-        queryLocalFonts?: () => Promise<{ family: string }[]>;
-      }
-    ).queryLocalFonts;
-    if (!queryFonts) {
-      notify(
-        t(
-          "Local font discovery is unavailable here. Enter an installed font family manually.",
-        ),
-        "info",
-      );
-      return;
-    }
-    const fonts = await queryFonts();
-    setFontNames([...new Set(fonts.map((font) => font.family))].sort());
   }
   const customs = context.snapshot.value.customThemes.map(frontendTheme);
   const published = context.snapshot.published.themes
@@ -763,54 +742,6 @@ export function ThemePanel({
         </Dialog>
         <SettingsSection title={t("Typography")}>
           <SettingsRow
-            title={t("Interface font")}
-            control={
-              <>
-                <Input
-                  size="sm"
-                  aria-label={t("Interface font")}
-                  className="w-52"
-                  list="local-font-families"
-                  value={fontDraft.sans}
-                  placeholder={t("System default")}
-                  onChange={(event) =>
-                    setFontDraft({ ...fontDraft, sans: event.target.value })
-                  }
-                  onBlur={saveTypography}
-                />
-                <ResetButton
-                  label={t("Reset interface font")}
-                  disabled={context.isBusy}
-                  onClick={() => resetTypography({ sans: "" })}
-                />
-              </>
-            }
-          />
-          <SettingsRow
-            title={t("Monospace font")}
-            control={
-              <>
-                <Input
-                  size="sm"
-                  aria-label={t("Monospace font")}
-                  className="w-52"
-                  list="local-font-families"
-                  value={fontDraft.code}
-                  placeholder={t("System default")}
-                  onChange={(event) =>
-                    setFontDraft({ ...fontDraft, code: event.target.value })
-                  }
-                  onBlur={saveTypography}
-                />
-                <ResetButton
-                  label={t("Reset monospace font")}
-                  disabled={context.isBusy}
-                  onClick={() => resetTypography({ code: "" })}
-                />
-              </>
-            }
-          />
-          <SettingsRow
             title={t("Interface size")}
             description="12–20 px"
             control={
@@ -868,42 +799,18 @@ export function ThemePanel({
               </>
             }
           />
-          <SettingsRow
-            title={t("Preview")}
-            control={
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => void action(discoverFonts)}
-              >
-                {t("Find installed fonts")}
-              </Button>
-            }
-          >
+          <SettingsRow title={t("Preview")}>
             <div className="flex flex-col gap-1.5 rounded-lg bg-muted/40 px-3 py-2.5">
-              <p
-                style={{
-                  fontFamily: fontFamilyList(fontDraft.sans || "Segoe UI"),
-                  fontSize: fontDraft.interfaceSize,
-                }}
-              >
+              <p style={{ fontSize: fontDraft.interfaceSize }}>
                 The quick brown fox · 0123456789
               </p>
               <code
                 className="text-muted-foreground"
-                style={{
-                  fontFamily: fontFamilyList(fontDraft.code || "Consolas"),
-                  fontSize: fontDraft.codeSize,
-                }}
+                style={{ fontSize: fontDraft.codeSize }}
               >
                 input: 123,456 · cost: $1.2345
               </code>
             </div>
-            <datalist id="local-font-families">
-              {fontNames.map((font) => (
-                <option key={font} value={font} />
-              ))}
-            </datalist>
           </SettingsRow>
         </SettingsSection>
         <SettingsSection title={t("Effects")}>

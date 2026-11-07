@@ -1,4 +1,5 @@
 @import "../../tools/parity/upstream/apps/web/src/index.css";
+@import "./fonts/fonts.css";
 @source "../../tools/parity/upstream/apps/web/src/components";
 @source "../../tools/parity/src/workbench.tsx";
 @source "./";

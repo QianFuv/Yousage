@@ -296,19 +296,11 @@ export class Snapshot {
 }
 
 export class Typography {
-    "sans": string;
-    "code": string;
     "interfaceSize": number;
     "codeSize": number;
 
     /** Creates a new Typography instance. */
     constructor($$source: Partial<Typography> = {}) {
-        if (!("sans" in $$source)) {
-            this["sans"] = "";
-        }
-        if (!("code" in $$source)) {
-            this["code"] = "";
-        }
         if (!("interfaceSize" in $$source)) {
             this["interfaceSize"] = 0;
         }

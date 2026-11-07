@@ -123,6 +123,22 @@ entries.set("go:standard-library", {
     { file: "LICENSE", text: readFileSync(join(goRoot, "LICENSE"), "utf8") },
   ],
 });
+const fontLicenses = [
+  "OFL-JetBrainsMono.txt",
+  "OFL-LXGW-WenKai.txt",
+  "LICENSE-NerdFonts.txt",
+];
+entries.set("font:JetBrainsLxgwNerdMono@1.3", {
+  ecosystem: "font",
+  name: "JetBrainsLxgwNerdMono",
+  version: "1.3",
+  license: "OFL-1.1 AND MIT",
+  source: "https://github.com/lvbibir/JetBrainsLxgwNerdMono/releases/tag/v1.3",
+  files: fontLicenses.map((file) => ({
+    file,
+    text: readFileSync(join("frontend/src/fonts", file), "utf8"),
+  })),
+});
 const referenceLicense = readFileSync("build/t3code.LICENSE.txt", "utf8");
 let notices = `# Third-party notices\n\nYousage 0.1.0 is an independent project. No T3 endorsement is implied.\n\nThis conservative inventory includes the locked production package graphs and direct/indirect Go requirements; not every listed package is necessarily emitted by tree shaking or each platform build. Development-only packages are excluded. System WebView runtimes are supplied by the operating system.\n\n## t3code\n\nSource: https://github.com/pingdotgg/t3code/tree/51f7f77f87318a5329d3bab15d513fda5654200b\n\n${referenceLicense.trim()}\n`;
 const manifest = [];

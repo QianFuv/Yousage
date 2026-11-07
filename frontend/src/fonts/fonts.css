@@ -1,0 +1,15 @@
+/* JetBrainsLxgwNerdMono 1.3 (OFL-1.1 and MIT), subset by build/subset-font.py to the interface's characters. */
+@font-face {
+  font-family: "JetBrainsLxgwNerdMono";
+  src: url("./JetBrainsLxgwNerdMono-Regular.woff2") format("woff2");
+  font-weight: 100 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsLxgwNerdMono";
+  src: url("./JetBrainsLxgwNerdMono-Bold.woff2") format("woff2");
+  font-weight: 600 900;
+  font-style: normal;
+  font-display: swap;
+}

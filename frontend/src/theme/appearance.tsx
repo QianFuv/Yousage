@@ -41,19 +41,12 @@ type AppearanceContextValue = {
 };
 const APPEARANCE_CONTEXT = createContext<AppearanceContextValue | null>(null);
 
-/** Normalize individual font names and fallback lists without treating a list as one family. */
-export function fontFamilyList(input: string): string {
-  return input
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean)
-    .map((name) =>
-      /^(['"]).*\1$/.test(name) || /^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)
-        ? name
-        : JSON.stringify(name.replaceAll('"', "")),
-    )
-    .join(", ");
-}
+/**
+ * The one interface and monospace font: the bundled JetBrainsLxgwNerdMono subset, then
+ * system monospace and CJK fonts for characters the subset does not carry.
+ */
+export const FONT_STACK =
+  '"JetBrainsLxgwNerdMono","Cascadia Mono",Consolas,"SF Mono",Menlo,"Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",monospace';
 
 /** Convert validated native definitions through the same portable schema the original UI expects. */
 export function frontendTheme(definition: models.Definition): ThemeDefinition {
@@ -99,14 +92,8 @@ export function applySavedAppearance(
   );
   const root = document.documentElement;
   root.style.fontSize = `${value.typography.interfaceSize}px`;
-  root.style.setProperty(
-    "--font-sans",
-    `${fontFamilyList(value.typography.sans) || '"Segoe UI"'},-apple-system,BlinkMacSystemFont,system-ui,sans-serif`,
-  );
-  root.style.setProperty(
-    "--font-mono",
-    `${fontFamilyList(value.typography.code) || "Consolas"},"SF Mono",Menlo,"Liberation Mono",monospace`,
-  );
+  root.style.setProperty("--font-sans", FONT_STACK);
+  root.style.setProperty("--font-mono", FONT_STACK);
   root.style.setProperty("--code-font-size", `${value.typography.codeSize}px`);
   root.style.setProperty("--font-size-code", `${value.typography.codeSize}px`);
   root.style.setProperty("--diffs-font-size", `${value.typography.codeSize}px`);

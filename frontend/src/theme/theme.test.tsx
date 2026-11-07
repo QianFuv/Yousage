@@ -21,7 +21,7 @@ import {
   mergedImport,
   parseThemeBatch,
 } from "./ThemePanel";
-import { fontFamilyList, frontendTheme, nativeLibrary } from "./appearance";
+import { frontendTheme, nativeLibrary } from "./appearance";
 import {
   LibraryValue,
   Definition,
@@ -180,12 +180,6 @@ it("preserves update metadata and distinguishes copies", () => {
   expect(copies[1].id).not.toBe(original.id);
   expect(copies[1].label).not.toBe(original.label);
   expect(copies[0]).toEqual(original);
-});
-it("normalizes comma-separated font fallbacks without losing quoted families", () => {
-  expect(fontFamilyList('Segoe UI, Inter, "Noto Sans"')).toBe(
-    '"Segoe UI", Inter, "Noto Sans"',
-  );
-  expect(fontFamilyList(" , ")).toBe("");
 });
 it("imports current T3 Code theme files that carry search match colors", () => {
   const text = JSON.stringify({

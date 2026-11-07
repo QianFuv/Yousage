@@ -592,8 +592,6 @@ let snapshot: LibrarySnapshot = {
       lightOwner: "",
       darkOwner: "",
       typography: {
-        sans: "",
-        code: "",
         interfaceSize: 16,
         codeSize: 14,
       },

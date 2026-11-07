@@ -18,10 +18,8 @@ type SettingsRepository interface {
 	WriteSetting(context.Context, string, int64, any) (int64, error)
 }
 type Typography struct {
-	Sans          string `json:"sans"`
-	Code          string `json:"code"`
-	InterfaceSize int    `json:"interfaceSize"`
-	CodeSize      int    `json:"codeSize"`
+	InterfaceSize int `json:"interfaceSize"`
+	CodeSize      int `json:"codeSize"`
 }
 type AppearancePreferences struct {
 	Mode               string            `json:"mode"`
@@ -70,7 +68,7 @@ func (preferences AppearancePreferences) validate() error {
 	if strings.TrimSpace(preferences.BaseThemeId) == "" || len(preferences.BaseThemeId) > 64 || len(preferences.LightOwner) > 64 || len(preferences.DarkOwner) > 64 {
 		return errors.New("invalid theme preference")
 	}
-	if preferences.Typography.InterfaceSize < 12 || preferences.Typography.InterfaceSize > 20 || preferences.Typography.CodeSize < 10 || preferences.Typography.CodeSize > 18 || len(preferences.Typography.Sans) > 256 || len(preferences.Typography.Code) > 256 {
+	if preferences.Typography.InterfaceSize < 12 || preferences.Typography.InterfaceSize > 20 || preferences.Typography.CodeSize < 10 || preferences.Typography.CodeSize > 18 {
 		return errors.New("invalid typography preference")
 	}
 	if math.IsNaN(preferences.Contrast) || math.IsInf(preferences.Contrast, 0) || preferences.Contrast < 50 || preferences.Contrast > 200 || math.IsNaN(preferences.GlassOpacity) || math.IsInf(preferences.GlassOpacity, 0) || preferences.GlassOpacity < 40 || preferences.GlassOpacity > 100 || preferences.MotionMs < 0 || preferences.MotionMs > 400 {
