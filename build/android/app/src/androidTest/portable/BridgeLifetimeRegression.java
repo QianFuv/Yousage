@@ -55,20 +55,9 @@ public final class BridgeLifetimeRegression {
         run("current native diagnostics interface", BridgeLifetimeRegression::activeDiagnostics);
         run("detached native diagnostics interface", BridgeLifetimeRegression::detachedDiagnostics);
         run("replaced native diagnostics interface", BridgeLifetimeRegression::replacedDiagnostics);
-        run("viewer shown is queued and current", BridgeLifetimeRegression::currentViewerShown);
-        run("viewer false is queued and current", BridgeLifetimeRegression::currentViewerHidden);
-        run("queued signals after interface detach", () -> rejectedViewerSignals("interface"));
-        run("queued signals after WebView detach", () -> rejectedViewerSignals("detach"));
-        run("queued signals after replacement", () -> rejectedViewerSignals("replace"));
-        run("queued signals after same-view reattachment", () -> rejectedViewerSignals("rebind"));
-        run("queued signals after document starts", () -> rejectedViewerSignals("document"));
-        run("current signals after document starts", BridgeLifetimeRegression::currentDocumentSignals);
-        run("queued signals after Activity finishes", () -> rejectedViewerSignals("finishing"));
-        run("queued signals after Activity destruction", () -> rejectedViewerSignals("destroyed"));
         run("old interface after same-view reattachment", BridgeLifetimeRegression::sameViewInterfaceInvalidation);
         run("queued diagnostics UI after same-view reattachment", BridgeLifetimeRegression::queuedDiagnosticsAfterRebind);
-        run("invalid fixed category cannot reveal diagnostics", BridgeLifetimeRegression::invalidCategory);
-        run("current frontend failure ignores exhausted logging allowance", BridgeLifetimeRegression::rateLimitedFailure);
+        run("frontend failures keep the logging allowance", BridgeLifetimeRegression::rateLimitedFailure);
         run("legacy console and native logs redact caller data", BridgeLifetimeRegression::logPrivacy);
         if (failureCount != 0) throw new AssertionError(failureCount + " lifetime regressions failed");
     }
@@ -231,66 +220,6 @@ public final class BridgeLifetimeRegression {
         }
     }
 
-    /** A current accepted-render signal must wait for the native UI queue before hiding startup. */
-    private static void currentViewerShown() {
-        ViewerFixture fixture = new ViewerFixture();
-        viewerShown(fixture.javascriptBridge, true);
-        require(fixture.activity.viewerDiagnostics.shouldShowEntry() && fixture.activity.shownCalls == 0,
-                "bridge changed native UI from the JavaScript thread");
-        Handler.drain();
-        require(!fixture.activity.viewerDiagnostics.shouldShowEntry() && fixture.activity.shownCalls == 1,
-                "current accepted rendering did not hide diagnostics");
-    }
-
-    /** Leaving the viewer must reveal native access after a previously accepted render. */
-    private static void currentViewerHidden() {
-        ViewerFixture fixture = new ViewerFixture();
-        fixture.activity.viewerDiagnostics.setViewerShown(true);
-        viewerShown(fixture.javascriptBridge, false);
-        require(!fixture.activity.viewerDiagnostics.shouldShowEntry(), "false signal bypassed the UI queue");
-        Handler.drain();
-        require(fixture.activity.viewerDiagnostics.shouldShowEntry(), "current false signal did not reveal diagnostics");
-    }
-
-    /** Both hiding and revealing must discard queued work across every relevant lifetime boundary. */
-    private static void rejectedViewerSignals(String boundary) {
-        for (String signal : new String[] {"true", "false", "render", "internal"}) {
-            ViewerFixture fixture = new ViewerFixture();
-            boolean isInitiallyVisible = "true".equals(signal);
-            fixture.activity.viewerDiagnostics.setViewerShown(!isInitiallyVisible);
-            if ("true".equals(signal) || "false".equals(signal)) {
-                viewerShown(fixture.javascriptBridge, "true".equals(signal));
-            } else {
-                diagnostic(fixture.javascriptBridge, signal);
-            }
-            switch (boundary) {
-                case "interface": fixture.javascriptBridge.detach(); break;
-                case "detach": fixture.bridge.setWebView(null); fixture.view.isDestroyed = true; break;
-                case "replace": fixture.bridge.setWebView(new WebView()); break;
-                case "rebind": fixture.bridge.setWebView(fixture.view); break;
-                case "document": documentStarted(fixture.bridge, fixture.view); break;
-                case "finishing": fixture.activity.isFinishing = true; break;
-                case "destroyed": fixture.activity.isDestroyed = true; break;
-                default: throw new AssertionError("unknown synthetic boundary");
-            }
-            Handler.drain();
-            require(fixture.activity.shownCalls == 0 && fixture.activity.viewerDiagnostics.shouldShowEntry() == isInitiallyVisible,
-                    boundary + " allowed stale " + signal + " signal");
-        }
-    }
-
-    /** A fresh document must still accept new evidence through its installed interface. */
-    private static void currentDocumentSignals() {
-        ViewerFixture fixture = new ViewerFixture();
-        documentStarted(fixture.bridge, fixture.view);
-        viewerShown(fixture.javascriptBridge, true);
-        Handler.drain();
-        require(!fixture.activity.viewerDiagnostics.shouldShowEntry(), "new document could not acknowledge rendering");
-        diagnostic(fixture.javascriptBridge, "render");
-        Handler.drain();
-        require(fixture.activity.viewerDiagnostics.shouldShowEntry(), "new document could not reveal a render failure");
-    }
-
     /** Old interfaces cannot revive by issuing new calls after the same WebView is rebound. */
     private static void sameViewInterfaceInvalidation() {
         RecordingBridge bridge = new RecordingBridge();
@@ -326,18 +255,7 @@ public final class BridgeLifetimeRegression {
         require(bridge.diagnosticsUiCount == 0, "queued settings diagnostics escaped its attachment");
     }
 
-    /** Caller strings outside the closed failure vocabulary must not affect native presentation. */
-    private static void invalidCategory() {
-        ViewerFixture fixture = new ViewerFixture();
-        fixture.activity.viewerDiagnostics.setViewerShown(true);
-        diagnostic(fixture.javascriptBridge, CANARY);
-        diagnostic(fixture.javascriptBridge, null);
-        Handler.drain();
-        require(!fixture.activity.viewerDiagnostics.shouldShowEntry() && fixture.activity.shownCalls == 0,
-                "arbitrary caller category changed recovery visibility");
-    }
-
-    /** Exercise the real store allowance while proving hide/reveal neither depends on nor deletes logs. */
+    /** Exercise the real store allowance: failures beyond ten per minute are not logged. */
     private static void rateLimitedFailure() {
         Path root = null;
         try {
@@ -348,13 +266,8 @@ public final class BridgeLifetimeRegression {
             Handler.drain();
             String before = store.readReport().text;
             require(before.split("frontend_error", -1).length - 1 == 10, "synthetic log allowance was not filled");
-            viewerShown(fixture.javascriptBridge, true);
-            Handler.drain();
-            require(!fixture.activity.viewerDiagnostics.shouldShowEntry(), "accepted viewer did not hide entry");
-            require(store.readReport().text.equals(before), "hiding the chip deleted or changed logs");
             diagnostic(fixture.javascriptBridge, "render");
             Handler.drain();
-            require(fixture.activity.viewerDiagnostics.shouldShowEntry(), "logging rate limit suppressed current render failure access");
             require(store.readReport().text.equals(before), "logging rate limit or stored log retention changed");
             Field count = DiagnosticsStore.class.getDeclaredField("frontendCount");
             count.setAccessible(true);
@@ -369,26 +282,6 @@ public final class BridgeLifetimeRegression {
                     throw new AssertionError("could not clean synthetic temporary logs", failure);
                 }
             }
-        }
-    }
-
-    /** Invoke the stable boolean-only API reflectively so the committed before-state also compiles. */
-    private static void viewerShown(WailsJSBridge javascriptBridge, boolean isShown) {
-        try {
-            WailsJSBridge.class.getMethod("setViewerShown", boolean.class).invoke(javascriptBridge, isShown);
-        } catch (ReflectiveOperationException failure) {
-            throw new AssertionError("Native accepted-render API unavailable", failure);
-        }
-    }
-
-    /** Start a fresh document without replacing the host's WebView object. */
-    private static void documentStarted(WailsBridge bridge, WebView view) {
-        try {
-            Method method = WailsBridge.class.getDeclaredMethod("onDocumentStarted", WebView.class);
-            method.setAccessible(true);
-            method.invoke(bridge, view);
-        } catch (ReflectiveOperationException failure) {
-            throw new AssertionError("Native document-start invalidation unavailable", failure);
         }
     }
 

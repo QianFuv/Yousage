@@ -147,14 +147,6 @@ public class WailsBridge {
         if (diagnostics != null) diagnostics.frontendFailure(category);
     }
 
-    /** Apply frontend readiness on the UI thread without invoking Go or touching stored logs. */
-    void setViewerShown(boolean isShown) {
-        WebViewBinding binding = webViewBinding;
-        if (isCurrentBinding(binding) && activity instanceof MainActivity) {
-            ((MainActivity) activity).setViewerShown(binding.view, isShown);
-        }
-    }
-
     /** Pass fixed readiness plus a document ticket without exposing application or pairing data. */
     void setStartupContentReady(WebViewBinding binding, String document, boolean ready) {
         if (isCurrentBinding(binding) && document.equals(binding.document) && activity instanceof MainActivity) {

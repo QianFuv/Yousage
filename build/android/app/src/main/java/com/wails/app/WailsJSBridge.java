@@ -98,17 +98,10 @@ public class WailsJSBridge {
     @JavascriptInterface
     public void diagnostic(String category) {
         if (canInvoke() && ("render".equals(category) || "internal".equals(category))) {
-            postToCurrentViewer(() -> bridge.setViewerShown(false));
             String document = startupDocument();
             setStartupContentReady(document, false);
             bridge.recordFrontendDiagnostic(category);
         }
-    }
-
-    /** Report fresh accepted rendering, or leaving/failing the current viewer, without payload data. */
-    @JavascriptInterface
-    public void setViewerShown(boolean isShown) {
-        postToCurrentViewer(() -> bridge.setViewerShown(isShown));
     }
 
     /** Capture a non-secret document identity once in the frontend before asynchronous startup work. */

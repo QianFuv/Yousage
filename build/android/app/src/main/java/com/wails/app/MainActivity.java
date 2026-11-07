@@ -31,8 +31,6 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebViewRenderProcess;
-import android.webkit.WebViewRenderProcessClient;
 import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
@@ -66,11 +64,9 @@ public class MainActivity extends AppCompatActivity {
     private volatile WebView webView;
     private WailsJSBridge javascriptBridge;
     private View recoveryPanel;
-    private View diagnosticsEntry;
     private View startupLoading;
     private final StartupHandoff startupHandoff = new StartupHandoff();
     private boolean isResumed;
-    private final ViewerDiagnosticsState viewerDiagnostics = new ViewerDiagnosticsState();
     private boolean hasAttemptedRendererRecovery;
     private boolean isDestroying;
     private WailsBridge bridge;
@@ -112,8 +108,6 @@ public class MainActivity extends AppCompatActivity {
         applySystemInsets();
         recoveryPanel = findViewById(R.id.viewer_recovery);
         findViewById(R.id.viewer_retry).setOnClickListener(view -> retryApplication());
-        diagnosticsEntry = findViewById(R.id.diagnostics_open);
-        diagnosticsEntry.setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
         findViewById(R.id.viewer_diagnostics).setOnClickListener(view -> DiagnosticsUi.show(this, diagnostics));
         startupLoading = findViewById(R.id.startup_loading);
         if (Build.VERSION.SDK_INT >= 31) prepareStartupFrame();
@@ -232,8 +226,6 @@ public class MainActivity extends AppCompatActivity {
     /** Configure a fresh view with the existing local origin and native bridge. */
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
-        viewerDiagnostics.startViewer();
-        updateDiagnosticsEntry();
         webView = new WebView(this);
         if (Build.VERSION.SDK_INT >= 31 && startupHandoff.isPending())
             webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
@@ -241,7 +233,6 @@ public class MainActivity extends AppCompatActivity {
         container.addView(webView, 0, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         bridge.setWebView(webView);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) setupRendererClient(webView);
         webView.setBackgroundColor(android.graphics.Color.rgb(10, 10, 10));
 
         // Configure WebView settings
@@ -273,7 +264,6 @@ public class MainActivity extends AppCompatActivity {
                 if (view != webView || isDestroying) return;
                 startupHandoff.content(false);
                 bridge.onDocumentStarted(view);
-                setViewerShown(view, false);
                 super.onPageStarted(view, url, favicon);
             }
 
@@ -404,44 +394,6 @@ public class MainActivity extends AppCompatActivity {
         webView.addJavascriptInterface(javascriptBridge, "wails");
     }
 
-    /** Observe API 29+ stalls on the WebView's UI thread without replacing a live renderer. */
-    @android.annotation.TargetApi(Build.VERSION_CODES.Q)
-    private void setupRendererClient(WebView view) {
-        WailsBridge.WebViewBinding binding = bridge.captureWebViewBinding(view);
-        view.setWebViewRenderProcessClient(new WebViewRenderProcessClient() {
-            /** Reveal native diagnostics while preserving accepted rendering as an independent reason. */
-            @Override
-            public void onRenderProcessUnresponsive(WebView stalledView, WebViewRenderProcess renderer) {
-                if (bridge.isCurrentBinding(binding)) setRendererUnresponsive(stalledView, true);
-            }
-
-            /** Clear only the stall reason; startup or render faults still need accepted evidence. */
-            @Override
-            public void onRenderProcessResponsive(WebView responsiveView, WebViewRenderProcess renderer) {
-                if (bridge.isCurrentBinding(binding)) setRendererUnresponsive(responsiveView, false);
-            }
-        });
-    }
-
-    /** Apply only evidence from the currently hosted view while its Activity is alive. */
-    void setViewerShown(WebView sourceView, boolean isShown) {
-        if (sourceView != webView || isDestroying || isFinishing() || isDestroyed()) return;
-        viewerDiagnostics.setViewerShown(isShown);
-        updateDiagnosticsEntry();
-    }
-
-    /** Update responsiveness independently of startup/render failure and recovery budget. */
-    private void setRendererUnresponsive(WebView sourceView, boolean isUnresponsive) {
-        if (sourceView != webView || isDestroying || isFinishing() || isDestroyed()) return;
-        viewerDiagnostics.setRendererUnresponsive(isUnresponsive);
-        updateDiagnosticsEntry();
-    }
-
-    /** Hide the overlay without reserving normal layout space or deleting diagnostics. */
-    private void updateDiagnosticsEntry() {
-        diagnosticsEntry.setVisibility(viewerDiagnostics.shouldShowEntry() ? View.VISIBLE : View.GONE);
-    }
-
     /** Open external HTTPS destinations in the system browser and block other schemes. */
     private boolean openExternalNavigation(Uri destination) {
         if (WAILS_SCHEME.equals(destination.getScheme()) && WAILS_HOST.equals(destination.getHost())) {
@@ -478,8 +430,6 @@ public class MainActivity extends AppCompatActivity {
     /** Invalidate callbacks before removing and destroying the current view. */
     private void disposeWebView() {
         startupHandoff.content(false);
-        viewerDiagnostics.startViewer();
-        updateDiagnosticsEntry();
         WebView disposedView = webView;
         webView = null;
         bridge.setWebView(null);

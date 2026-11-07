@@ -8,7 +8,6 @@ import type { ViewerHost } from "./web/mountViewer";
 import {
   androidDiagnosticSink,
   androidDiagnosticsOpener,
-  androidViewerShownReporter,
   createDiagnosticReporter,
   DIAGNOSTIC_LIMIT,
   DIAGNOSTIC_WINDOW_MS,
@@ -185,43 +184,6 @@ describe("uncaughtRenderHandler", () => {
 });
 
 describe("Android native interface", () => {
-  it("reports only boolean visibility independently of exhausted logging limits", () => {
-    const wails = {
-      shown: [] as boolean[],
-      diagnostic: vi.fn(),
-      /** Record native visibility while verifying the bridge receiver is preserved. */
-      setViewerShown(isShown: boolean) {
-        this.shown.push(isShown);
-      },
-    };
-    const report = createDiagnosticReporter(androidDiagnosticSink({ wails }));
-    for (let index = 0; index <= DIAGNOSTIC_LIMIT; index++) report("render");
-    const reportShown = androidViewerShownReporter({ wails });
-    reportShown!(true);
-    reportShown!(false);
-    reportShown!(true);
-    expect(wails.shown).toEqual([true, false, true]);
-    expect(wails.diagnostic).toHaveBeenCalledTimes(DIAGNOSTIC_LIMIT);
-  });
-
-  it("guards missing, non-callable, unreadable and detached visibility methods", () => {
-    for (const scope of [
-      {},
-      { wails: { setViewerShown: true } },
-      { wails: UNREADABLE },
-      UNREADABLE,
-    ])
-      expect(androidViewerShownReporter(scope)).toBeNull();
-    const report = androidViewerShownReporter({
-      wails: {
-        setViewerShown() {
-          throw UNREADABLE;
-        },
-      },
-    });
-    expect(() => report!(false)).not.toThrow();
-  });
-
   it("is absent outside the Android app, including the relay web page and desktop", () => {
     expect(androidDiagnosticSink({})).toBeNull();
     expect(androidDiagnosticsOpener({})).toBeNull();
@@ -295,7 +257,8 @@ describe("Android native interface", () => {
   });
 });
 
-describe("Android viewer visibility lifecycle", () => {
+/** Each case re-imports the whole Android entry, which can exceed 5 s under a parallel full run. */
+describe("Android viewer visibility lifecycle", { timeout: 30_000 }, () => {
   afterEach(() => {
     vi.doUnmock("react-dom/client");
     vi.doUnmock("@wailsio/runtime");
@@ -328,7 +291,6 @@ describe("Android viewer visibility lifecycle", () => {
     vi.useFakeTimers();
     const runtime = await import("@wailsio/runtime");
     vi.doMock("@wailsio/runtime", () => runtime);
-    const shown = vi.fn();
     const contentReady = vi.fn();
     const diagnostic = vi.fn();
     const render =
@@ -344,7 +306,6 @@ describe("Android viewer visibility lifecycle", () => {
       downloaded ? Promise.resolve(downloaded) : new Promise(() => {}),
     );
     vi.stubGlobal("wails", {
-      setViewerShown: shown,
       diagnostic,
       startupDocument: () => "test-document",
       setStartupContentReady: contentReady,
@@ -385,7 +346,6 @@ describe("Android viewer visibility lifecycle", () => {
     await import("./android/android");
     await vi.advanceTimersByTimeAsync(0);
     return {
-      shown,
       contentReady,
       diagnostic,
       render,
@@ -396,17 +356,6 @@ describe("Android viewer visibility lifecycle", () => {
       mount,
     };
   }
-
-  it.each(["unpaired", "empty"])(
-    "keeps native access on the %s standalone screen",
-    async (status) => {
-      const { shown, hosts, render } = await androidEntry({ status });
-      expect(shown).toHaveBeenLastCalledWith(false);
-      expect(shown).not.toHaveBeenCalledWith(true);
-      expect(hosts).toHaveLength(0);
-      expect(render).toHaveBeenCalled();
-    },
-  );
 
   it.each(["unpaired", "problem"])(
     "hands off %s only after its own content commit and rejects the replaced marker",
@@ -461,31 +410,27 @@ describe("Android viewer visibility lifecycle", () => {
   });
 
   it("does not equate mount completion with readiness and ignores a viewer left for pairing", async () => {
-    const { shown, hosts, unmount } = await androidEntry();
+    const { contentReady, hosts, unmount } = await androidEntry();
     expect(hosts).toHaveLength(1);
-    expect(shown).not.toHaveBeenCalledWith(true);
+    expect(contentReady).not.toHaveBeenCalledWith("test-document", true);
     hosts[0].reportViewerShown!(true);
-    expect(shown).toHaveBeenLastCalledWith(true);
+    expect(contentReady).toHaveBeenLastCalledWith("test-document", true);
     hosts[0].connection!.onChangeLink!();
     expect(unmount).toHaveBeenCalledOnce();
-    expect(shown).toHaveBeenLastCalledWith(false);
-    const count = shown.mock.calls.length;
+    expect(contentReady).toHaveBeenLastCalledWith("test-document", false);
+    const count = contentReady.mock.calls.length;
     hosts[0].reportViewerShown!(true);
     hosts[0].reportViewerShown!(false);
-    expect(shown).toHaveBeenCalledTimes(count);
+    expect(contentReady).toHaveBeenCalledTimes(count);
   });
 
-  it("reveals native access on outer failure even after diagnostic logging is exhausted", async () => {
-    const { shown, hosts, failRoot, diagnostic, render } = await androidEntry();
+  it("shows the problem screen on outer failure even after diagnostic logging is exhausted", async () => {
+    const { hosts, failRoot, diagnostic, render } = await androidEntry();
     hosts[0].reportViewerShown!(true);
     for (let index = 0; index < DIAGNOSTIC_LIMIT; index++)
       window.dispatchEvent(new Event("error"));
     expect(diagnostic).toHaveBeenCalledTimes(DIAGNOSTIC_LIMIT);
     failRoot();
-    expect(shown).toHaveBeenLastCalledWith(false);
-    const count = shown.mock.calls.length;
-    hosts[0].reportViewerShown!(true);
-    expect(shown).toHaveBeenCalledTimes(count);
     await vi.advanceTimersByTimeAsync(0);
     expect(render).toHaveBeenCalled();
     expect(diagnostic).toHaveBeenCalledTimes(DIAGNOSTIC_LIMIT);

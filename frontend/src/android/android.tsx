@@ -11,7 +11,6 @@ import { viewerHistory } from "../usage/dialogHistory";
 import {
   androidDiagnosticSink,
   androidDiagnosticsOpener,
-  androidViewerShownReporter,
   createDiagnosticReporter,
   installDiagnosticListeners,
 } from "../diagnostics";
@@ -29,8 +28,6 @@ import "./android.css";
 
 /** Fixed render/internal categories for the native diagnostics, which work without Go. */
 const reportDiagnostic = createDiagnosticReporter(androidDiagnosticSink());
-/** Native recovery visibility is independent of rate-limited diagnostic logging. */
-const REPORT_VIEWER_SHOWN = androidViewerShownReporter();
 /** Pairing and errors can finish startup without claiming an accepted report. */
 const REPORT_STARTUP_CONTENT = startupContentReporter();
 /** Invalidate callbacks when a standalone presentation is replaced within an opening request. */
@@ -44,7 +41,6 @@ let isShowingFatal = false;
 const root: Root = createRoot(document.getElementById("root")!, {
   /** Replace a blank page after a failure no boundary caught, without looping on the problem screen. */
   onUncaughtError() {
-    REPORT_VIEWER_SHOWN?.(false);
     reportDiagnostic("render");
     if (isShowingFatal) return;
     isShowingFatal = true;
@@ -70,7 +66,6 @@ function leaveViewer() {
   REPORT_STARTUP_CONTENT(false);
   unmountViewer?.();
   unmountViewer = null;
-  REPORT_VIEWER_SHOWN?.(false);
 }
 
 /**
@@ -264,10 +259,7 @@ async function showSnapshot(generation: number, shouldDownload: boolean) {
       showDiagnostics: androidDiagnosticsOpener() ?? undefined,
       /** Ignore visibility from an opening request superseded by recovery or pairing. */
       reportViewerShown: (isShown) => {
-        if (isCurrent()) {
-          REPORT_VIEWER_SHOWN?.(isShown);
-          REPORT_STARTUP_CONTENT(isShown);
-        }
+        if (isCurrent()) REPORT_STARTUP_CONTENT(isShown);
       },
       /** A first render/save failure must offer recovery instead of retaining the native spinner. */
       onInitialFailure: () => {
