@@ -10,20 +10,14 @@ import (
 )
 
 // TestStoreReadsRebindParameters prevents reused reads from retaining a previous
-// identifier, blob kind, expiry cutoff, or result after a missing row.
+// identifier, expiry cutoff, or result after a missing row.
 func TestStoreReadsRebindParameters(t *testing.T) {
 	server, clock := newTestServer(t)
 	now := clock.now()
 	expiresAt := now.Add(time.Hour)
-	spaceData, shareData := []byte{1, 2, 3}, []byte{1, 4, 5}
+	spaceData := []byte{1, 2, 3}
 	if err := server.store.replaceSpace(t.Context(), testID, spaceData, now); err != nil {
 		t.Fatal(err)
-	}
-	if err := server.store.reserveShare(t.Context(), testID, now, expiresAt); err != nil {
-		t.Fatal(err)
-	}
-	if isFilled, err := server.store.fillShare(t.Context(), testID, shareData, now); err != nil || !isFilled {
-		t.Fatalf("fill share = %t: %v", isFilled, err)
 	}
 	if _, err := server.store.database.Exec("UPDATE blobs SET expires_at=? WHERE kind='space' AND id=?", expiresAt.UnixNano(), testID); err != nil {
 		t.Fatal(err)
@@ -36,9 +30,7 @@ func TestStoreReadsRebindParameters(t *testing.T) {
 			data []byte
 		}{
 			{"space", testID, now, spaceData},
-			{"share", testID, now, shareData},
 			{"space", "BBBBBBBBBBBBBBBBBBBBBB", now, nil},
-			{"share", testID, expiresAt, nil},
 			{"space", testID, expiresAt, nil},
 			{"space", testID, expiresAt.Add(-time.Nanosecond), spaceData},
 		} {
@@ -51,8 +43,6 @@ func TestStoreReadsRebindParameters(t *testing.T) {
 				t.Fatalf("%s/%s: incorrect bytes or timestamp: %+v, %v", scenario.kind, scenario.id, value, err)
 			} else if scenario.kind == "space" && value.etag != contentEtag(scenario.data) {
 				t.Fatal("space read returned another row's validator")
-			} else if scenario.kind == "share" && value.etag != "" {
-				t.Fatal("share read retained a space validator")
 			}
 			if scenario.kind == "space" {
 				validator, err := server.store.readSpaceValidator(t.Context(), scenario.id, scenario.now)

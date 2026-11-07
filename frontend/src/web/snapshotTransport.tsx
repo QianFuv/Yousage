@@ -9,7 +9,6 @@ type ViewerMethod =
   | "GetUsage"
   | "GetLossReport"
   | "GetSpeedReport"
-  | "GetReceipt"
   | "GetDisplay"
   | "SaveDisplay"
   | "GetAppearance"
@@ -26,7 +25,6 @@ const PROBES: Record<ViewerMethod, () => Promise<unknown>> = {
   GetUsage: () => nativeApi.GetUsage(1, ""),
   GetLossReport: () => nativeApi.GetLossReport(1, ""),
   GetSpeedReport: () => nativeApi.GetSpeedReport(1, ""),
-  GetReceipt: () => nativeApi.GetReceipt(1, ""),
   GetDisplay: () => nativeApi.GetDisplay(),
   SaveDisplay: () => nativeApi.SaveDisplay({} as never),
   GetAppearance: () => nativeApi.GetAppearance(),
@@ -118,8 +116,6 @@ export function createSnapshotTransport(
         return period(request.args[0]).loss;
       case "GetSpeedReport":
         return period(request.args[0]).speed;
-      case "GetReceipt":
-        return period(request.args[0]).receipt;
       case "GetDisplay":
         return display ?? snapshot.display;
       case "SaveDisplay": {

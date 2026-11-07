@@ -56,7 +56,7 @@ afterEach(() => {
  * @returns The snapshot.
  */
 function snapshot(generatedAt: string): PrivateSnapshot {
-  const period = { usage: {}, loss: {}, speed: {}, receipt: {} };
+  const period = { usage: {}, loss: {}, speed: {} };
   return {
     formatVersion: 1,
     generatedAt,

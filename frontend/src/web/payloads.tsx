@@ -1,14 +1,13 @@
-/** Decrypted relay payloads: the private dashboard snapshot and a public receipt share. */
+/** Decrypted relay payload: the private dashboard snapshot. */
 import { SavedDisplay } from "../../bindings/yousage/internal/preferences/models";
 import {
   LossReport,
-  Receipt,
   Snapshot,
   SpeedReport,
 } from "../../bindings/yousage/internal/service/models";
 import { LibrarySnapshot } from "../../bindings/yousage/internal/theme/models";
 
-/** Format version understood by this build for both payload kinds. */
+/** Snapshot format version understood by this build. */
 export const PAYLOAD_FORMAT_VERSION = 1;
 
 /** Trailing windows carried by a snapshot, keyed by their day count. */
@@ -19,7 +18,6 @@ export type SnapshotPeriod = {
   usage: unknown;
   loss: unknown;
   speed: unknown;
-  receipt: unknown;
 };
 
 /** The private snapshot pushed by the desktop after each refresh. */
@@ -34,73 +32,6 @@ export type PrivateSnapshot = {
   bootstrap: { isSystemDark: boolean; systemLocale: string };
 };
 
-/** One provider's share of one chart bucket. */
-export type ShareSeriesValue = {
-  provider: string;
-  tokens: number;
-  costUsd?: number;
-};
-
-/**
- * A receipt line, without its cost when amounts are hidden; older shares omit
- * `isPaymentUnknown` and `unpricedRecords`.
- */
-export type ShareReceiptItem = {
-  provider: string;
-  model: string;
-  tokens: number;
-  costUsd?: number;
-  unpricedRecords?: number;
-  isSubscription: boolean;
-  isPaymentUnknown?: boolean;
-};
-
-/**
- * A model's slice of the period, measured by cost or by tokens when amounts are hidden;
- * older shares omit `unpricedRecords`.
- */
-export type ShareModel = {
-  provider: string;
-  model: string;
-  tokens: number;
-  costUsd?: number;
-  unpricedRecords?: number;
-  share: number;
-};
-
-/** The public share page payload. Every `*Usd` field is absent when amounts are hidden. */
-export type SharePayload = {
-  formatVersion: number;
-  createdAt: string;
-  expiresAt: string;
-  days: number;
-  timeZone: string;
-  window: {
-    sinceDay: string;
-    untilDay: string;
-    resolution: "hour" | "day";
-    startsAtMs: number;
-    endsAtMs: number;
-  };
-  hideAmounts: boolean;
-  receipt: {
-    number: string;
-    totalUsd?: number;
-    subscriptionUsd?: number;
-    paidUsd?: number;
-    unknownPaymentUsd?: number;
-    cacheSavingsUsd?: number;
-    tokens: number;
-    sessions: number;
-    activeDays: number;
-    unpricedRecords: number;
-    items: ShareReceiptItem[];
-  };
-  series: { startMs: number; values: ShareSeriesValue[] }[];
-  models: ShareModel[];
-  palette: { appearance: "dark" | "light"; colors: Record<string, string> };
-};
-
 /**
  * Generated binding models the viewer's pages build from each report of a period.
  * They tolerate omitted fields and `null` collections, which older desktops and empty
@@ -110,7 +41,6 @@ const REPORT_MODELS = {
   usage: Snapshot.createFrom,
   loss: LossReport.createFrom,
   speed: SpeedReport.createFrom,
-  receipt: Receipt.createFrom,
 } satisfies Record<keyof SnapshotPeriod, (source: unknown) => unknown>;
 
 /**
@@ -188,28 +118,6 @@ export function isPrivateSnapshot(value: unknown): value is PrivateSnapshot {
     isObject(appearance) &&
     isModelReadable(LibrarySnapshot.createFrom, appearance) &&
     isObject(bootstrap)
-  );
-}
-
-/**
- * Check the minimal shape of a decrypted share payload.
- *
- * @param value - Parsed JSON.
- * @returns Whether the receipt, series, models and palette are present.
- */
-export function isSharePayload(value: unknown): value is SharePayload {
-  const payload = value as SharePayload | null;
-  return (
-    typeof payload === "object" &&
-    payload !== null &&
-    payload.formatVersion === PAYLOAD_FORMAT_VERSION &&
-    typeof payload.receipt === "object" &&
-    payload.receipt !== null &&
-    Array.isArray(payload.receipt.items) &&
-    Array.isArray(payload.series) &&
-    Array.isArray(payload.models) &&
-    typeof payload.window === "object" &&
-    payload.window !== null
   );
 }
 

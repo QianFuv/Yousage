@@ -39,7 +39,7 @@ func snapshotProblem(payload []byte) string {
 	periods := snapshotObject(root["periods"])
 	for _, days := range []string{"1", "7", "30", "90"} {
 		period := snapshotObject(periods[days])
-		for _, report := range []string{"usage", "loss", "speed", "receipt"} {
+		for _, report := range []string{"usage", "loss", "speed"} {
 			if snapshotObject(period[report]) == nil {
 				return "data"
 			}

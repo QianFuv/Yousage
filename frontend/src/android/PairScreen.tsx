@@ -60,7 +60,7 @@ export function PairScreen({
       <h1>{t("Connect to your desktop")}</h1>
       <p>
         {t(
-          "On your computer, open Settings → Sync & sharing, turn on Sync to phone and copy the phone link. Paste it here.",
+          "On your computer, open Settings → Sync, turn on Sync to phone and copy the phone link. Paste it here.",
         )}
       </p>
       <div className="android-pair-field">

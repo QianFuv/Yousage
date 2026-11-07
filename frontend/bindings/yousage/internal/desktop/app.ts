@@ -69,20 +69,11 @@ export function CopyText(value: string): $CancellablePromise<void> {
 }
 
 /**
- * CreateShare publishes an encrypted expiring receipt and returns its link and QR.
- */
-export function CreateShare(request: sync$0.ShareRequest): $CancellablePromise<sync$0.ShareView> {
-    return $Call.ByID(2321726175, request).then(($result: any) => {
-        return $$createType3($result);
-    });
-}
-
-/**
  * DetectProviders checks registered installation locations without executing account probes.
  */
 export function DetectProviders(): $CancellablePromise<service$0.ProviderDetection[]> {
     return $Call.ByID(3021794615).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType4($result);
     });
 }
 
@@ -119,7 +110,7 @@ export function FrontendReady(): $CancellablePromise<void> {
  */
 export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(1580242582).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType5($result);
     });
 }
 
@@ -135,7 +126,7 @@ export function GetAutostart(): $CancellablePromise<boolean> {
  */
 export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
     return $Call.ByID(234512250).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType6($result);
     });
 }
 
@@ -144,7 +135,7 @@ export function GetBootstrap(): $CancellablePromise<$models.Bootstrap> {
  */
 export function GetConfiguration(): $CancellablePromise<service$0.SavedConfiguration> {
     return $Call.ByID(138867414).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType7($result);
     });
 }
 
@@ -161,7 +152,7 @@ export function GetDiagnostics(): $CancellablePromise<string> {
  */
 export function GetDisplay(): $CancellablePromise<preferences$0.SavedDisplay> {
     return $Call.ByID(2217068354).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType8($result);
     });
 }
 
@@ -177,16 +168,7 @@ export function GetLocalEnvironmentId(): $CancellablePromise<string> {
  */
 export function GetLossReport(days: number, timeZone: string): $CancellablePromise<service$0.LossReport> {
     return $Call.ByID(3548485653, days, timeZone).then(($result: any) => {
-        return $$createType10($result);
-    });
-}
-
-/**
- * GetReceipt returns a local trailing-window receipt using the Usage pricing pipeline.
- */
-export function GetReceipt(days: number, timeZone: string): $CancellablePromise<service$0.Receipt> {
-    return $Call.ByID(887616352, days, timeZone).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType9($result);
     });
 }
 
@@ -195,7 +177,7 @@ export function GetReceipt(days: number, timeZone: string): $CancellablePromise<
  */
 export function GetRefreshState(): $CancellablePromise<$models.RefreshState> {
     return $Call.ByID(179581928).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType10($result);
     });
 }
 
@@ -204,7 +186,7 @@ export function GetRefreshState(): $CancellablePromise<$models.RefreshState> {
  */
 export function GetSources(): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(3891224558).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType11($result);
     });
 }
 
@@ -213,16 +195,16 @@ export function GetSources(): $CancellablePromise<$models.SavedSources> {
  */
 export function GetSpeedReport(days: number, timeZone: string): $CancellablePromise<service$0.SpeedReport> {
     return $Call.ByID(1696078537, days, timeZone).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType12($result);
     });
 }
 
 /**
- * GetSync returns sync settings, pairing QR, upload status and active share links.
+ * GetSync returns sync settings, the pairing link and upload status.
  */
 export function GetSync(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(4074763935).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType13($result);
     });
 }
 
@@ -231,7 +213,7 @@ export function GetSync(): $CancellablePromise<sync$0.State> {
  */
 export function GetUsage(days: number, timeZone: string): $CancellablePromise<service$0.Snapshot> {
     return $Call.ByID(2994566643, days, timeZone).then(($result: any) => {
-        return $$createType16($result);
+        return $$createType14($result);
     });
 }
 
@@ -254,7 +236,7 @@ export function OpenExternal(destination: string): $CancellablePromise<void> {
  */
 export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
     return $Call.ByID(3805514037, origin, label, bootstrap, isReadOnly).then(($result: any) => {
-        return $$createType17($result);
+        return $$createType15($result);
     });
 }
 
@@ -263,16 +245,7 @@ export function PairEnvironment(origin: string, label: string, bootstrap: string
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(4260808657).then(($result: any) => {
-        return $$createType19($result);
-    });
-}
-
-/**
- * PreviewShare returns a sanitized local receipt preview without creating a relay link.
- */
-export function PreviewShare(request: sync$0.ShareRequest): $CancellablePromise<sync$0.SharePayload> {
-    return $Call.ByID(352551935, request).then(($result: any) => {
-        return $$createType20($result);
+        return $$createType17($result);
     });
 }
 
@@ -281,7 +254,7 @@ export function PreviewShare(request: sync$0.ShareRequest): $CancellablePromise<
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3937500892, paths).then(($result: any) => {
-        return $$createType19($result);
+        return $$createType17($result);
     });
 }
 
@@ -322,20 +295,11 @@ export function RequestRefresh(): $CancellablePromise<void> {
 }
 
 /**
- * RevokeShare removes a published share and its local record.
- */
-export function RevokeShare(id: string): $CancellablePromise<sync$0.State> {
-    return $Call.ByID(2387546301, id).then(($result: any) => {
-        return $$createType15($result);
-    });
-}
-
-/**
  * RotatePairing replaces the private link and publishes a new encrypted snapshot.
  */
 export function RotatePairing(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2621478377).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType13($result);
     });
 }
 
@@ -344,7 +308,7 @@ export function RotatePairing(): $CancellablePromise<sync$0.State> {
  */
 export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $CancellablePromise<theme$0.LibrarySnapshot> {
     return $Call.ByID(1406368615, revision, value).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType5($result);
     });
 }
 
@@ -353,7 +317,7 @@ export function SaveAppearance(revision: number, value: theme$0.LibraryValue): $
  */
 export function SaveConfiguration(saved: service$0.SavedConfiguration): $CancellablePromise<service$0.SavedConfiguration> {
     return $Call.ByID(1220111841, saved).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType7($result);
     });
 }
 
@@ -362,7 +326,7 @@ export function SaveConfiguration(saved: service$0.SavedConfiguration): $Cancell
  */
 export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellablePromise<preferences$0.SavedDisplay> {
     return $Call.ByID(2913585293, saved).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType8($result);
     });
 }
 
@@ -371,7 +335,7 @@ export function SaveDisplay(saved: preferences$0.SavedDisplay): $CancellableProm
  */
 export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$models.SavedSources> {
     return $Call.ByID(430430537, saved).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType11($result);
     });
 }
 
@@ -380,7 +344,7 @@ export function SaveSources(saved: $models.SavedSources): $CancellablePromise<$m
  */
 export function SaveSync(input: sync$0.SaveInput): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2010684434, input).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType13($result);
     });
 }
 
@@ -433,7 +397,7 @@ export function SyncAppearance(isDark: boolean, red: number, green: number, blue
  */
 export function SyncNow(): $CancellablePromise<sync$0.State> {
     return $Call.ByID(2065172309).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType13($result);
     });
 }
 
@@ -448,21 +412,18 @@ export function TestRelay(relayUrl: string, token: string): $CancellablePromise<
 const $$createType0 = remote$0.SaveOutcome.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = quota$0.ResetResult.createFrom;
-const $$createType3 = sync$0.ShareView.createFrom;
-const $$createType4 = service$0.ProviderDetection.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = theme$0.LibrarySnapshot.createFrom;
-const $$createType7 = $models.Bootstrap.createFrom;
-const $$createType8 = service$0.SavedConfiguration.createFrom;
-const $$createType9 = preferences$0.SavedDisplay.createFrom;
-const $$createType10 = service$0.LossReport.createFrom;
-const $$createType11 = service$0.Receipt.createFrom;
-const $$createType12 = $models.RefreshState.createFrom;
-const $$createType13 = $models.SavedSources.createFrom;
-const $$createType14 = service$0.SpeedReport.createFrom;
-const $$createType15 = sync$0.State.createFrom;
-const $$createType16 = service$0.Snapshot.createFrom;
-const $$createType17 = service$0.ConnectionPreference.createFrom;
-const $$createType18 = $models.ThemeFileInput.createFrom;
-const $$createType19 = $Create.Array($$createType18);
-const $$createType20 = sync$0.SharePayload.createFrom;
+const $$createType3 = service$0.ProviderDetection.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = theme$0.LibrarySnapshot.createFrom;
+const $$createType6 = $models.Bootstrap.createFrom;
+const $$createType7 = service$0.SavedConfiguration.createFrom;
+const $$createType8 = preferences$0.SavedDisplay.createFrom;
+const $$createType9 = service$0.LossReport.createFrom;
+const $$createType10 = $models.RefreshState.createFrom;
+const $$createType11 = $models.SavedSources.createFrom;
+const $$createType12 = service$0.SpeedReport.createFrom;
+const $$createType13 = sync$0.State.createFrom;
+const $$createType14 = service$0.Snapshot.createFrom;
+const $$createType15 = service$0.ConnectionPreference.createFrom;
+const $$createType16 = $models.ThemeFileInput.createFrom;
+const $$createType17 = $Create.Array($$createType16);

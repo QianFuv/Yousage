@@ -136,10 +136,7 @@ func TestDesktopRefreshCompletionTriggersSyncAndSaveReconcilesBackground(test *t
 	engine, err := datasync.NewEngine(app.context, datasync.EngineOptions{
 		Preferences: app.usage.Preferences, Secrets: app.usage.Secrets,
 		BuildSnapshot: func(context.Context, string) (datasync.Snapshot, error) { return datasync.Snapshot{}, nil },
-		BuildShare: func(context.Context, datasync.ShareRequest) (datasync.SharePayload, error) {
-			return datasync.SharePayload{}, nil
-		},
-		Now: app.usage.Now,
+		Now:           app.usage.Now,
 		AfterFunc: func(delay time.Duration, callback func()) datasync.Timer {
 			scheduled = append(scheduled, delay)
 			return syncTestTimer{}

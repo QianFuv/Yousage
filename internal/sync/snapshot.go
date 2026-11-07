@@ -17,15 +17,13 @@ type SnapshotSource interface {
 	Usage(context.Context, int, string) (service.Snapshot, error)
 	LossReport(context.Context, int, string) (service.LossReport, error)
 	SpeedReport(context.Context, int, string) (service.SpeedReport, error)
-	Receipt(context.Context, int, string) (service.Receipt, error)
 }
 
-// Period contains all four reports for one supported dashboard window.
+// Period contains every report for one supported dashboard window.
 type Period struct {
-	Usage   service.Snapshot    `json:"usage"`
-	Loss    service.LossReport  `json:"loss"`
-	Speed   service.SpeedReport `json:"speed"`
-	Receipt service.Receipt     `json:"receipt"`
+	Usage service.Snapshot    `json:"usage"`
+	Loss  service.LossReport  `json:"loss"`
+	Speed service.SpeedReport `json:"speed"`
 }
 
 // Snapshot contains read-only dashboard data without connection configuration.
@@ -69,9 +67,6 @@ func (builder SnapshotBuilder) Build(ctx context.Context, timeZone string) (Snap
 			return Snapshot{}, err
 		}
 		if period.Speed, err = builder.Source.SpeedReport(ctx, days, timeZone); err != nil {
-			return Snapshot{}, err
-		}
-		if period.Receipt, err = builder.Source.Receipt(ctx, days, timeZone); err != nil {
 			return Snapshot{}, err
 		}
 		snapshot.Periods[strconv.Itoa(days)] = period

@@ -97,9 +97,7 @@ let syncState = {
   relayUrl: "https://relay.example.invalid",
   hasToken: true,
   pairingUrl: "",
-  pairingQrModules: [] as string[],
   status: { lastPushAt: "", lastError: "", isPushing: false },
-  shares: [] as Record<string, unknown>[],
 };
 
 /** One synthetic history stream: a provider model read from one source folder. */
@@ -620,173 +618,6 @@ function lossFixture(days: number, zone: string) {
   };
 }
 
-/** Local receipt: Codex by subscription, Claude paid, Pi with an unknown payment method. */
-function receiptFixture(days: number, zone: string) {
-  const { window, labels, isHourly } = fixtureWindow(days, zone);
-  const buckets = fixtureBuckets(ENVIRONMENTS[0].streams, labels, isHourly);
-  const items = new Map<
-    string,
-    {
-      provider: string;
-      model: string;
-      tokens: number;
-      costUsd: number;
-      unpricedRecords: number;
-      isSubscription: boolean;
-      isPaymentUnknown: boolean;
-    }
-  >();
-  let subscriptionUsd = 0;
-  let unknownPaymentUsd = 0;
-  for (const bucket of buckets) {
-    const key = `${bucket.provider}\u0000${bucket.model}`;
-    const item = items.get(key) ?? {
-      provider: bucket.provider,
-      model: bucket.model,
-      tokens: 0,
-      costUsd: 0,
-      unpricedRecords: 0,
-      isSubscription: bucket.provider === "codex",
-      isPaymentUnknown: bucket.provider === "pi",
-    };
-    const totals = bucket.totals;
-    item.tokens +=
-      totals.uncachedInputTokens +
-      totals.cachedInputTokens +
-      totals.cacheCreationTokens +
-      totals.outputTokens;
-    item.costUsd += bucket.costUsd;
-    item.unpricedRecords += bucket.unpricedRecords;
-    items.set(key, item);
-    if (item.isPaymentUnknown) unknownPaymentUsd += bucket.costUsd;
-    else if (item.isSubscription) subscriptionUsd += bucket.costUsd;
-  }
-  const list = [...items.values()].sort(
-    (first, second) => second.costUsd - first.costUsd,
-  );
-  const totalUsd = list.reduce((sum, item) => sum + item.costUsd, 0);
-  return {
-    days,
-    window,
-    startsAtMs: isHourly
-      ? REFERENCE_MS - DAY_MS
-      : Date.parse(`${window.sinceDay}T00:00:00Z`),
-    endsAtMs: REFERENCE_MS,
-    number: `FX-${days}`,
-    timeZone: zone,
-    sinceDay: window.sinceDay,
-    untilDay: window.untilDay,
-    items: list,
-    totalUsd,
-    subscriptionUsd,
-    paidUsd: Math.max(0, totalUsd - subscriptionUsd - unknownPaymentUsd),
-    unknownPaymentUsd,
-    tokens: list.reduce((sum, item) => sum + item.tokens, 0),
-    sessions: buckets.length,
-    cacheSavingsUsd: buckets.reduce(
-      (sum, bucket) => sum + bucket.cacheSavingsUsd,
-      0,
-    ),
-    unpricedRecords: list.reduce((sum, item) => sum + item.unpricedRecords, 0),
-    activeDays: new Set(buckets.map((bucket) => bucket.day)).size,
-    firstAtMs: null,
-    lastAtMs: null,
-    qrText: "",
-    qrModules: [],
-  };
-}
-
-/** Public share preview of the local receipt, without amounts when they are hidden. */
-function sharePreview(request: {
-  days: number;
-  ttlDays: number;
-  hideAmounts: boolean;
-  timeZone: string;
-  palette: unknown;
-}) {
-  const receipt = receiptFixture(request.days, request.timeZone);
-  const { labels, isHourly } = fixtureWindow(request.days, request.timeZone);
-  const buckets = fixtureBuckets(ENVIRONMENTS[0].streams, labels, isHourly);
-  const amount = (value: number) => (request.hideAmounts ? undefined : value);
-  const measure = (item: { tokens: number; costUsd: number }) =>
-    request.hideAmounts ? item.tokens : item.costUsd;
-  const total = receipt.items.reduce((sum, item) => sum + measure(item), 0);
-  return {
-    formatVersion: 1,
-    createdAt: new Date(REFERENCE_MS).toISOString(),
-    expiresAt: new Date(REFERENCE_MS + request.ttlDays * DAY_MS).toISOString(),
-    days: request.days,
-    timeZone: request.timeZone,
-    window: {
-      sinceDay: receipt.sinceDay,
-      untilDay: receipt.untilDay,
-      resolution: isHourly ? "hour" : "day",
-      startsAtMs: receipt.startsAtMs,
-      endsAtMs: receipt.endsAtMs,
-    },
-    hideAmounts: request.hideAmounts,
-    receipt: {
-      number: receipt.number,
-      totalUsd: amount(receipt.totalUsd),
-      subscriptionUsd: amount(receipt.subscriptionUsd),
-      paidUsd: amount(receipt.paidUsd),
-      unknownPaymentUsd:
-        receipt.unknownPaymentUsd > 0
-          ? amount(receipt.unknownPaymentUsd)
-          : undefined,
-      cacheSavingsUsd: amount(receipt.cacheSavingsUsd),
-      tokens: receipt.tokens,
-      sessions: receipt.sessions,
-      activeDays: receipt.activeDays,
-      unpricedRecords: receipt.unpricedRecords,
-      items: receipt.items.map((item) => ({
-        provider: item.provider,
-        model: item.model,
-        tokens: item.tokens,
-        costUsd: amount(item.costUsd),
-        unpricedRecords: item.unpricedRecords || undefined,
-        isSubscription: item.isSubscription,
-        isPaymentUnknown: item.isPaymentUnknown || undefined,
-      })),
-    },
-    series: labels.map((label) => ({
-      startMs: isHourly ? Date.parse(label) : Date.parse(`${label}T12:00:00Z`),
-      values: ["codex", "claude", "pi"].flatMap((provider) => {
-        const owned = buckets.filter(
-          (bucket) =>
-            bucket.provider === provider && bucket.day === label.slice(0, 10),
-        );
-        if (owned.length === 0) return [];
-        const tokens = owned.reduce(
-          (sum, bucket) =>
-            sum +
-            bucket.totals.uncachedInputTokens +
-            bucket.totals.outputTokens,
-          0,
-        );
-        return [
-          {
-            provider,
-            tokens,
-            costUsd: amount(
-              owned.reduce((sum, bucket) => sum + bucket.costUsd, 0),
-            ),
-          },
-        ];
-      }),
-    })),
-    models: receipt.items.map((item) => ({
-      provider: item.provider,
-      model: item.model,
-      tokens: item.tokens,
-      costUsd: amount(item.costUsd),
-      unpricedRecords: item.unpricedRecords || undefined,
-      share: total > 0 ? measure(item) / total : 0,
-    })),
-    palette: request.palette,
-  };
-}
-
 let shouldRejectAppearance = false;
 let isFixtureSystemDark = false;
 let snapshot: LibrarySnapshot = {
@@ -870,7 +701,6 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
   GetUsage: (days: number, zone: string) => usageFixture(days, zone),
   GetSpeedReport: (days: number, zone: string) => speedFixture(days, zone),
   GetLossReport: (days: number, zone: string) => lossFixture(days, zone),
-  GetReceipt: (days: number, zone: string) => receiptFixture(days, zone),
   RefreshUsage: async () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     return null;
@@ -915,29 +745,6 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
   SyncNow: () => structuredClone(syncState),
   RotatePairing: () => structuredClone(syncState),
   TestRelay: () => null,
-  PreviewShare: sharePreview,
-  CreateShare: (request: Parameters<typeof sharePreview>[0]) => {
-    const preview = sharePreview(request);
-    const share = {
-      id: `share-fixture-${crypto.randomUUID()}`,
-      url: "https://relay.example.invalid/s/fixture#synthetic",
-      days: request.days,
-      ttlDays: request.ttlDays,
-      hideAmounts: request.hideAmounts,
-      createdAt: preview.createdAt,
-      expiresAt: preview.expiresAt,
-      qrModules: [],
-    };
-    syncState = { ...syncState, shares: [...syncState.shares, share] };
-    return structuredClone(share);
-  },
-  RevokeShare: (id: string) => {
-    syncState = {
-      ...syncState,
-      shares: syncState.shares.filter((share) => share.id !== id),
-    };
-    return structuredClone(syncState);
-  },
   GetBootstrap: () => ({ isSystemDark: false, systemLocale: "en-US" }),
   GetAppearance: () => JSON.parse(JSON.stringify(snapshot)),
   SaveAppearance: async (revision: number, value: LibraryValue) => {

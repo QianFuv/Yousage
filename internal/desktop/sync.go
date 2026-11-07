@@ -23,10 +23,7 @@ func (service *App) initializeSync(ctx context.Context) error {
 		Preferences:   service.usage.Preferences,
 		Secrets:       service.usage.Secrets,
 		BuildSnapshot: builder.Build,
-		BuildShare: func(ctx context.Context, request sync.ShareRequest) (sync.SharePayload, error) {
-			return sync.BuildShare(ctx, service.usage, request)
-		},
-		Now: service.usage.Now,
+		Now:           service.usage.Now,
 		OnChanged: func(state sync.State) {
 			if service.nativeApp != nil {
 				service.nativeApp.Event.Emit("sync-state", state)
@@ -49,7 +46,7 @@ func (service *App) triggerSync() {
 	}
 }
 
-// GetSync returns sync settings, pairing QR, upload status and active share links.
+// GetSync returns sync settings, the pairing link and upload status.
 func (service *App) GetSync() (sync.State, error) {
 	return service.syncEngine.State(service.context)
 }
@@ -96,29 +93,4 @@ func (service *App) RotatePairing() (sync.State, error) {
 	}
 	defer release()
 	return service.syncEngine.RotatePairing(ctx)
-}
-
-// PreviewShare returns a sanitized local receipt preview without creating a relay link.
-func (service *App) PreviewShare(request sync.ShareRequest) (sync.SharePayload, error) {
-	return service.syncEngine.PreviewShare(service.context, request)
-}
-
-// CreateShare publishes an encrypted expiring receipt and returns its link and QR.
-func (service *App) CreateShare(request sync.ShareRequest) (sync.ShareView, error) {
-	ctx, release, err := service.usage.BeginWrite(service.context)
-	if err != nil {
-		return sync.ShareView{}, err
-	}
-	defer release()
-	return service.syncEngine.CreateShare(ctx, request)
-}
-
-// RevokeShare removes a published share and its local record.
-func (service *App) RevokeShare(id string) (sync.State, error) {
-	ctx, release, err := service.usage.BeginWrite(service.context)
-	if err != nil {
-		return sync.State{}, err
-	}
-	defer release()
-	return service.syncEngine.RevokeShare(ctx, id)
 }

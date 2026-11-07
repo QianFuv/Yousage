@@ -151,10 +151,7 @@ func newEngineFixture(test *testing.T) *engineFixture {
 	fixture.engine, err = NewEngine(context.Background(), EngineOptions{
 		Preferences: preferences.New(fixture.store), Secrets: fixture.secrets, Now: fixture.clock.Now, AfterFunc: fixture.clock.afterFunc,
 		BuildSnapshot: func(context.Context, string) (Snapshot, error) { return fixture.snapshot, fixture.buildError },
-		BuildShare: func(_ context.Context, request ShareRequest) (SharePayload, error) {
-			return SharePayload{FormatVersion: 1, Days: request.Days, TimeZone: request.TimeZone, HideAmounts: request.HideAmounts, Palette: request.Palette}, nil
-		},
-		OnChanged: func(state State) { fixture.events = append(fixture.events, state) },
+		OnChanged:     func(state State) { fixture.events = append(fixture.events, state) },
 	})
 	if err != nil {
 		test.Fatal(err)
@@ -169,7 +166,7 @@ func (fixture *engineFixture) enable(test *testing.T) State {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if state.RelayUrl != fixture.server.URL || state.PairingUrl == "" || !state.HasToken || len(state.PairingQrModules) == 0 {
+	if state.RelayUrl != fixture.server.URL || state.PairingUrl == "" || !state.HasToken {
 		test.Fatal("first enable did not pair", state)
 	}
 	fixture.clock.advance(0)
@@ -197,13 +194,6 @@ func TestEngineDisabledMakesNoRelayRequests(test *testing.T) {
 	fixture.engine.SyncNow(context.Background())
 	if _, err := fixture.engine.RotatePairing(context.Background()); err == nil {
 		test.Fatal("rotation enabled disabled sync")
-	}
-	if _, err := fixture.engine.CreateShare(context.Background(), shareRequest()); err == nil {
-		test.Fatal("disabled share made a request")
-	}
-	fixture.engine.RevokeShare(context.Background(), "AAAAAAAAAAAAAAAAAAAAAA")
-	if _, err := fixture.engine.PreviewShare(context.Background(), shareRequest()); err != nil {
-		test.Fatal(err)
 	}
 	if fixture.requests.Load() != 0 {
 		test.Fatal("disabled sync contacted relay")
@@ -340,45 +330,10 @@ func TestEngineSkipsObservationMetadataOnlyChanges(test *testing.T) {
 	}
 }
 
-func TestEngineShareCreateRevokeExpiryAndRotation(test *testing.T) {
+func TestEngineRotatePairing(test *testing.T) {
 	fixture := newEngineFixture(test)
-	state := fixture.enable(test)
+	oldPairing := fixture.enable(test).PairingUrl
 	oldId := fixture.engine.Settings().SpaceId
-	oldPairing := state.PairingUrl
-	for _, shouldExpire := range []bool{false, true} {
-		request := shareRequest()
-		request.HideAmounts = true
-		view, err := fixture.engine.CreateShare(context.Background(), request)
-		if err != nil || view.Id == "" || len(view.QrModules) == 0 {
-			test.Fatal(view, err)
-		}
-		parsed, _ := url.Parse(view.Url)
-		data, status := readBlob(test, fixture.server.URL+"/api/shares/"+view.Id)
-		plaintext, err := Open(data, parsed.Fragment, "share:"+view.Id)
-		if status != 200 || err != nil || strings.Contains(string(plaintext), "Usd") || !strings.Contains(string(plaintext), view.ExpiresAt) {
-			test.Fatal("share was not encrypted with its identity and lifetime", err)
-		}
-		if _, err = Open(data, fixture.secrets.values[spaceKeyId], "share:"+view.Id); err == nil {
-			test.Fatal("share reused private pairing key")
-		}
-		if shouldExpire {
-			fixture.clock.advance(14 * 24 * time.Hour)
-			state, err = fixture.engine.State(context.Background())
-			_, status = readBlob(test, fixture.server.URL+"/api/shares/"+view.Id)
-			if err != nil || len(state.Shares) != 0 || status != 404 {
-				test.Fatal("expired link retained", state.Shares, status, err)
-			}
-		} else {
-			if err = fixture.engine.client.delete(context.Background(), fixture.server.URL, fixtureToken, "shares", view.Id); err != nil {
-				test.Fatal(err)
-			}
-			state, err = fixture.engine.RevokeShare(context.Background(), view.Id)
-			_, status = readBlob(test, fixture.server.URL+"/api/shares/"+view.Id)
-			if err != nil || len(state.Shares) != 0 || status != 404 {
-				test.Fatal("share revocation failed", err)
-			}
-		}
-	}
 	state, err := fixture.engine.RotatePairing(context.Background())
 	if err != nil || state.PairingUrl == oldPairing || fixture.engine.Settings().SpaceId == oldId {
 		test.Fatal("pairing not replaced", err)
@@ -439,51 +394,28 @@ func TestEngineTimeZonePersistsOnlyChanges(test *testing.T) {
 	}
 }
 
-func TestEngineKeepsForeignRelayShareUntilItCanActuallyBeRevoked(test *testing.T) {
-	fixture := newEngineFixture(test)
-	fixture.enable(test)
-	view, err := fixture.engine.CreateShare(context.Background(), shareRequest())
+// TestEngineIgnoresLegacyShareRecords loads sync settings saved while share links existed.
+func TestEngineIgnoresLegacyShareRecords(test *testing.T) {
+	store, err := storage.Open(filepath.Join(test.TempDir(), "sync.sqlite"))
 	if err != nil {
 		test.Fatal(err)
 	}
-	otherCalls := 0
-	otherRelay := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		otherCalls++
-		writer.WriteHeader(http.StatusNoContent)
-	}))
-	defer otherRelay.Close()
-	if _, err = fixture.engine.Save(context.Background(), SaveInput{IsEnabled: true, RelayUrl: otherRelay.URL, Token: "another-synthetic-owner-token"}); err != nil {
+	defer store.Close()
+	legacy := map[string]any{"isEnabled": false, "relayUrl": "https://relay.example", "spaceId": "", "timeZone": "UTC", "shares": []map[string]any{{"id": "AAAAAAAAAAAAAAAAAAAAAA", "url": "https://relay.example/s/AAAAAAAAAAAAAAAAAAAAAA#key"}}}
+	if _, err = store.WriteSetting(context.Background(), "sync", 0, legacy); err != nil {
 		test.Fatal(err)
 	}
-	state, err := fixture.engine.RevokeShare(context.Background(), view.Id)
-	if err == nil || len(state.Shares) != 1 || otherCalls != 0 {
-		test.Fatal("foreign-origin revocation silently discarded a live link", state.Shares, otherCalls, err)
+	engine, err := NewEngine(context.Background(), EngineOptions{Preferences: preferences.New(store), Secrets: &memorySecrets{values: map[string]string{}}, BuildSnapshot: func(context.Context, string) (Snapshot, error) { return Snapshot{}, nil }})
+	if err != nil {
+		test.Fatal("legacy share records blocked sync settings", err)
 	}
-	_, status := readBlob(test, fixture.server.URL+"/api/shares/"+view.Id)
-	if status != 200 {
-		test.Fatal("foreign relay share was changed")
-	}
-}
-
-func TestEngineEventsExcludeExpiredShares(test *testing.T) {
-	fixture := newEngineFixture(test)
-	fixture.enable(test)
-	if _, err := fixture.engine.CreateShare(context.Background(), shareRequest()); err != nil {
+	defer engine.Close()
+	if err = engine.RecordTimeZone(context.Background(), "Asia/Shanghai"); err != nil {
 		test.Fatal(err)
 	}
-	fixture.clock.advance(14 * 24 * time.Hour)
-	fixture.engine.emit()
-	if len(fixture.events[len(fixture.events)-1].Shares) != 0 {
-		test.Fatal("status event exposed expired links")
-	}
-	state, err := fixture.engine.State(context.Background())
-	if err != nil || len(state.Shares) != 0 {
-		test.Fatal(state.Shares, err)
-	}
-	var settings Settings
-	fixture.store.ReadSetting(context.Background(), "sync", &settings)
-	if len(settings.Shares) != 0 {
-		test.Fatal("expired links were not pruned from persistence")
+	var persisted map[string]json.RawMessage
+	if _, err = store.ReadSetting(context.Background(), "sync", &persisted); err != nil || persisted["shares"] != nil {
+		test.Fatal("legacy share records survived the next save", persisted, err)
 	}
 }
 

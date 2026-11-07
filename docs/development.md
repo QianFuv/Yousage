@@ -92,11 +92,11 @@ go run ./tools/spikes/theme --app bin/yousage.exe  # 用真实可执行文件验
 ```
 
 - `go test` 使用合成的 Codex / Claude / Pi 数据
-  覆盖解析、去重、定价、时间窗口、额度合并和损耗、速率、小票等报表，不会读取真实账户，
+  覆盖解析、去重、定价、时间窗口、额度合并和损耗、速率等报表，不会读取真实账户，
   也不会消耗重置券。
 - Pi 的 Go 解析测试和固定版本上游读取器共同读取 `tools/parity/fixtures/pi-usage.json`，
   验证响应模型、独立缓存分类、辅助调用、部分完成请求和费用回退；服务测试另覆盖
-  来源升级、多个会话目录、分叉去重、损耗边界与未知支付金额的分享隐私。
+  来源升级、多个会话目录、分叉去重与损耗边界。
 - Codex 的 Go 解析测试和固定版本上游读取器共同读取 `tools/parity/fixtures/codex-usage.json`，
   验证累计值核对、计数不变量和格式错误计数。
 - `tools/spikes/claude` 是 Claude 控制协议的测试替身，`tools/spikes/theme`

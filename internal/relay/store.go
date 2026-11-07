@@ -1,4 +1,4 @@
-// Package relay serves encrypted snapshots and expiring shares without decrypting them.
+// Package relay serves encrypted snapshots without decrypting them.
 package relay
 
 import (
@@ -145,6 +145,9 @@ func initializeStore(database *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if _, err = transaction.Exec("DELETE FROM blobs WHERE kind='share'"); err != nil {
+		return err
+	}
 	return transaction.Commit()
 }
 
@@ -194,36 +197,7 @@ func (store *blobStore) replaceSpace(ctx context.Context, id string, data []byte
 	return err
 }
 
-func (store *blobStore) reserveShare(ctx context.Context, id string, now, expiresAt time.Time) error {
-	_, err := store.database.ExecContext(ctx, `INSERT INTO blobs(kind,id,data,created_at,updated_at,expires_at)
-		VALUES('share',?,NULL,?,?,?)`, id, now.UnixNano(), now.UnixNano(), expiresAt.UnixNano())
-	return err
-}
-
-func (store *blobStore) fillShare(ctx context.Context, id string, data []byte, now time.Time) (bool, error) {
-	result, err := store.database.ExecContext(ctx, `UPDATE blobs SET data=?,updated_at=?
-		WHERE kind='share' AND id=? AND data IS NULL AND expires_at>?`, data, now.UnixNano(), id, now.UnixNano())
-	if err != nil {
-		return false, err
-	}
-	count, err := result.RowsAffected()
-	if err != nil || count > 0 {
-		return count > 0, err
-	}
-	var exists int
-	err = store.database.QueryRowContext(ctx, `SELECT 1 FROM blobs WHERE kind='share' AND id=? AND expires_at>?`, id, now.UnixNano()).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, sql.ErrNoRows
-	}
-	return false, err
-}
-
 func (store *blobStore) delete(ctx context.Context, kind, id string) error {
 	_, err := store.database.ExecContext(ctx, "DELETE FROM blobs WHERE kind=? AND id=?", kind, id)
-	return err
-}
-
-func (store *blobStore) sweep(ctx context.Context, now time.Time) error {
-	_, err := store.database.ExecContext(ctx, "DELETE FROM blobs WHERE expires_at<=?", now.UnixNano())
 	return err
 }

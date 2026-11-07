@@ -258,24 +258,38 @@ func TestSpaceValidatorsStayConsistentDuringReplace(t *testing.T) {
 	}
 }
 
-// TestConditionalReadsRetainShareAndExpiryRules keeps validators space-specific.
-func TestConditionalReadsRetainShareAndExpiryRules(t *testing.T) {
+// TestConditionalReadsRespectSpaceExpiry hides expired spaces even with a matching validator.
+func TestConditionalReadsRespectSpaceExpiry(t *testing.T) {
 	server, clock := newTestServer(t)
-	id, expiresAt := reserveTestShare(t, server, 1)
-	path := "/api/shares/" + id
 	data := []byte{1, 2, 3}
-	requireStatus(t, performRequest(server, http.MethodPut, path, testToken, data), http.StatusNoContent)
-	response := conditionalRequest(server, path, "*")
-	requireStatus(t, response, http.StatusOK)
-	if !bytes.Equal(response.Body.Bytes(), data) || response.Header().Get("ETag") != "" {
-		t.Fatal("share response acquired space validators")
-	}
-	clock.set(expiresAt)
-	requireStatus(t, conditionalRequest(server, path, "*"), http.StatusNotFound)
 	spacePath := "/api/spaces/" + testID
 	requireStatus(t, performRequest(server, http.MethodPut, spacePath, testToken, data), http.StatusNoContent)
 	if _, err := server.store.database.Exec("UPDATE blobs SET expires_at=? WHERE kind='space' AND id=?", clock.now().Add(-time.Nanosecond).UnixNano(), testID); err != nil {
 		t.Fatal(err)
 	}
 	requireStatus(t, conditionalRequest(server, spacePath, contentEtag(data)), http.StatusNotFound)
+}
+
+// TestOpenPurgesLegacyShares deletes share ciphertext left by relays that served share links.
+func TestOpenPurgesLegacyShares(t *testing.T) {
+	directory := legacyStore(t)
+	database, err := sql.Open("sqlite", filepath.Join(directory, "relay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`INSERT INTO blobs(kind,id,data,created_at,updated_at,expires_at)
+		VALUES('share',?,?,1,1,?)`, testID, []byte{1, 9}, time.Now().Add(time.Hour).UnixNano()); err != nil {
+		t.Fatal(err)
+	}
+	database.Close()
+	server, err := New(Config{Token: testToken, DataDir: directory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	var shares int
+	if err := server.store.database.QueryRow("SELECT count(*) FROM blobs WHERE kind='share'").Scan(&shares); err != nil || shares != 0 {
+		t.Fatalf("legacy shares = %d: %v", shares, err)
+	}
+	requireStatus(t, performRequest(server, http.MethodGet, "/api/spaces/"+testID, "", nil), http.StatusOK)
 }

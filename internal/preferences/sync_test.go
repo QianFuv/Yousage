@@ -17,7 +17,7 @@ func TestSyncRecordIsValidatedAndVersioned(test *testing.T) {
 	}
 	defer store.Close()
 	service := preferences.New(store)
-	settings := sync.Settings{TimeZone: "UTC", Shares: []sync.ShareRecord{}}
+	settings := sync.Settings{TimeZone: "UTC"}
 	ctx := context.Background()
 	revision, err := service.Sync(ctx, &settings)
 	if err != nil || revision != 0 {
@@ -36,7 +36,6 @@ func TestSyncRecordIsValidatedAndVersioned(test *testing.T) {
 		{TimeZone: "invalid"},
 		{TimeZone: "UTC", RelayUrl: "https://relay.example/path"},
 		{TimeZone: "UTC", SpaceId: "bad"},
-		{TimeZone: "UTC", Shares: []sync.ShareRecord{{Id: "AAAAAAAAAAAAAAAAAAAAAA", Days: 14, TtlDays: 90}}},
 	} {
 		if _, err = service.SaveSync(ctx, invalid, revision); err == nil {
 			test.Fatal("invalid sync settings saved", invalid)

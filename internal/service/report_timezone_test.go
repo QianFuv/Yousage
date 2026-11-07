@@ -68,10 +68,6 @@ func TestReportsPreserveLocalDays(test *testing.T) {
 					test.Fatal("timed request assigned to wrong local day", bucket)
 				}
 			}
-			receipt, err := service.Receipt(ctx, 7, fixture.zone)
-			if err != nil || receipt.ActiveDays != 2 || receipt.Sessions != 1 || receipt.FirstAtMs == nil || receipt.LastAtMs == nil || *receipt.FirstAtMs != records[0].TimestampMs || *receipt.LastAtMs != records[2].TimestampMs {
-				test.Fatal("receipt local activity changed", receipt, err)
-			}
 		})
 	}
 }

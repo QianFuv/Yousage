@@ -15,7 +15,7 @@ export const PERIOD_OPTIONS = [
 ] as const;
 
 /**
- * The saved period in days, shared by Usage, Receipts, Loss and Speed.
+ * The saved period in days, shared by Usage, Loss and Speed.
  *
  * @returns The selected period: 1, 7, 30 or 90.
  */

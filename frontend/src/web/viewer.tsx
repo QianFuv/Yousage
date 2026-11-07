@@ -72,7 +72,7 @@ async function start() {
   const locale = navigator.language || "en";
   setLanguage(resolveLanguage("system", locale));
   const address = parseRelayAddress(location.pathname, location.hash);
-  if (!address || address.kind !== "space") return showProblem("link");
+  if (!address) return showProblem("link");
   const first = await loadCandidate(address, "");
   if (first.status !== "ok")
     return showProblem(first.status === "problem" ? first.problem : "network");

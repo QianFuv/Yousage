@@ -16,8 +16,6 @@ import type { PrivateSnapshot } from "./payloads";
 import { SnapshotResult } from "../../bindings/yousage/internal/mobile/models";
 import {
   LossReport,
-  Receipt,
-  ReceiptItem,
   Snapshot,
   SpeedReport,
 } from "../../bindings/yousage/internal/service/models";
@@ -53,8 +51,7 @@ function snapshotFixture(): PrivateSnapshot {
       fixture
         .replaceAll("__DAYS__", String(days))
         .replaceAll("__SINCE__", since)
-        .replaceAll("__WINDOW__", JSON.stringify(window))
-        .replaceAll("__START_MS__", String(start)),
+        .replaceAll("__WINDOW__", JSON.stringify(window)),
     ) as PrivateSnapshot;
   });
   return {
@@ -113,15 +110,12 @@ describe("snapshot transport", () => {
       const usage = await nativeApi.GetUsage(days, "UTC");
       const loss = await nativeApi.GetLossReport(days, "UTC");
       const speed = await nativeApi.GetSpeedReport(days, "UTC");
-      const receipt = await nativeApi.GetReceipt(days, "UTC");
       expect(usage).toBeInstanceOf(Snapshot);
       expect(loss).toBeInstanceOf(LossReport);
       expect(speed).toBeInstanceOf(SpeedReport);
-      expect(receipt).toBeInstanceOf(Receipt);
-      expect(receipt.items[0]).toBeInstanceOf(ReceiptItem);
-      expect(
-        JSON.parse(JSON.stringify({ usage, loss, speed, receipt })),
-      ).toMatchObject(expected.periods[String(days)]);
+      expect(JSON.parse(JSON.stringify({ usage, loss, speed }))).toMatchObject(
+        expected.periods[String(days)],
+      );
       const merged = mergeAnsweredUsage(
         (usage as unknown as UsageSnapshot).environments,
       );
@@ -156,16 +150,16 @@ describe("snapshot transport", () => {
       expect(read.text).toBe(text);
       expect(read.payload).toEqual(expected);
       usage.environments[0].summary!.buckets[0].totals.outputTokens = -1;
-      receipt.items[0].model = "mutated consumer copy";
+      speed.models[0].model = "mutated consumer copy";
       expect(
         JSON.parse(JSON.stringify(await nativeApi.GetUsage(days, "UTC"))),
       ).toMatchObject(
         expected.periods[String(days)].usage as Record<string, unknown>,
       );
       expect(
-        JSON.parse(JSON.stringify(await nativeApi.GetReceipt(days, "UTC"))),
+        JSON.parse(JSON.stringify(await nativeApi.GetSpeedReport(days, "UTC"))),
       ).toMatchObject(
-        expected.periods[String(days)].receipt as Record<string, unknown>,
+        expected.periods[String(days)].speed as Record<string, unknown>,
       );
       expect(read.payload).toEqual(expected);
     },
@@ -208,9 +202,6 @@ describe("snapshot transport", () => {
     expect(await nativeApi.GetSpeedReport(1, "UTC")).toMatchObject({
       overall: { decodeTokensPerSecond: 1.8 },
     });
-    expect(await nativeApi.GetReceipt(30, "UTC")).toMatchObject({
-      days: 30,
-    });
   });
 
   it("hands out copies so model constructors cannot change the snapshot", async () => {
@@ -231,40 +222,6 @@ describe("snapshot transport", () => {
     await nativeApi.GetUsage(7, "UTC");
     await nativeApi.GetUsage(7, "UTC");
     expect(snapshot.periods["7"].usage).toStrictEqual(usage);
-  });
-
-  it("reads receipts from older snapshots as having no unknown payments", async () => {
-    const snapshot = snapshotFixture();
-    snapshot.periods["7"].receipt = {
-      totalUsd: 3,
-      subscriptionUsd: 1,
-      paidUsd: 2,
-      items: [{ provider: "codex", model: "m", costUsd: 3 }],
-    };
-    snapshot.periods["30"].receipt = {
-      totalUsd: 4,
-      subscriptionUsd: 1,
-      paidUsd: 2,
-      unknownPaymentUsd: 1,
-      items: [
-        { provider: "pi", model: "b/m", costUsd: 1, isPaymentUnknown: true },
-      ],
-    };
-    const names = await captureMethodIds(setTransport);
-    setTransport(
-      createSnapshotTransport(names, {
-        current: () => snapshot,
-        refetch: async () => {},
-        device: { isDark: () => false, locale: "en" },
-        open: () => {},
-      }),
-    );
-    const older = await nativeApi.GetReceipt(7, "UTC");
-    expect(older.unknownPaymentUsd).toBe(0);
-    expect(older.items[0].isPaymentUnknown).toBe(false);
-    const current = await nativeApi.GetReceipt(30, "UTC");
-    expect(current.unknownPaymentUsd).toBe(1);
-    expect(current.items[0].isPaymentUnknown).toBe(true);
   });
 
   it("uses the viewing device for color scheme and locale", async () => {
@@ -318,7 +275,6 @@ describe("snapshot transport", () => {
     await expect(nativeApi.GetSync()).rejects.toThrow();
     await expect(nativeApi.SaveSync({} as never)).rejects.toThrow();
     await expect(nativeApi.RotatePairing()).rejects.toThrow();
-    await expect(nativeApi.CreateShare({} as never)).rejects.toThrow();
     await expect(nativeApi.ApplyPricing([], {} as never)).rejects.toThrow();
     await expect(nativeApi.SetAutostart(true)).rejects.toThrow();
   });

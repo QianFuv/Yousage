@@ -571,7 +571,7 @@ const SETTINGS_SECTIONS: readonly {
   },
   {
     id: "sync",
-    label: msg("Sync & sharing"),
+    label: msg("Sync"),
     shortLabel: msg("Sync"),
     icon: SmartphoneIcon,
   },

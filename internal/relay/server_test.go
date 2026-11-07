@@ -3,8 +3,6 @@ package relay
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -68,27 +66,6 @@ func requireStatus(t *testing.T, response *httptest.ResponseRecorder, expected i
 	}
 }
 
-func reserveTestShare(t *testing.T, server *Server, ttlDays int) (string, time.Time) {
-	t.Helper()
-	response := performRequest(server, http.MethodPost, fmt.Sprintf("/api/shares/reserve?ttlDays=%d", ttlDays), testToken, nil)
-	requireStatus(t, response, http.StatusCreated)
-	var reservation struct {
-		ID        string    `json:"id"`
-		ExpiresAt time.Time `json:"expiresAt"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &reservation); err != nil {
-		t.Fatal(err)
-	}
-	if !validID.MatchString(reservation.ID) {
-		t.Fatalf("invalid generated share id %q", reservation.ID)
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(reservation.ID)
-	if err != nil || len(decoded) != 16 {
-		t.Fatalf("share id must encode 16 bytes: %q, %v", reservation.ID, err)
-	}
-	return reservation.ID, reservation.ExpiresAt
-}
-
 // TestWritesRequireOwnerToken rejects missing and incorrect owner credentials.
 func TestWritesRequireOwnerToken(t *testing.T) {
 	server, _ := newTestServer(t)
@@ -96,9 +73,6 @@ func TestWritesRequireOwnerToken(t *testing.T) {
 		{http.MethodGet, "/api/auth"},
 		{http.MethodPut, "/api/spaces/" + testID},
 		{http.MethodDelete, "/api/spaces/" + testID},
-		{http.MethodPost, "/api/shares/reserve?ttlDays=14"},
-		{http.MethodPut, "/api/shares/" + testID},
-		{http.MethodDelete, "/api/shares/" + testID},
 	} {
 		for _, token := range []string{"", "wrong-owner-token"} {
 			t.Run(route.method+route.path+token, func(t *testing.T) {
@@ -115,12 +89,18 @@ func TestWritesRequireOwnerToken(t *testing.T) {
 // TestUnknownReadsReturnNotFound keeps absent blobs and routes undiscoverable.
 func TestUnknownReadsReturnNotFound(t *testing.T) {
 	server, _ := newTestServer(t)
-	for _, path := range []string{"/api/spaces/" + testID, "/api/shares/" + testID, "/api/unknown", "/unknown"} {
+	for _, path := range []string{"/api/spaces/" + testID, "/api/shares/" + testID, "/s/" + testID, "/api/unknown", "/unknown"} {
 		t.Run(path, func(t *testing.T) {
 			requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusNotFound)
 		})
 	}
-	requireStatus(t, performRequest(server, http.MethodPut, "/api/shares/"+testID, testToken, []byte{1}), http.StatusNotFound)
+	for _, route := range []struct{ method, path string }{
+		{http.MethodPost, "/api/shares/reserve?ttlDays=14"}, {http.MethodPut, "/api/shares/" + testID}, {http.MethodDelete, "/api/shares/" + testID},
+	} {
+		if response := performRequest(server, route.method, route.path, testToken, []byte{1}); response.Code != http.StatusNotFound && response.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("%s %s = %d, want share routes removed", route.method, route.path, response.Code)
+		}
+	}
 }
 
 // TestSpaceReplaceReturnsIdenticalBytesAndValidators verifies replacement and conditional reads.
@@ -174,106 +154,10 @@ func TestSpaceReplaceReturnsIdenticalBytesAndValidators(t *testing.T) {
 	requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusNotFound)
 }
 
-// TestShareReservationFillOnceAndExactExpiry checks the two-step share lifecycle for every TTL.
-func TestShareReservationFillOnceAndExactExpiry(t *testing.T) {
-	for _, ttlDays := range []int{1, 7, 14, 30} {
-		t.Run(fmt.Sprint(ttlDays), func(t *testing.T) {
-			server, clock := newTestServer(t)
-			createdAt := clock.now()
-			id, expiresAt := reserveTestShare(t, server, ttlDays)
-			if expected := createdAt.Add(time.Duration(ttlDays) * 24 * time.Hour); !expiresAt.Equal(expected) {
-				t.Fatalf("expiry = %s, want %s", expiresAt, expected)
-			}
-			path := "/api/shares/" + id
-			requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusNotFound)
-			data := []byte{1, 11, 0, 255}
-			clock.set(createdAt.Add(time.Hour))
-			requireStatus(t, performRequest(server, http.MethodPut, path, testToken, data), http.StatusNoContent)
-			requireStatus(t, performRequest(server, http.MethodPut, path, testToken, []byte{1, 99}), http.StatusConflict)
-			response := performRequest(server, http.MethodGet, path, "", nil)
-			requireStatus(t, response, http.StatusOK)
-			if !bytes.Equal(response.Body.Bytes(), data) {
-				t.Fatal("share was overwritten or corrupted")
-			}
-			clock.set(expiresAt.Add(-time.Nanosecond))
-			requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusOK)
-			clock.set(expiresAt)
-			requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusNotFound)
-			requireStatus(t, performRequest(server, http.MethodPut, path, testToken, data), http.StatusNotFound)
-		})
-	}
-}
-
-// TestShareConcurrentFillHasOneWinner prevents concurrent uploads from overwriting shares.
-func TestShareConcurrentFillHasOneWinner(t *testing.T) {
-	server, _ := newTestServer(t)
-	id, _ := reserveTestShare(t, server, 14)
-	results := make(chan *httptest.ResponseRecorder, 2)
-	for _, data := range [][]byte{{1, 2}, {1, 3}} {
-		go func() {
-			results <- performRequest(server, http.MethodPut, "/api/shares/"+id, testToken, data)
-		}()
-	}
-	statuses := map[int]int{}
-	for range 2 {
-		response := <-results
-		statuses[response.Code]++
-	}
-	if statuses[http.StatusNoContent] != 1 || statuses[http.StatusConflict] != 1 {
-		t.Fatalf("fill results = %v", statuses)
-	}
-}
-
-// TestSweeperDeletesExpiredRowsOnly removes expired filled and empty shares while preserving live data.
-func TestSweeperDeletesExpiredRowsOnly(t *testing.T) {
-	server, clock := newTestServer(t)
-	id, _ := reserveTestShare(t, server, 1)
-	requireStatus(t, performRequest(server, http.MethodPut, "/api/shares/"+id, testToken, []byte{1}), http.StatusNoContent)
-	reserveTestShare(t, server, 1)
-	activeID, _ := reserveTestShare(t, server, 7)
-	requireStatus(t, performRequest(server, http.MethodPut, "/api/spaces/"+testID, testToken, []byte{1}), http.StatusNoContent)
-	clock.set(clock.now().Add(24 * time.Hour))
-	if err := server.Sweep(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	var count int
-	if err := server.store.database.QueryRow("SELECT count(*) FROM blobs").Scan(&count); err != nil || count != 2 {
-		t.Fatalf("rows after sweep = %d, want 2: %v", count, err)
-	}
-	requireStatus(t, performRequest(server, http.MethodPut, "/api/shares/"+activeID, testToken, []byte{1}), http.StatusNoContent)
-	requireStatus(t, performRequest(server, http.MethodGet, "/api/spaces/"+testID, "", nil), http.StatusOK)
-}
-
-// TestExpiredEmptyShareCannotBeFilledAndRevocationIsIdempotent checks expiry and explicit revocation.
-func TestExpiredEmptyShareCannotBeFilledAndRevocationIsIdempotent(t *testing.T) {
-	server, clock := newTestServer(t)
-	id, expiresAt := reserveTestShare(t, server, 1)
-	clock.set(expiresAt)
-	requireStatus(t, performRequest(server, http.MethodPut, "/api/shares/"+id, testToken, []byte{1}), http.StatusNotFound)
-	activeID, _ := reserveTestShare(t, server, 14)
-	path := "/api/shares/" + activeID
-	requireStatus(t, performRequest(server, http.MethodPut, path, testToken, []byte{1}), http.StatusNoContent)
-	for range 2 {
-		requireStatus(t, performRequest(server, http.MethodDelete, path, testToken, nil), http.StatusNoContent)
-	}
-	requireStatus(t, performRequest(server, http.MethodGet, path, "", nil), http.StatusNotFound)
-}
-
-// TestInvalidShareTTL rejects missing, malformed, and unsupported lifetimes.
-func TestInvalidShareTTL(t *testing.T) {
-	server, _ := newTestServer(t)
-	for _, ttl := range []string{"", "0", "-1", "2", "31", "1.0", "invalid", "999999999999999999999999"} {
-		t.Run(ttl, func(t *testing.T) {
-			requireStatus(t, performRequest(server, http.MethodPost, "/api/shares/reserve?ttlDays="+ttl, testToken, nil), http.StatusBadRequest)
-		})
-	}
-}
-
 // TestEnvelopeBodyLimit permits exactly 4 MiB and rejects larger streamed uploads.
 func TestEnvelopeBodyLimit(t *testing.T) {
 	server, _ := newTestServer(t)
-	id, _ := reserveTestShare(t, server, 14)
-	for _, path := range []string{"/api/spaces/" + testID, "/api/shares/" + id} {
+	for _, path := range []string{"/api/spaces/" + testID} {
 		for _, size := range []int{maxBodyBytes + 1, maxBodyBytes} {
 			t.Run(fmt.Sprintf("%s/%d", path, size), func(t *testing.T) {
 				data := make([]byte, size)
@@ -296,17 +180,13 @@ func TestEnvelopeBodyLimit(t *testing.T) {
 // TestInvalidEnvelopeVersionAndID rejects invalid envelope versions and path identifiers.
 func TestInvalidEnvelopeVersionAndID(t *testing.T) {
 	server, _ := newTestServer(t)
-	id, _ := reserveTestShare(t, server, 14)
-	for _, path := range []string{"/api/spaces/" + testID, "/api/shares/" + id} {
-		for _, data := range [][]byte{nil, {0}, {2, 1, 2}} {
-			requireStatus(t, performRequest(server, http.MethodPut, path, testToken, data), http.StatusBadRequest)
-		}
+	for _, data := range [][]byte{nil, {0}, {2, 1, 2}} {
+		requireStatus(t, performRequest(server, http.MethodPut, "/api/spaces/"+testID, testToken, data), http.StatusBadRequest)
 	}
 	for _, id := range []string{"short", strings.Repeat("A", 21), strings.Repeat("A", 23), strings.Repeat("A", 21) + ".", strings.Repeat("A", 21) + "!", strings.Repeat("A", 21) + "é"} {
 		for _, route := range []struct{ method, prefix string }{
 			{http.MethodGet, "/api/spaces/"}, {http.MethodPut, "/api/spaces/"}, {http.MethodDelete, "/api/spaces/"},
-			{http.MethodGet, "/api/shares/"}, {http.MethodPut, "/api/shares/"}, {http.MethodDelete, "/api/shares/"},
-			{http.MethodGet, "/v/"}, {http.MethodGet, "/s/"},
+			{http.MethodGet, "/v/"},
 		} {
 			requireStatus(t, performRequest(server, route.method, route.prefix+id, testToken, []byte{1}), http.StatusBadRequest)
 		}
@@ -319,7 +199,7 @@ func TestAPIAndHTMLSecurityHeaders(t *testing.T) {
 	for _, route := range []struct{ method, path, token string }{
 		{http.MethodGet, "/api/auth", testToken}, {http.MethodGet, "/api/auth", ""},
 		{http.MethodGet, "/api/spaces/" + testID, ""}, {http.MethodPut, "/api/spaces/bad", testToken},
-		{http.MethodPut, "/api/spaces/" + testID, testToken}, {http.MethodPost, "/api/shares/reserve?ttlDays=14", testToken},
+		{http.MethodPut, "/api/spaces/" + testID, testToken},
 		{http.MethodGet, "/api/unknown", ""}, {http.MethodPatch, "/api/auth", testToken},
 	} {
 		response := performRequest(server, route.method, route.path, route.token, []byte{1})
@@ -327,7 +207,7 @@ func TestAPIAndHTMLSecurityHeaders(t *testing.T) {
 			t.Errorf("%s %s missing no-store", route.method, route.path)
 		}
 	}
-	for _, prefix := range []string{"/v/", "/s/"} {
+	for _, prefix := range []string{"/v/"} {
 		response := performRequest(server, http.MethodGet, prefix+testID, "", nil)
 		requireStatus(t, response, http.StatusOK)
 		for name, expected := range map[string]string{
@@ -344,7 +224,7 @@ func TestAPIAndHTMLSecurityHeaders(t *testing.T) {
 // TestPlaceholderServedWhenDistAbsent works independently of concurrent frontend builds.
 func TestPlaceholderServedWhenDistAbsent(t *testing.T) {
 	files := fstest.MapFS{"web/README.md": &fstest.MapFile{Data: []byte("build web assets")}}
-	for _, page := range []string{"viewer.html", "share.html"} {
+	for _, page := range []string{"viewer.html"} {
 		t.Run(page, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/v/"+testID, nil)
 			request.SetPathValue("id", testID)
@@ -362,10 +242,9 @@ func TestPlaceholderServedWhenDistAbsent(t *testing.T) {
 func TestBuiltPagesAndImmutableAssets(t *testing.T) {
 	files := fstest.MapFS{
 		"web/dist/viewer.html":   {Data: []byte("<html>viewer</html>")},
-		"web/dist/share.html":    {Data: []byte("<html>share</html>")},
 		"web/dist/assets/app.js": {Data: []byte("export const app = true;")},
 	}
-	for _, page := range []string{"viewer.html", "share.html"} {
+	for _, page := range []string{"viewer.html"} {
 		request := httptest.NewRequest(http.MethodGet, "/v/"+testID, nil)
 		request.SetPathValue("id", testID)
 		response := httptest.NewRecorder()

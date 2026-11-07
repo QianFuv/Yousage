@@ -11,7 +11,7 @@ import { interpretSnapshot } from "./snapshot";
  * @returns The snapshot as JSON text.
  */
 function snapshotJson(formatVersion = 1): string {
-  const period = { usage: {}, loss: {}, speed: {}, receipt: {} };
+  const period = { usage: {}, loss: {}, speed: {} };
   return JSON.stringify({
     formatVersion,
     generatedAt: "2026-10-16T00:00:00Z",
@@ -79,9 +79,11 @@ describe("interpretSnapshot", () => {
     }
     expect(
       Object.values(expected.periods).map(
-        (period) => (period as { receipt: { days: number } }).receipt.days,
+        (period) =>
+          (period as { speed: { measuredRequests: number } }).speed
+            .measuredRequests,
       ),
-    ).toEqual([1, 7, 30, 90]);
+    ).toEqual([106, 706, 3006, 9006]);
   });
 
   it("accepts a valid snapshot with its entity tag, text and candidate ID", () => {

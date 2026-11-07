@@ -13,8 +13,6 @@ export {
     LossTotals,
     NativeProvider,
     ProviderDetection,
-    Receipt,
-    ReceiptItem,
     SavedConfiguration,
     Snapshot,
     SpeedBucket,

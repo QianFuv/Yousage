@@ -2,18 +2,15 @@ package relay
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,19 +31,17 @@ type Config struct {
 	Now func() time.Time
 }
 
-// Server owns the relay HTTP handler, SQLite database, and expiry sweeper.
+// Server owns the relay HTTP handler and SQLite database.
 type Server struct {
 	store      *blobStore
 	tokenHash  [sha256.Size]byte
 	now        func() time.Time
 	handler    http.Handler
-	stop       chan struct{}
-	done       chan struct{}
 	closeOnce  sync.Once
 	closeError error
 }
 
-// New opens relay.db and starts an hourly expiry sweep. Close releases its resources.
+// New opens relay.db. Close releases its resources.
 func New(config Config) (*Server, error) {
 	if utf8.RuneCountInString(config.Token) < 24 {
 		return nil, errors.New("YOUSAGE_RELAY_TOKEN must contain at least 24 characters")
@@ -61,12 +56,8 @@ func New(config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	server := &Server{
-		store: store, tokenHash: sha256.Sum256([]byte(config.Token)), now: config.Now,
-		stop: make(chan struct{}), done: make(chan struct{}),
-	}
+	server := &Server{store: store, tokenHash: sha256.Sum256([]byte(config.Token)), now: config.Now}
 	server.handler = server.routes()
-	go server.sweepLoop()
 	return server, nil
 }
 
@@ -78,11 +69,9 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	server.handler.ServeHTTP(writer, request)
 }
 
-// Close stops the expiry sweeper and closes SQLite after HTTP requests have drained.
+// Close closes SQLite after HTTP requests have drained.
 func (server *Server) Close() error {
 	server.closeOnce.Do(func() {
-		close(server.stop)
-		<-server.done
 		server.closeError = server.store.close()
 	})
 	return server.closeError
@@ -112,25 +101,6 @@ func (server *Server) Serve(ctx context.Context, listener net.Listener) error {
 	}
 }
 
-// Sweep deletes expired reservations and filled shares using the configured clock.
-func (server *Server) Sweep(ctx context.Context) error {
-	return server.store.sweep(ctx, server.now())
-}
-
-func (server *Server) sweepLoop() {
-	defer close(server.done)
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-server.stop:
-			return
-		case <-ticker.C:
-			server.Sweep(context.Background())
-		}
-	}
-}
-
 func (server *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, request *http.Request) {
@@ -142,12 +112,7 @@ func (server *Server) routes() http.Handler {
 	mux.HandleFunc("PUT /api/spaces/{id}", server.authorize(server.writeSpace))
 	mux.HandleFunc("GET /api/spaces/{id}", server.readBlob("space"))
 	mux.HandleFunc("DELETE /api/spaces/{id}", server.authorize(server.deleteBlob("space")))
-	mux.HandleFunc("POST /api/shares/reserve", server.authorize(server.reserveShare))
-	mux.HandleFunc("PUT /api/shares/{id}", server.authorize(server.fillShare))
-	mux.HandleFunc("GET /api/shares/{id}", server.readBlob("share"))
-	mux.HandleFunc("DELETE /api/shares/{id}", server.authorize(server.deleteBlob("share")))
 	mux.HandleFunc("GET /v/{id}", servePage("viewer.html", webFiles))
-	mux.HandleFunc("GET /s/{id}", servePage("share.html", webFiles))
 	mux.HandleFunc("GET /assets/", serveAsset(webFiles))
 	return mux
 }
@@ -264,52 +229,6 @@ func matchesEtag(condition, etag string) bool {
 		}
 	}
 	return false
-}
-
-func (server *Server) reserveShare(writer http.ResponseWriter, request *http.Request) {
-	ttlDays, err := strconv.Atoi(request.URL.Query().Get("ttlDays"))
-	if err != nil || (ttlDays != 1 && ttlDays != 7 && ttlDays != 14 && ttlDays != 30) {
-		http.Error(writer, "ttlDays must be 1, 7, 14, or 30", http.StatusBadRequest)
-		return
-	}
-	var randomID [16]byte
-	if _, err := rand.Read(randomID[:]); err != nil {
-		http.Error(writer, "id generation unavailable", http.StatusInternalServerError)
-		return
-	}
-	id := base64.RawURLEncoding.EncodeToString(randomID[:])
-	now := server.now().UTC()
-	expiresAt := now.Add(time.Duration(ttlDays) * 24 * time.Hour)
-	if err := server.store.reserveShare(request.Context(), id, now, expiresAt); err != nil {
-		http.Error(writer, "storage unavailable", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(writer, http.StatusCreated, map[string]string{"id": id, "expiresAt": expiresAt.Format(time.RFC3339Nano)})
-}
-
-func (server *Server) fillShare(writer http.ResponseWriter, request *http.Request) {
-	id, isValid := requestID(writer, request)
-	if !isValid {
-		return
-	}
-	data, isValid := readEnvelope(writer, request)
-	if !isValid {
-		return
-	}
-	isFilled, err := server.store.fillShare(request.Context(), id, data, server.now())
-	if errors.Is(err, sql.ErrNoRows) {
-		http.NotFound(writer, request)
-		return
-	}
-	if err != nil {
-		http.Error(writer, "storage unavailable", http.StatusInternalServerError)
-		return
-	}
-	if !isFilled {
-		http.Error(writer, "share already filled", http.StatusConflict)
-		return
-	}
-	writer.WriteHeader(http.StatusNoContent)
 }
 
 func (server *Server) deleteBlob(kind string) http.HandlerFunc {

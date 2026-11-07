@@ -73,10 +73,6 @@ func TestEmptyReportsSurviveCandidateAndCache(test *testing.T) {
 			Usage: service.Snapshot{Window: period.Usage.Window, Environments: []service.EnvironmentState{}},
 			Loss:  service.LossReport{Window: period.Loss.Window},
 			Speed: service.SpeedReport{Window: period.Speed.Window},
-			Receipt: service.Receipt{
-				Window: period.Receipt.Window, Days: period.Receipt.Days, TimeZone: period.Receipt.TimeZone,
-				SinceDay: period.Receipt.SinceDay, UntilDay: period.Receipt.UntilDay, Items: []service.ReceiptItem{},
-			},
 		}
 	}
 	encoded, err := json.Marshal(snapshot)
@@ -117,8 +113,12 @@ func TestBusinessFieldsSurviveCandidateAndCache(test *testing.T) {
 			event.AtMs -= int64(index) * 1000
 			period.Loss.Events = append(period.Loss.Events, event)
 		}
-		period.Loss.CacheExpiry.Events = service.LossEventLimit + period.Receipt.Days
-		period.Receipt.Items[0].Model += "/recovered-C"
+		days, err := strconv.Atoi(name)
+		if err != nil {
+			test.Fatal(err)
+		}
+		period.Loss.CacheExpiry.Events = service.LossEventLimit + days
+		period.Speed.Models[0].Model += "/recovered-C"
 		snapshot.Periods[name] = period
 	}
 	encoded, err := json.Marshal(snapshot)
@@ -177,7 +177,7 @@ func TestInvalidSnapshotShapePreservesAccepted(test *testing.T) {
 	}{
 		{"unsupported format", func(value map[string]any) { value["formatVersion"] = 99 }},
 		{"null period", func(value map[string]any) { value["periods"].(map[string]any)["30"] = nil }},
-		{"missing report", func(value map[string]any) { delete(value["periods"].(map[string]any)["7"].(map[string]any), "receipt") }},
+		{"missing report", func(value map[string]any) { delete(value["periods"].(map[string]any)["7"].(map[string]any), "speed") }},
 		{"null display value", func(value map[string]any) { value["display"].(map[string]any)["value"] = nil }},
 		{"missing appearance", func(value map[string]any) { delete(value, "appearance") }},
 		{"invalid metadata", func(value map[string]any) { value["generatedAt"] = false }},

@@ -3,14 +3,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   '"{role}" is not a supported theme color role.':
     "“{role}”不是受支持的主题颜色角色。",
   "+{percent}% of pool": "+{percent}% 的总额度",
-  "1 day": "1 天",
   "12-hour": "12 小时制",
-  "14 days": "14 天",
   "24-hour": "24 小时制",
   "24h": "24 小时",
-  "30 days": "30 天",
   "30d": "30 天",
-  "7 days": "7 天",
   "7d": "7 天",
   "90d": "90 天",
   "A new phone link is ready.": "新的手机链接已生成。",
@@ -22,7 +18,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "API estimate": "API 估算",
   "API estimate excludes {share} unpriced records.":
     "API 估算未包含 {share} 未定价的记录。",
-  "API-equivalent spend": "API 等值花费",
   About: "关于",
   "About & diagnostics": "关于与诊断",
   "Accent Foreground": "强调色文字",
@@ -37,11 +32,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Ahead of pace: spending faster than the window elapses":
     "超出节奏：消耗速度快于时间窗口流逝",
   "All environments": "所有环境",
-  "Amounts hidden": "已隐藏金额",
   "An account or settings change is running. Wait for the result before closing.":
     "账户或设置正在更改，请等待完成后再关闭。",
-  "Anyone with this link can open the page until it expires.":
-    "在过期之前，任何拿到链接的人都能打开此页面。",
   Appearance: "外观",
   "Appearance is already saving. Try again after it finishes.":
     "外观正在保存，请稍后再试。",
@@ -52,8 +44,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Apply to": "应用于",
   "Automatic pricing after saving": "保存后使用自动定价",
   "Automatic refresh": "自动刷新",
-  "Available for": "有效期",
-  "Available until {date}": "有效期至 {date}",
   Back: "返回",
   "Back to usage": "返回用量",
   Behavior: "行为",
@@ -139,10 +129,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Could not save.": "保存失败。",
   "Could not save. Try again.": "保存失败，请重试。",
   "Could not use the reset credit.": "无法使用重置券。",
-  "Create a link from a printed receipt. Active links are listed here.":
-    "在打印出的小票上创建链接，生效中的链接会列在这里。",
-  "Create link": "创建链接",
-  "Creating link…": "正在创建链接…",
   "Custom configuration": "自定义配置",
   "Custom history location": "自定义历史位置",
   "Custom model prices": "自定义模型价格",
@@ -153,8 +139,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Daily cost by provider": "各 Provider 每日费用",
   "Daily processed tokens": "每日处理 Token",
   "Daily processed tokens by provider": "各 Provider 每日处理 Token",
-  "Daily spend": "每日花费",
-  "Daily tokens": "每日 Token",
   Dark: "暗色",
   Data: "数据",
   Day: "日",
@@ -175,7 +159,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Display & behavior": "显示与行为",
   Documentation: "文档",
   "Documentation opened.": "已打开文档。",
-  Done: "完成",
   Effects: "效果",
   "Enable {label}": "启用 {label}",
   "Enter a model ID.": "请输入模型 ID。",
@@ -192,7 +175,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Follow system": "跟随系统",
   "For example https://relay.example.com": "例如 https://relay.example.com",
   "Glass opacity": "毛玻璃不透明度",
-  "Hide amounts": "隐藏金额",
   "High confidence": "可信度高",
   "History draft discarded.": "已放弃历史来源草稿。",
   "History location detected": "已检测到历史记录位置",
@@ -203,8 +185,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Hourly cost by provider": "各 Provider 每小时费用",
   "Hourly processed tokens": "每小时处理 Token",
   "Hourly processed tokens by provider": "各 Provider 每小时处理 Token",
-  "Hourly spend": "每小时花费",
-  "Hourly tokens": "每小时 Token",
   "How quota reset times are shown.": "额度重置时间的显示方式。",
   "Icon Muted": "次要图标",
   "Import themes": "导入主题",
@@ -223,11 +203,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Keep the current link": "保留当前链接",
   "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
-  "Last 24 hours": "最近 24 小时",
   "Last successful limits are retained.": "已保留上次成功读取的额度。",
   "Last updated": "最近更新",
   "Last upload": "上次上传",
-  "Last {days} days": "最近 {days} 天",
   "Launch at login": "开机自启",
   "Launch into the notification area without opening the window. Click the tray icon to open it.":
     "启动后只在托盘中运行，不打开窗口；点击托盘图标即可打开。",
@@ -290,12 +268,9 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Nothing to reset right now.": "当前没有需要重置的额度。",
   Offline: "离线",
   "On pace with the window": "与时间窗口节奏一致",
-  "On your computer, open Settings → Sync & sharing, turn on Sync to phone and copy the phone link. Paste it here.":
-    "在电脑上打开 设置 → 同步与分享，开启“同步到手机”并复制手机链接，然后粘贴到这里。",
   Open: "打开",
   "Open Appearance": "打开外观设置",
   "Open settings": "打开设置",
-  "Open sync settings": "打开同步设置",
   Optional: "可选",
   Other: "其他",
   "Outcome unknown. Reload this environment and review its saved settings before retrying.":
@@ -312,7 +287,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Placeholder: "占位文字",
   Plan: "套餐",
   Premium: "加价",
-  "Preparing preview…": "正在生成预览…",
   Preview: "预览",
   "Preview pasted theme": "预览粘贴的主题",
   Prices: "价格",
@@ -330,7 +304,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":
     "桌面端快照的只读视图，在这里做的更改不会保存。",
   "Ready to import {count} themes": "准备导入 {count} 个主题",
-  "Receipt image copied.": "小票图片已复制。",
   "Recent redacted events stored on this device. Nothing is uploaded unless you share it.":
     "保存在本设备上的近期脱敏事件。除非你主动分享，否则不会上传。",
   Recenter: "居中",
@@ -373,14 +346,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Restores: "恢复",
   "Retry failed saves": "重试保存失败的项",
   "Review data sources": "检查数据来源",
-  Revoke: "撤回",
-  "Revoke this share link?": "撤回这个分享链接？",
   Save: "保存",
   "Save changes": "保存更改",
   Saved: "已保存",
   "Saving…": "正在保存…",
-  "Scan to open the shared page": "扫码打开分享页",
-  "Scan with your phone to open the dashboard.": "用手机扫码打开用量面板。",
   "Scanning…": "正在扫描…",
   Secondary: "次要背景",
   "Secondary Foreground": "次要背景文字",
@@ -392,18 +361,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Selected themes removed.": "已删除所选主题。",
   Session: "会话",
   "Set price": "设置价格",
-  "Set up a relay in Sync & sharing to create share links.":
-    "请先在“同步与分享”中设置 relay，才能创建分享链接。",
   Settings: "设置",
   Share: "占比",
-  "Share link": "分享链接",
-  "Share link revoked.": "分享链接已撤回。",
-  "Share links": "分享链接",
-  "Share preview": "分享预览",
-  "Share this receipt": "分享这张小票",
-  "Shared from Yousage": "来自 Yousage 的分享",
-  "Shared from Yousage · available until {date}":
-    "来自 Yousage 的分享 · 有效期至 {date}",
   Sidebar: "侧边栏",
   "Sidebar Border": "侧边栏边框",
   "Sidebar Control Surface": "侧边栏控件背景",
@@ -420,7 +379,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
   Sources: "来源",
   "Sources & connections": "数据来源",
-  "Spend over time": "花费趋势",
   Spent: "已花费",
   "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
   "Start Yousage when you sign in to this computer.":
@@ -430,7 +388,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Surface Overlay": "浮层表面",
   "Surface Raised": "凸起表面",
   Sync: "同步",
-  "Sync & sharing": "同步与分享",
   "Sync is on.": "同步已开启。",
   "Sync now": "立即同步",
   "Sync settings saved.": "同步设置已保存。",
@@ -453,21 +410,13 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "“{role}”的颜色必须是 CSS 颜色字面量，例如 oklch(0.62 0.2 280)。",
   "The YOUSAGE_RELAY_TOKEN set on the relay.":
     "即 relay 上设置的 YOUSAGE_RELAY_TOKEN。",
-  "The current link stops working and its snapshot is deleted from the relay. Scan the new code on your phone.":
-    "当前链接会立即失效，relay 上的快照也会被删除。请在手机上扫描新的二维码。",
   "The desktop app uploads a new snapshot after each refresh. This page checks for it every 30 seconds while shown.":
     "桌面端每次刷新后都会上传新快照，本页面显示时每 30 秒检查一次。",
   "The key does not match the stored data. Copy the whole link or scan the code again.":
     "密钥与存储的数据不匹配。请复制完整链接或重新扫码。",
   "The line is where even spending would be.": "竖线表示均匀消耗时应处的位置。",
-  "The page below is encrypted on this device and uploaded to your relay. The key stays in the link.":
-    "下面的页面会在本机加密后上传到你的 relay，解密密钥只保存在链接里。",
-  "The page is deleted from the relay and the link stops working immediately.":
-    "页面会从 relay 上删除，链接立即失效。",
   "The part after # holds the key that opens this page. Copy the whole link or scan the code again.":
     "链接中 # 后面的部分是打开此页面的密钥。请复制完整链接或重新扫码。",
-  "The part after # is the key. Anyone with the full link can read your snapshot, so keep it private.":
-    "# 后面的部分是密钥。拿到完整链接的人都能读取你的快照，请勿外传。",
   "The part after # is the key. It stays on this phone and is never sent to the relay.":
     "# 后面的部分是密钥，只保存在这台手机上，不会发送给 relay。",
   "The relay cannot be reached": "无法连接 relay",
@@ -521,8 +470,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Toggle account email visibility": "切换账户邮箱显示",
   Tokens: "Token",
   "Tokens by type": "按类型划分的 Token",
-  "Tokens over time": "Token 趋势",
-  "Tokens processed": "处理的 Token",
   Total: "合计",
   Totals: "合计",
   "Try again": "重试",
@@ -580,7 +527,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Weekly: "每周",
   "Your installed themes changed while this package was downloading. Try again.":
     "下载期间已安装的主题发生了变化，请重试。",
-  "Yousage usage share": "Yousage 用量分享",
   "expires in {duration}": "{duration}后过期",
   "in {duration}": "{duration}后",
   "invalid theme JSON.": "主题 JSON 无效。",
@@ -618,21 +564,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "本周期已用等值 API {spent}，总价值估算中",
   "Used {spent}": "已用 {spent}",
   Earlier: "之前周期",
-  "Print receipt": "打印小票",
-  Close: "关闭",
   Copied: "已复制",
-  "Receipt {label}": "{label} 小票",
-  "24-HOUR RECEIPT": "24 小时小票",
-  "{days}-DAY RECEIPT": "{days} 天小票",
-  "Nothing purchased": "无消费",
-  "Paid by subscription": "订阅支付",
-  "Amount paid": "实付",
-  "Active days": "活跃天数",
-  Sessions: "会话",
-  "Cache saved": "缓存节省",
-  "Summary code": "摘要二维码",
-  "Scan for the summary": "扫码查看摘要",
-  "Thank you · come again": "谢谢惠顾 · 欢迎再来",
   Loss: "损耗分析",
   "Loss period": "损耗统计时间段",
   "Extra spend · {count} event": "额外花费 · {count} 次事件",
@@ -654,7 +586,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "No loss in this window.": "该时间段内没有损耗。",
   "Unknown model": "未知模型",
   "Estimated from cache hit rates": "根据缓存命中率估算",
-  "Copy as PNG": "复制为 PNG",
   Speed: "速率统计",
   "Output speed": "输出速率",
   "Speed period": "速率统计时间段",
@@ -694,9 +625,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "请为每个自定义会话文件夹填写路径。",
   "Quota limits are not available: {label} does not report subscription quotas. Its usage still appears from saved history.":
     "无法查看额度：{label} 不提供订阅额度信息。其用量仍会根据已保存的历史显示。",
-  "payment unknown": "支付方式未知",
-  "Payment method unknown": "支付方式未知",
-  "Known amount paid": "已知实付",
   "Even pace": "均匀消耗",
   "{percent}% left by now": "此时应剩余 {percent}%",
   "Quota may have changed; earlier cycles are ignored.":
@@ -713,4 +641,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{spent} ({low}–{high}%)": "{spent}（{low}–{high}%）",
   "Average output · {count} requests": "平均输出速率 · {count} 次请求",
   "Not measured": "未测量",
+  "On your computer, open Settings → Sync, turn on Sync to phone and copy the phone link. Paste it here.":
+    "在电脑上打开 设置 → 同步，开启“同步到手机”并复制手机链接，然后粘贴到这里。",
+  "Open this link on your phone. The part after # is the key, so keep the link private.":
+    "在手机上打开此链接。# 后面的部分是密钥，请妥善保管链接。",
+  "The current link stops working and its snapshot is deleted from the relay. Open the new link on your phone.":
+    "当前链接将失效，其快照会从中继删除。请在手机上打开新链接。",
 };

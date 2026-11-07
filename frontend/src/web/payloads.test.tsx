@@ -49,14 +49,6 @@ function emptySnapshot(): Record<string, unknown> {
       measuredRequests: 0,
       unmeasuredRequests: 0,
     },
-    receipt: {
-      days: 30,
-      window,
-      items: null,
-      firstAtMs: null,
-      lastAtMs: null,
-      qrModules: null,
-    },
   });
   return {
     formatVersion: 1,
@@ -98,7 +90,7 @@ describe("isPrivateSnapshot", () => {
   });
 
   it("accepts reports from older desktops that omit fields", () => {
-    const report = { usage: {}, loss: {}, speed: {}, receipt: {} };
+    const report = { usage: {}, loss: {}, speed: {} };
     expect(
       isPrivateSnapshot(
         changed(
@@ -117,8 +109,8 @@ describe("isPrivateSnapshot", () => {
     expect(
       isPrivateSnapshot(
         changed([
-          ["periods", "30", "receipt", "items"],
-          [{ provider: "aurora", model: "aurora-large", tokens: 1 }],
+          ["periods", "30", "speed", "models"],
+          [{ provider: "aurora", model: "aurora-large", requests: 1 }],
         ]),
       ),
     ).toBe(true);
@@ -128,7 +120,7 @@ describe("isPrivateSnapshot", () => {
     ["a null period", ["periods", "7"], null],
     ["a missing period", ["periods", "90"], REMOVE],
     ["null periods", ["periods"], null],
-    ["a missing report", ["periods", "1", "receipt"], REMOVE],
+    ["a missing report", ["periods", "1", "speed"], REMOVE],
     ["a null report", ["periods", "30", "usage"], null],
     ["a report that is a list", ["periods", "30", "loss"], []],
     ["a null nested report part", ["periods", "1", "usage", "window"], null],

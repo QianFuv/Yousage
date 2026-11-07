@@ -228,15 +228,6 @@ func TestPiHistoryFeedsEveryReport(test *testing.T) {
 		if tokens != 152 || math.Abs(cost-1.750499) > 1e-9 {
 			test.Fatal("Pi fork or pricing totals incorrect", tokens, cost)
 		}
-		receipt, err := service.Receipt(ctx, days, "UTC")
-		if err != nil || receipt.Tokens != tokens || math.Abs(receipt.TotalUsd-cost) > 1e-9 || receipt.PaidUsd != 0 || receipt.UnknownPaymentUsd != receipt.TotalUsd || !strings.Contains(receipt.QrText, "PAYMENT UNKNOWN") {
-			test.Fatal("Pi estimated cost mislabelled as paid", receipt, err)
-		}
-		for _, item := range receipt.Items {
-			if !item.IsPaymentUnknown || item.IsSubscription {
-				test.Fatal(item)
-			}
-		}
 		speed, err := service.SpeedReport(ctx, days, "UTC")
 		if err != nil || speed.MeasuredRequests != 0 || speed.UnmeasuredRequests != 3 {
 			test.Fatal("native timestamps fabricated generation timing", speed, err)
@@ -256,8 +247,15 @@ func TestPiHistoryFeedsEveryReport(test *testing.T) {
 	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
 		test.Fatal(err)
 	}
-	repriced, err := service.Receipt(ctx, 7, "UTC")
-	if err != nil || math.Abs(repriced.TotalUsd-0.50008) > 1e-9 || repriced.UnknownPaymentUsd != repriced.TotalUsd || repriced.Tokens != 152 {
-		test.Fatal("persisted Pi facts did not reprice with aliases and explicit free overrides", repriced, err)
+	window, _ := accounting.BuildWindow(now, 7, "UTC")
+	repriced, err := service.localSummary(ctx, window)
+	var repricedTokens int64
+	var repricedCost float64
+	for _, bucket := range repriced.Buckets {
+		repricedTokens += bucket.Totals.Total()
+		repricedCost += bucket.CostUsd
+	}
+	if err != nil || math.Abs(repricedCost-0.50008) > 1e-9 || repricedTokens != 152 {
+		test.Fatal("persisted Pi facts did not reprice with aliases and explicit free overrides", repricedCost, repricedTokens, err)
 	}
 }

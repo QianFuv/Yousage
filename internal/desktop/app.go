@@ -249,11 +249,6 @@ func (service *App) GetUsage(days int, timeZone string) (dataservice.Snapshot, e
 	return service.usage.Usage(service.context, days, timeZone)
 }
 
-// GetReceipt returns a local trailing-window receipt using the Usage pricing pipeline.
-func (service *App) GetReceipt(days int, timeZone string) (dataservice.Receipt, error) {
-	return service.usage.Receipt(service.context, days, timeZone)
-}
-
 // GetSpeedReport returns local generation throughput separated by billing speed tier.
 func (service *App) GetSpeedReport(days int, timeZone string) (dataservice.SpeedReport, error) {
 	return service.usage.SpeedReport(service.context, days, timeZone)

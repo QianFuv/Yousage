@@ -40,12 +40,7 @@ import type { DiagnosticReporter } from "../diagnostics";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 /** Bindings that read a shown snapshot's reports, which its pages render once answered. */
-const REPORT_READS = new Set([
-  "GetUsage",
-  "GetLossReport",
-  "GetSpeedReport",
-  "GetReceipt",
-]);
+const REPORT_READS = new Set(["GetUsage", "GetLossReport", "GetSpeedReport"]);
 
 /** Why a downloaded snapshot was not kept, as shown over the snapshot kept instead. */
 const REJECTION_MESSAGES = {

@@ -64,7 +64,6 @@ vi.mock("./host", async (importOriginal) => ({
     redeem: async () => {},
   })),
 }));
-vi.mock("../receipt/ReceiptButton", () => ({ ReceiptButton: () => null }));
 vi.mock("../../vendor/UsageProviderChart", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../vendor/UsageProviderChart")>()),
   UsageProviderChart: () => <div data-chart />,

@@ -50,13 +50,6 @@ func (source *reportFixture) SpeedReport(_ context.Context, days int, timeZone s
 	return source.periods[strconv.Itoa(days)].Speed, source.read("speed", days, timeZone)
 }
 
-func (source *reportFixture) Receipt(_ context.Context, days int, timeZone string) (service.Receipt, error) {
-	if source.periods != nil {
-		return source.periods[strconv.Itoa(days)].Receipt, source.read("receipt", days, timeZone)
-	}
-	return service.Receipt{Days: days, TimeZone: timeZone}, source.read("receipt", days, timeZone)
-}
-
 func (source *reportFixture) Configuration(context.Context) (service.SavedConfiguration, error) {
 	source.configurationReads++
 	return service.SavedConfiguration{Value: source.configuration}, nil
@@ -79,12 +72,12 @@ func TestSnapshotAllPeriodsAndNoConfiguration(test *testing.T) {
 		return preferences.SavedDisplay{Value: preferences.Defaults()}, nil
 	}, Appearance: func(context.Context) (theme.LibrarySnapshot, error) { return theme.LibrarySnapshot{}, nil }, Bootstrap: func() any { return map[string]any{"isSystemDark": true, "systemLocale": "en"} }, Now: newFixtureClock().Now}
 	snapshot, err := builder.Build(context.Background(), "Asia/Shanghai")
-	if err != nil || len(snapshot.Periods) != 4 || len(source.calls) != 16 || source.configurationReads != 0 || snapshot.AppVersion == "" || snapshot.GeneratedAt == "" {
+	if err != nil || len(snapshot.Periods) != 4 || len(source.calls) != 12 || source.configurationReads != 0 || snapshot.AppVersion == "" || snapshot.GeneratedAt == "" {
 		test.Fatal(snapshot, err)
 	}
 	for _, days := range []int{1, 7, 30, 90} {
 		period, hasPeriod := snapshot.Periods[strconv.Itoa(days)]
-		if !hasPeriod || period.Receipt.Days != days || period.Receipt.TimeZone != "Asia/Shanghai" || !reflect.DeepEqual(period.Usage, source.usage) {
+		if !hasPeriod || !reflect.DeepEqual(period.Usage, source.usage) {
 			test.Fatal("missing period or modified usage", days)
 		}
 	}
@@ -115,7 +108,7 @@ func TestSnapshotAllPeriodsAndNoConfiguration(test *testing.T) {
 			test.Fatal("provider quota or auth label missing", name, provider)
 		}
 	}
-	for _, report := range []string{"usage", "loss", "speed", "receipt"} {
+	for _, report := range []string{"usage", "loss", "speed"} {
 		for _, days := range []int{1, 7, 30, 90} {
 			source.failReport, source.failDays = report, days
 			failed, err := builder.Build(context.Background(), "UTC")
@@ -220,14 +213,7 @@ const reportParityJSON = `{
         {"provider": "pi", "model": "synthetic/untimed-__DAYS__", "speed": "standard", "requests": 0, "unmeasuredRequests": __DAYS__, "totalTokens": __DAYS__210, "inputTokens": __DAYS__156, "cachedInputTokens": 52, "cacheHitRate": 0.25, "contextTokensPerRequest": 156, "outputTokensPerRequest": 54}],
       "providers": [{"provider": "codex", "requests": __DAYS__06, "unmeasuredRequests": __DAYS__, "totalTokens": __DAYS__810, "tokensPerSecond": __DAYS__.2}],
       "buckets": [{"label": "2026-10-19", "models": [{"provider": "codex", "model": "synthetic/vendor/complete-model-identifier-__DAYS__", "speed": "fast", "requests": __DAYS__06, "outputTokens": __DAYS__04, "generationMs": __DAYS__500, "tokensPerSecond": __DAYS__.2}],
-        "providers": [{"provider": "codex", "requests": __DAYS__06, "outputTokens": __DAYS__04, "generationMs": __DAYS__500, "tokensPerSecond": __DAYS__.2}]}]},
-    "receipt": {"days": __DAYS__, "window": __WINDOW__,
-      "startsAtMs": __START_MS__, "endsAtMs": 1792454400000, "number": "synthetic-__DAYS__", "timeZone": "UTC", "sinceDay": "__SINCE__", "untilDay": "2026-10-20",
-      "items": [{"provider": "codex", "model": "synthetic/vendor/complete-model-identifier-__DAYS__", "tokens": __DAYS__410, "costUsd": __DAYS__.25, "unpricedRecords": __DAYS__, "isSubscription": true, "isPaymentUnknown": false},
-        {"provider": "pi", "model": "synthetic/untimed-__DAYS__", "tokens": 210, "costUsd": 2.75, "unpricedRecords": 0, "isSubscription": false, "isPaymentUnknown": true}],
-      "totalUsd": __DAYS__.99, "subscriptionUsd": __DAYS__.25, "paidUsd": 0.25, "unknownPaymentUsd": 2.75,
-      "tokens": __DAYS__620, "sessions": __DAYS__04, "cacheSavingsUsd": __DAYS__.5, "unpricedRecords": __DAYS__, "activeDays": __DAYS__,
-      "firstAtMs": 1792368000001, "lastAtMs": 1792454399999, "qrText": "synthetic receipt __DAYS__", "qrModules": ["101", "010", "101"]}
+        "providers": [{"provider": "codex", "requests": __DAYS__06, "outputTokens": __DAYS__04, "generationMs": __DAYS__500, "tokensPerSecond": __DAYS__.2}]}]}
   }}
 }`
 
@@ -246,11 +232,7 @@ func paritySnapshot(test *testing.T) Snapshot {
 		if err != nil {
 			test.Fatal(err)
 		}
-		start, err := time.Parse(time.DateOnly, window.SinceDay)
-		if err != nil {
-			test.Fatal(err)
-		}
-		payload := strings.NewReplacer("__DAYS__", name, "__SINCE__", window.SinceDay, "__WINDOW__", string(windowJSON), "__START_MS__", strconv.FormatInt(start.UnixMilli(), 10)).Replace(reportParityJSON)
+		payload := strings.NewReplacer("__DAYS__", name, "__SINCE__", window.SinceDay, "__WINDOW__", string(windowJSON)).Replace(reportParityJSON)
 		decoder := json.NewDecoder(strings.NewReader(payload))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&snapshot); err != nil {
@@ -278,7 +260,7 @@ func TestSnapshotBusinessFieldPreservation(test *testing.T) {
 		test.Fatal(err)
 	}
 	expected.AppVersion = AppVersion
-	if !reflect.DeepEqual(actual, expected) || len(source.calls) != 16 {
+	if !reflect.DeepEqual(actual, expected) || len(source.calls) != 12 {
 		test.Fatal("builder changed source business fields or skipped a report")
 	}
 	encoded, err := json.Marshal(actual)

@@ -1,4 +1,4 @@
-// Command yousage-relay serves encrypted snapshots and expiring receipt shares.
+// Command yousage-relay serves encrypted dashboard snapshots.
 package main
 
 import (

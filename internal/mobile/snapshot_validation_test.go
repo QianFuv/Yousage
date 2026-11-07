@@ -20,7 +20,7 @@ func TestSnapshotContractRejectsUnsafeValues(test *testing.T) {
 		{"missing period", func(value map[string]any) { delete(value["periods"].(map[string]any), "90") }},
 		{"null report", func(value map[string]any) { value["periods"].(map[string]any)["30"].(map[string]any)["usage"] = nil }},
 		{"array report", func(value map[string]any) {
-			value["periods"].(map[string]any)["30"].(map[string]any)["receipt"] = []any{}
+			value["periods"].(map[string]any)["30"].(map[string]any)["speed"] = []any{}
 		}},
 		{"array display", func(value map[string]any) { value["display"] = []any{} }},
 		{"missing display value", func(value map[string]any) { delete(value["display"].(map[string]any), "value") }},
@@ -73,15 +73,15 @@ func TestSnapshotContractCompatibility(test *testing.T) {
 			value["display"].(map[string]any)["value"] = map[string]any{}
 			value["appearance"] = map[string]any{}
 			for _, period := range value["periods"].(map[string]any) {
-				receipt := period.(map[string]any)["receipt"].(map[string]any)
-				delete(receipt, "unknownPaymentUsd")
-				receipt["items"] = []any{map[string]any{"provider": "codex", "model": "synthetic", "tokens": 0}}
+				speed := period.(map[string]any)["speed"].(map[string]any)
+				delete(speed, "unmeasuredRequests")
+				speed["models"] = []any{map[string]any{"provider": "codex", "model": "synthetic", "requests": 0}}
 			}
 		}},
 		{"nullable environment and collections", func(value map[string]any) {
 			for _, period := range value["periods"].(map[string]any) {
 				period.(map[string]any)["usage"].(map[string]any)["environments"] = []any{map[string]any{"environmentId": "synthetic", "summary": nil, "serverConfig": nil, "cycleValues": nil}}
-				period.(map[string]any)["receipt"].(map[string]any)["items"] = nil
+				period.(map[string]any)["speed"].(map[string]any)["models"] = nil
 			}
 		}},
 		{"future provider and fields", func(value map[string]any) {
@@ -93,7 +93,6 @@ func TestSnapshotContractCompatibility(test *testing.T) {
 				}}
 				period.(map[string]any)["loss"].(map[string]any)["providers"] = []any{map[string]any{"provider": "future-provider"}}
 				period.(map[string]any)["speed"].(map[string]any)["models"] = []any{map[string]any{"provider": "future-provider"}}
-				period.(map[string]any)["receipt"].(map[string]any)["items"] = []any{map[string]any{"provider": "future-provider"}}
 			}
 		}},
 	} {
@@ -122,7 +121,6 @@ func TestPopulatedParityValidation(test *testing.T) {
 		{"speed", "models", "medianLatencyMs"},
 		{"speed", "models", "cacheHitRate"},
 		{"speed", "models", "unmeasuredRequests"},
-		{"receipt", "items", "tokens"},
 	} {
 		test.Run(path[len(path)-1], func(test *testing.T) {
 			bad := changedSnapshot(test, fixture, func(value map[string]any) {

@@ -5,14 +5,12 @@ import { associatedData, parseRelayAddress } from "./relay";
 const ID = "AbCdEfGhIjKlMnOpQrSt_-";
 
 describe("relay addresses", () => {
-  it("reads viewer and share links", () => {
+  it("reads viewer links", () => {
     expect(parseRelayAddress(`/v/${ID}`, "#key")).toEqual({
-      kind: "space",
       id: ID,
       key: "key",
     });
-    expect(parseRelayAddress(`/s/${ID}/`, "#key")).toEqual({
-      kind: "share",
+    expect(parseRelayAddress(`/v/${ID}/`, "#key")).toEqual({
       id: ID,
       key: "key",
     });
@@ -23,15 +21,11 @@ describe("relay addresses", () => {
     expect(parseRelayAddress(`/v/${ID}`, "#")).toBeNull();
     expect(parseRelayAddress("/v/short", "#key")).toBeNull();
     expect(parseRelayAddress(`/x/${ID}`, "#key")).toBeNull();
+    expect(parseRelayAddress(`/s/${ID}`, "#key")).toBeNull();
     expect(parseRelayAddress(`/v/${ID}/extra`, "#key")).toBeNull();
   });
 
   it("binds ciphertext to the same location the desktop used", () => {
-    expect(associatedData({ kind: "space", id: ID, key: "k" })).toBe(
-      `space:${ID}`,
-    );
-    expect(associatedData({ kind: "share", id: ID, key: "k" })).toBe(
-      `share:${ID}`,
-    );
+    expect(associatedData({ id: ID, key: "k" })).toBe(`space:${ID}`);
   });
 });

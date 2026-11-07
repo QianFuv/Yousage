@@ -511,174 +511,6 @@ export class ProviderDetection {
     }
 }
 
-/**
- * Receipt presents a local trailing window with the same pricing as Usage.
- */
-export class Receipt {
-    "days": number;
-    "window": accounting$0.Window;
-    "startsAtMs": number;
-    "endsAtMs": number;
-    "number": string;
-    "timeZone": string;
-    "sinceDay": string;
-    "untilDay": string;
-    "items": ReceiptItem[];
-    "totalUsd": number;
-    "subscriptionUsd": number;
-    "paidUsd": number;
-    "unknownPaymentUsd": number;
-    "tokens": number;
-    "sessions": number;
-    "cacheSavingsUsd": number;
-    "unpricedRecords": number;
-    "activeDays": number;
-    "firstAtMs": number | null;
-    "lastAtMs": number | null;
-    "qrText": string;
-    "qrModules": string[];
-
-    /** Creates a new Receipt instance. */
-    constructor($$source: Partial<Receipt> = {}) {
-        if (!("days" in $$source)) {
-            this["days"] = 0;
-        }
-        if (!("window" in $$source)) {
-            this["window"] = (new accounting$0.Window());
-        }
-        if (!("startsAtMs" in $$source)) {
-            this["startsAtMs"] = 0;
-        }
-        if (!("endsAtMs" in $$source)) {
-            this["endsAtMs"] = 0;
-        }
-        if (!("number" in $$source)) {
-            this["number"] = "";
-        }
-        if (!("timeZone" in $$source)) {
-            this["timeZone"] = "";
-        }
-        if (!("sinceDay" in $$source)) {
-            this["sinceDay"] = "";
-        }
-        if (!("untilDay" in $$source)) {
-            this["untilDay"] = "";
-        }
-        if (!("items" in $$source)) {
-            this["items"] = [];
-        }
-        if (!("totalUsd" in $$source)) {
-            this["totalUsd"] = 0;
-        }
-        if (!("subscriptionUsd" in $$source)) {
-            this["subscriptionUsd"] = 0;
-        }
-        if (!("paidUsd" in $$source)) {
-            this["paidUsd"] = 0;
-        }
-        if (!("unknownPaymentUsd" in $$source)) {
-            this["unknownPaymentUsd"] = 0;
-        }
-        if (!("tokens" in $$source)) {
-            this["tokens"] = 0;
-        }
-        if (!("sessions" in $$source)) {
-            this["sessions"] = 0;
-        }
-        if (!("cacheSavingsUsd" in $$source)) {
-            this["cacheSavingsUsd"] = 0;
-        }
-        if (!("unpricedRecords" in $$source)) {
-            this["unpricedRecords"] = 0;
-        }
-        if (!("activeDays" in $$source)) {
-            this["activeDays"] = 0;
-        }
-        if (!("firstAtMs" in $$source)) {
-            this["firstAtMs"] = null;
-        }
-        if (!("lastAtMs" in $$source)) {
-            this["lastAtMs"] = null;
-        }
-        if (!("qrText" in $$source)) {
-            this["qrText"] = "";
-        }
-        if (!("qrModules" in $$source)) {
-            this["qrModules"] = [];
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Receipt instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Receipt {
-        const $$createField1_0 = $$createType15;
-        const $$createField8_0 = $$createType24;
-        const $$createField21_0 = $$createType25;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("window" in $$parsedSource) {
-            $$parsedSource["window"] = $$createField1_0($$parsedSource["window"]);
-        }
-        if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField8_0($$parsedSource["items"]);
-        }
-        if ("qrModules" in $$parsedSource) {
-            $$parsedSource["qrModules"] = $$createField21_0($$parsedSource["qrModules"]);
-        }
-        return new Receipt($$parsedSource as Partial<Receipt>);
-    }
-}
-
-/**
- * ReceiptItem combines a provider/model's priced and unpriced usage.
- */
-export class ReceiptItem {
-    "provider": string;
-    "model": string;
-    "tokens": number;
-    "costUsd": number;
-    "unpricedRecords": number;
-    "isSubscription": boolean;
-    "isPaymentUnknown": boolean;
-
-    /** Creates a new ReceiptItem instance. */
-    constructor($$source: Partial<ReceiptItem> = {}) {
-        if (!("provider" in $$source)) {
-            this["provider"] = "";
-        }
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-        if (!("tokens" in $$source)) {
-            this["tokens"] = 0;
-        }
-        if (!("costUsd" in $$source)) {
-            this["costUsd"] = 0;
-        }
-        if (!("unpricedRecords" in $$source)) {
-            this["unpricedRecords"] = 0;
-        }
-        if (!("isSubscription" in $$source)) {
-            this["isSubscription"] = false;
-        }
-        if (!("isPaymentUnknown" in $$source)) {
-            this["isPaymentUnknown"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ReceiptItem instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ReceiptItem {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ReceiptItem($$parsedSource as Partial<ReceiptItem>);
-    }
-}
-
 export class SavedConfiguration {
     "revision": number;
     "value": Configuration;
@@ -699,7 +531,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType26;
+        const $$createField1_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -729,7 +561,7 @@ export class Snapshot {
      */
     static createFrom($$source: any = {}): Snapshot {
         const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType28;
+        const $$createField1_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -768,8 +600,8 @@ export class SpeedBucket {
      * Creates a new SpeedBucket instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedBucket {
-        const $$createField1_0 = $$createType30;
-        const $$createField2_0 = $$createType32;
+        const $$createField1_0 = $$createType27;
+        const $$createField2_0 = $$createType29;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
@@ -1134,10 +966,10 @@ export class SpeedReport {
      */
     static createFrom($$source: any = {}): SpeedReport {
         const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType33;
-        const $$createField2_0 = $$createType35;
-        const $$createField3_0 = $$createType37;
-        const $$createField4_0 = $$createType39;
+        const $$createField1_0 = $$createType30;
+        const $$createField2_0 = $$createType32;
+        const $$createField3_0 = $$createType34;
+        const $$createField4_0 = $$createType36;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -1285,20 +1117,17 @@ const $$createType19 = LossDay.createFrom;
 const $$createType20 = $Create.Array($$createType19);
 const $$createType21 = LossEvent.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = ReceiptItem.createFrom;
-const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = $Create.Array($Create.Any);
-const $$createType26 = Configuration.createFrom;
-const $$createType27 = EnvironmentState.createFrom;
-const $$createType28 = $Create.Array($$createType27);
-const $$createType29 = SpeedBucketModel.createFrom;
-const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = SpeedBucketProvider.createFrom;
+const $$createType23 = Configuration.createFrom;
+const $$createType24 = EnvironmentState.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = SpeedBucketModel.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = SpeedBucketProvider.createFrom;
+const $$createType29 = $Create.Array($$createType28);
+const $$createType30 = SpeedStats.createFrom;
+const $$createType31 = SpeedModel.createFrom;
 const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = SpeedStats.createFrom;
-const $$createType34 = SpeedModel.createFrom;
-const $$createType35 = $Create.Array($$createType34);
-const $$createType36 = SpeedProvider.createFrom;
-const $$createType37 = $Create.Array($$createType36);
-const $$createType38 = SpeedBucket.createFrom;
-const $$createType39 = $Create.Array($$createType38);
+const $$createType33 = SpeedProvider.createFrom;
+const $$createType34 = $Create.Array($$createType33);
+const $$createType35 = SpeedBucket.createFrom;
+const $$createType36 = $Create.Array($$createType35);

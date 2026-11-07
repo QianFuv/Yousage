@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -91,27 +90,4 @@ func (client *Client) delete(ctx context.Context, origin, token, kind, id string
 		return errors.New("invalid relay identity")
 	}
 	return client.request(ctx, origin, token, http.MethodDelete, "/api/"+kind+"/"+id, nil, http.StatusNoContent, true, nil)
-}
-
-type reservation struct {
-	Id        string `json:"id"`
-	ExpiresAt string `json:"expiresAt"`
-}
-
-func (client *Client) reserve(ctx context.Context, origin, token string, ttlDays int) (reservation, error) {
-	result := reservation{}
-	if !validTtl(ttlDays) {
-		return result, errors.New("unsupported share lifetime")
-	}
-	err := client.request(ctx, origin, token, http.MethodPost, "/api/shares/reserve?ttlDays="+strconv.Itoa(ttlDays), nil, http.StatusCreated, false, &result)
-	if err != nil {
-		return result, err
-	}
-	if !identifierPattern.MatchString(result.Id) {
-		return reservation{}, errors.New("relay returned an invalid share identity")
-	}
-	if _, err = time.Parse(time.RFC3339, result.ExpiresAt); err != nil {
-		return reservation{}, errors.New("relay returned an invalid share expiry")
-	}
-	return result, nil
 }

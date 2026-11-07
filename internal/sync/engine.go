@@ -15,7 +15,6 @@ import (
 	"yousage/internal/diagnostics"
 	"yousage/internal/preferences"
 	"yousage/internal/secrets"
-	"yousage/internal/service"
 )
 
 const tokenId = "relay-token"
@@ -33,7 +32,6 @@ type EngineOptions struct {
 	Preferences   *preferences.Service
 	Secrets       secrets.Store
 	BuildSnapshot func(context.Context, string) (Snapshot, error)
-	BuildShare    func(context.Context, ShareRequest) (SharePayload, error)
 	HttpClient    *http.Client
 	Now           func() time.Time
 	AfterFunc     func(time.Duration, func()) Timer
@@ -65,7 +63,7 @@ type Engine struct {
 
 // NewEngine loads preferences and keyring values without contacting the relay.
 func NewEngine(ctx context.Context, options EngineOptions) (*Engine, error) {
-	if options.Preferences == nil || options.Secrets == nil || options.BuildSnapshot == nil || options.BuildShare == nil {
+	if options.Preferences == nil || options.Secrets == nil || options.BuildSnapshot == nil {
 		return nil, errors.New("sync engine dependencies are missing")
 	}
 	if options.Now == nil {
@@ -75,7 +73,7 @@ func NewEngine(ctx context.Context, options EngineOptions) (*Engine, error) {
 		options.AfterFunc = func(delay time.Duration, callback func()) Timer { return time.AfterFunc(delay, callback) }
 	}
 	owner, cancel := context.WithCancel(ctx)
-	engine := &Engine{context: owner, cancel: cancel, options: options, client: NewClient(options.HttpClient), settings: Settings{TimeZone: "UTC", Shares: []ShareRecord{}}}
+	engine := &Engine{context: owner, cancel: cancel, options: options, client: NewClient(options.HttpClient), settings: Settings{TimeZone: "UTC"}}
 	var err error
 	engine.revision, err = options.Preferences.Sync(ctx, &engine.settings)
 	if err == nil {
@@ -115,9 +113,7 @@ func (engine *Engine) Close() {
 func (engine *Engine) Settings() Settings {
 	engine.mutex.Lock()
 	defer engine.mutex.Unlock()
-	settings := engine.settings
-	settings.Shares = append([]ShareRecord{}, settings.Shares...)
-	return settings
+	return engine.settings
 }
 
 func (engine *Engine) persistLocked(ctx context.Context, settings Settings) error {
@@ -130,44 +126,18 @@ func (engine *Engine) persistLocked(ctx context.Context, settings Settings) erro
 }
 
 func (engine *Engine) stateLocked() State {
-	state := State{IsEnabled: engine.settings.IsEnabled, RelayUrl: engine.settings.RelayUrl, HasToken: engine.token != "", Status: engine.status, PairingQrModules: []string{}, Shares: []ShareView{}}
+	state := State{IsEnabled: engine.settings.IsEnabled, RelayUrl: engine.settings.RelayUrl, HasToken: engine.token != "", Status: engine.status}
 	if state.IsEnabled && engine.settings.SpaceId != "" && engine.spaceKey != "" {
 		state.PairingUrl = engine.settings.RelayUrl + "/v/" + engine.settings.SpaceId + "#" + engine.spaceKey
-		state.PairingQrModules, _ = service.QrModules(state.PairingUrl)
-	}
-	for _, record := range engine.settings.Shares {
-		expires, err := time.Parse(time.RFC3339, record.ExpiresAt)
-		if err != nil || !expires.After(engine.options.Now()) {
-			continue
-		}
-		modules, _ := service.QrModules(record.Url)
-		state.Shares = append(state.Shares, ShareView{record, modules})
 	}
 	return state
 }
 
-// State prunes expired local links before returning the current public state.
+// State returns the current public sync state.
 func (engine *Engine) State(ctx context.Context) (State, error) {
 	engine.mutex.Lock()
-	settings := engine.settings
-	settings.Shares = []ShareRecord{}
-	for _, record := range engine.settings.Shares {
-		expires, err := time.Parse(time.RFC3339, record.ExpiresAt)
-		if err == nil && expires.After(engine.options.Now()) {
-			settings.Shares = append(settings.Shares, record)
-		}
-	}
-	var err error
-	hasChanged := len(settings.Shares) != len(engine.settings.Shares)
-	if hasChanged {
-		err = engine.persistLocked(ctx, settings)
-	}
-	state := engine.stateLocked()
-	engine.mutex.Unlock()
-	if hasChanged && err == nil && engine.options.OnChanged != nil {
-		engine.options.OnChanged(state)
-	}
-	return state, err
+	defer engine.mutex.Unlock()
+	return engine.stateLocked(), nil
 }
 
 func (engine *Engine) emit() {
@@ -562,138 +532,4 @@ func (engine *Engine) rotate(ctx context.Context) error {
 		engine.client.delete(ctx, settings.RelayUrl, token, "spaces", oldId)
 	}
 	return engine.pushOwned(ctx, true)
-}
-
-// PreviewShare builds a local payload without using the relay or enabling sync.
-func (engine *Engine) PreviewShare(ctx context.Context, request ShareRequest) (SharePayload, error) {
-	if request.TimeZone == "" {
-		request.TimeZone = "UTC"
-	}
-	if err := request.Validate(); err != nil {
-		return SharePayload{}, err
-	}
-	payload, err := engine.options.BuildShare(ctx, request)
-	if err != nil {
-		return SharePayload{}, errors.New("could not build receipt share")
-	}
-	return payload, nil
-}
-
-// CreateShare reserves an identity, encrypts once with a fresh key, uploads, then persists its link.
-func (engine *Engine) CreateShare(ctx context.Context, request ShareRequest) (ShareView, error) {
-	owner, cancel := context.WithCancel(ctx)
-	stop := context.AfterFunc(engine.context, cancel)
-	defer stop()
-	defer cancel()
-	ctx = owner
-	engine.operation.Lock()
-	defer engine.operation.Unlock()
-	engine.mutex.Lock()
-	settings, token := engine.settings, engine.token
-	isClosed := engine.isClosed
-	engine.mutex.Unlock()
-	if isClosed || !settings.IsEnabled {
-		return ShareView{}, errors.New("enable sync before creating a share")
-	}
-	payload, err := engine.PreviewShare(ctx, request)
-	if err != nil {
-		return ShareView{}, err
-	}
-	reserved, err := engine.client.reserve(ctx, settings.RelayUrl, token, request.TtlDays)
-	if err != nil {
-		return ShareView{}, err
-	}
-	hasPersisted := false
-	defer func() {
-		if !hasPersisted {
-			engine.client.delete(ctx, settings.RelayUrl, token, "shares", reserved.Id)
-		}
-	}()
-	payload.CreatedAt, payload.ExpiresAt = engine.options.Now().UTC().Format(time.RFC3339), reserved.ExpiresAt
-	key, err := NewKey()
-	if err != nil {
-		return ShareView{}, err
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return ShareView{}, errors.New("could not encode receipt share")
-	}
-	envelope, err := Seal(data, key, "share:"+reserved.Id)
-	if err != nil {
-		return ShareView{}, err
-	}
-	if err = engine.client.put(ctx, settings.RelayUrl, token, "shares", reserved.Id, envelope); err != nil {
-		return ShareView{}, err
-	}
-	record := ShareRecord{reserved.Id, settings.RelayUrl + "/s/" + reserved.Id + "#" + key, request.Days, request.TtlDays, request.HideAmounts, payload.CreatedAt, payload.ExpiresAt}
-	modules, err := service.QrModules(record.Url)
-	if err != nil {
-		return ShareView{}, errors.New("could not encode share QR")
-	}
-	engine.mutex.Lock()
-	settings = engine.settings
-	settings.Shares = append(append([]ShareRecord{}, settings.Shares...), record)
-	err = engine.persistLocked(ctx, settings)
-	engine.mutex.Unlock()
-	if err != nil {
-		return ShareView{}, err
-	}
-	hasPersisted = true
-	engine.emit()
-	return ShareView{record, modules}, nil
-}
-
-// RevokeShare deletes the selected relay blob, tolerating 404, before removing its local record.
-func (engine *Engine) RevokeShare(ctx context.Context, id string) (State, error) {
-	owner, cancel := context.WithCancel(ctx)
-	stop := context.AfterFunc(engine.context, cancel)
-	defer stop()
-	defer cancel()
-	engine.operation.Lock()
-	err := engine.revoke(owner, id)
-	engine.operation.Unlock()
-	engine.emit()
-	state, stateError := engine.State(ctx)
-	if err != nil {
-		return state, err
-	}
-	return state, stateError
-}
-
-func (engine *Engine) revoke(ctx context.Context, id string) error {
-	engine.mutex.Lock()
-	settings, token := engine.settings, engine.token
-	isClosed := engine.isClosed
-	engine.mutex.Unlock()
-	if isClosed || !settings.IsEnabled {
-		return errors.New("enable sync before revoking a share")
-	}
-	position := -1
-	for index, record := range settings.Shares {
-		if record.Id == id {
-			position = index
-			break
-		}
-	}
-	if position == -1 {
-		return errors.New("share is not saved on this desktop")
-	}
-	record := settings.Shares[position]
-	if !strings.HasPrefix(record.Url, settings.RelayUrl+"/s/") {
-		return errors.New("share belongs to another relay; reconnect that relay before revoking it")
-	}
-	if err := engine.client.delete(ctx, settings.RelayUrl, token, "shares", id); err != nil {
-		return err
-	}
-	engine.mutex.Lock()
-	defer engine.mutex.Unlock()
-	settings = engine.settings
-	shares := make([]ShareRecord, 0, len(settings.Shares))
-	for _, record := range settings.Shares {
-		if record.Id != id {
-			shares = append(shares, record)
-		}
-	}
-	settings.Shares = shares
-	return engine.persistLocked(ctx, settings)
 }

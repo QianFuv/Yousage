@@ -191,3 +191,27 @@ func TestRatesKeepLastGoodOnFailedRefreshAndExpireFreshness(test *testing.T) {
 		test.Fatal("failure replaced last-good rates")
 	}
 }
+
+// seedReportRecords stores records as one snapshot source per provider for report tests.
+func seedReportRecords(t *testing.T, service *Service, records []domain.Record) {
+	t.Helper()
+	ctx := context.Background()
+	groups := map[domain.Provider][]domain.Record{}
+	for _, record := range records {
+		groups[record.Provider] = append(groups[record.Provider], record)
+	}
+	entries := []sourceIndex{}
+	for _, provider := range []domain.Provider{domain.Claude, domain.Codex, domain.Pi} {
+		if len(groups[provider]) == 0 {
+			continue
+		}
+		fingerprint := service.fingerprint(provider, t.TempDir())
+		if err := service.storeSnapshot(ctx, fingerprint, groups[provider], "ok", "", service.Now()); err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, sourceIndex{Source: remote.Source{Fingerprint: fingerprint, Status: "ok"}, IsSnapshot: true})
+	}
+	if _, err := service.Store.WriteSetting(ctx, "history-index", 0, entries); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -1,4 +1,4 @@
-/** Relay pages: the snapshot viewer and the share page, embedded into the relay binary. */
+/** Relay page: the snapshot viewer, embedded into the relay binary. */
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 import desktopConfig from "./vite.config";
@@ -13,7 +13,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         viewer: fileURLToPath(new URL("./viewer.html", import.meta.url)),
-        share: fileURLToPath(new URL("./share.html", import.meta.url)),
       },
     },
   },

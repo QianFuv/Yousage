@@ -255,7 +255,7 @@ export function WebViewer({
 }
 
 /**
- * A full-page message shown instead of the viewer or share page.
+ * A full-page message shown instead of the viewer.
  *
  * @param props - Title, explanation and optional actions.
  * @returns The message page.

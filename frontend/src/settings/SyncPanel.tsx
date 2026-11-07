@@ -1,4 +1,4 @@
-/** Sync & sharing settings: relay connection, phone pairing and active share links. */
+/** Sync settings: relay connection and phone pairing. */
 import { useEffect, useState } from "react";
 import { Events } from "@wailsio/runtime";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
@@ -16,7 +16,6 @@ import {
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 import {
   SaveInput,
-  type ShareView,
   State as SyncState,
 } from "../../bindings/yousage/internal/sync/models";
 import { t } from "../i18n";
@@ -29,7 +28,6 @@ import {
   SettingsRow,
   SettingsSection,
 } from "../ui";
-import { SummaryCode } from "../receipt/ReceiptPaper";
 
 /**
  * Whether a relay address sends the token without encryption to another machine.
@@ -62,18 +60,6 @@ function localTime(instant: string): string {
 }
 
 /**
- * Title of a shared period.
- *
- * @param days - Window length in days.
- * @returns “Last 24 hours” or “Last N days”.
- */
-function periodTitle(days: number): string {
-  return days === 1
-    ? t("Last 24 hours")
-    : t("Last {days} days", { days: String(days) });
-}
-
-/**
  * The sync state after an action, keeping the current one when the action returns none.
  *
  * Bindings without a result still resolve to an empty object, which must not replace the state.
@@ -89,14 +75,8 @@ export function nextSyncState(
   return result instanceof SyncState ? result : current;
 }
 
-/** A destructive action waiting for confirmation. */
-type PendingConfirm =
-  | { kind: "rotate" }
-  | { kind: "revoke"; share: ShareView }
-  | null;
-
 /**
- * Settings page for the relay, the phone link and share links.
+ * Settings page for the relay and the phone link.
  *
  * @returns The sync settings page.
  */
@@ -106,7 +86,7 @@ export function SyncPanel() {
   const [token, setToken] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
-  const [confirm, setConfirm] = useState<PendingConfirm>(null);
+  const [isConfirmingRotate, setIsConfirmingRotate] = useState(false);
 
   useEffect(() => {
     void nativeApi
@@ -162,8 +142,8 @@ export function SyncPanel() {
   const isDirty =
     state !== null && (relayUrl !== state.relayUrl || token !== "");
   return (
-    <section aria-label={t("Sync & sharing")}>
-      <PageHeader parent={t("Settings")} title={t("Sync & sharing")} />
+    <section aria-label={t("Sync")}>
+      <PageHeader parent={t("Settings")} title={t("Sync")} />
       <PageBody width="narrow">
         {loadError && <Notice tone="error">{loadError}</Notice>}
         <SettingsSection title={t("Relay")}>
@@ -280,142 +260,68 @@ export function SyncPanel() {
                 variant="ghost"
                 size="xs"
                 disabled={isBusy}
-                onClick={() => setConfirm({ kind: "rotate" })}
+                onClick={() => setIsConfirmingRotate(true)}
               >
                 {t("Reset link")}
               </Button>
             }
           >
-            <SettingsRow>
-              <div className="sync-pairing">
-                <div className="sync-pairing-code">
-                  <SummaryCode modules={state.pairingQrModules} />
-                </div>
-                <div className="flex min-w-0 flex-col gap-2 text-sm">
-                  <span>
-                    {t("Scan with your phone to open the dashboard.")}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {t(
-                      "The part after # is the key. Anyone with the full link can read your snapshot, so keep it private.",
-                    )}
-                  </span>
-                  <div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        void run(
-                          () => nativeApi.CopyText(state.pairingUrl),
-                          t("Link copied."),
-                        )
-                      }
-                    >
-                      <CopyIcon aria-hidden />
-                      {t("Copy link")}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </SettingsRow>
-          </SettingsSection>
-        )}
-        {state?.isEnabled && (
-          <SettingsSection title={t("Share links")}>
-            {state.shares.length === 0 ? (
-              <SettingsRow>
-                <p className="text-xs text-muted-foreground">
-                  {t(
-                    "Create a link from a printed receipt. Active links are listed here.",
-                  )}
-                </p>
-              </SettingsRow>
-            ) : (
-              state.shares.map((share) => (
-                <SettingsRow
-                  key={share.id}
-                  title={periodTitle(share.days)}
-                  description={
-                    t("Available until {date}", {
-                      date: localTime(share.expiresAt),
-                    }) + (share.hideAmounts ? ` · ${t("Amounts hidden")}` : "")
+            <SettingsRow
+              title={t("Phone link")}
+              description={t(
+                "Open this link on your phone. The part after # is the key, so keep the link private.",
+              )}
+              control={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void run(
+                      () => nativeApi.CopyText(state.pairingUrl),
+                      t("Link copied."),
+                    )
                   }
-                  control={
-                    <>
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() =>
-                          void run(
-                            () => nativeApi.CopyText(share.url),
-                            t("Link copied."),
-                          )
-                        }
-                      >
-                        {t("Copy link")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={isBusy}
-                        onClick={() => setConfirm({ kind: "revoke", share })}
-                      >
-                        {t("Revoke")}
-                      </Button>
-                    </>
-                  }
-                />
-              ))
-            )}
+                >
+                  <CopyIcon aria-hidden />
+                  {t("Copy link")}
+                </Button>
+              }
+            />
           </SettingsSection>
         )}
       </PageBody>
       <AlertDialog
-        open={confirm !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setConfirm(null);
-        }}
+        open={isConfirmingRotate}
+        onOpenChange={setIsConfirmingRotate}
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirm?.kind === "rotate"
-                ? t("Reset the phone link?")
-                : t("Revoke this share link?")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("Reset the phone link?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.kind === "rotate"
-                ? t(
-                    "The current link stops working and its snapshot is deleted from the relay. Scan the new code on your phone.",
-                  )
-                : t(
-                    "The page is deleted from the relay and the link stops working immediately.",
-                  )}
+              {t(
+                "The current link stops working and its snapshot is deleted from the relay. Open the new link on your phone.",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setConfirm(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmingRotate(false)}
+            >
               {t("Cancel")}
             </Button>
             <Button
               variant="destructive"
               disabled={isBusy}
               onClick={() => {
-                const pending = confirm;
-                setConfirm(null);
-                if (pending?.kind === "rotate")
-                  void run(
-                    () => nativeApi.RotatePairing(),
-                    t("A new phone link is ready."),
-                  );
-                else if (pending?.kind === "revoke")
-                  void run(
-                    () => nativeApi.RevokeShare(pending.share.id),
-                    t("Share link revoked."),
-                  );
+                setIsConfirmingRotate(false);
+                void run(
+                  () => nativeApi.RotatePairing(),
+                  t("A new phone link is ready."),
+                );
               }}
             >
-              {confirm?.kind === "rotate" ? t("Reset link") : t("Revoke")}
+              {t("Reset link")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
