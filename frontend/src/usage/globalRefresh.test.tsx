@@ -35,7 +35,6 @@ vi.mock("./controller", () => ({
       ],
       window: undefined,
     },
-    selected: null,
     error: "",
     isBusy: page.refreshState.isRefreshing,
     refreshState: page.refreshState,

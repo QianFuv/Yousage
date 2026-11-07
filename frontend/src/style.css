@@ -382,10 +382,6 @@ html [data-slot="input-control"].font-mono input {
 .usage-table-scroll > table:not([class]) :is(th, td):first-child {
   text-align: left;
 }
-.model-environment-comparison {
-  display: grid;
-  gap: 12px;
-}
 /* The model detail dialog keeps its inset margins clear of cutouts and system bars. */
 [data-slot="dialog-viewport"]:has(> .usage-model-dialog) {
   padding: max(1rem, env(safe-area-inset-top))

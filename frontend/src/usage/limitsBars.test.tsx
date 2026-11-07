@@ -200,6 +200,17 @@ describe("pooled limit bars", () => {
     ).toContain("此时应剩余 40%");
   });
 
+  it("does not name the lone environment an account is signed in to, nor leave its section empty", () => {
+    const markup = render(
+      presentations([{ email: "someone@example.com", windows: [SESSION] }]),
+    );
+    expect(markup).not.toContain("Signed in");
+    expect(markup).not.toContain(">Desktop<");
+    expect(markup).not.toMatch(
+      /<div class="flex flex-col gap-1 border-t border-border\/60 pt-2\.5"><\/div>/,
+    );
+  });
+
   it("shows the segment percentage only when the pool has several accounts", () => {
     const single = wideLabels(
       render(

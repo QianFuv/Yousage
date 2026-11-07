@@ -38,7 +38,12 @@ import { useIsReadOnly } from "../web/readOnly";
 import { ViewerCommitMarker } from "../web/renderAcknowledgment";
 import * as nativeApi from "../../bindings/yousage/internal/desktop/app";
 
-/** Preserve null All and explicit empty selection while exposing coverage inside the environment filter. */
+/**
+ * Usage statistics or quota of this device, read from the latest snapshot.
+ *
+ * @param props - Whether the page is visible, which view to show and how to open data source settings.
+ * @returns The Usage or Quota page.
+ */
 export function UsagePage({
   isActive,
   view,
@@ -62,25 +67,23 @@ export function UsagePage({
   useEffect(() => {
     if (isActive) setLimitsNow(Date.now());
   }, [isActive, data.snapshot]);
-  const selected = useMemo(
-    () =>
-      data.snapshot?.environments.filter(
-        (value) =>
-          data.selected === null || data.selected.has(value.environmentId),
-      ) ?? [],
-    [data.snapshot, data.selected],
+  const environments = useMemo(
+    () => data.snapshot?.environments ?? [],
+    [data.snapshot],
   );
   const merged = useMemo(
-    () => mergeAnsweredUsage(metric === "limits" ? [] : selected),
-    [selected, metric],
+    () => mergeAnsweredUsage(metric === "limits" ? [] : environments),
+    [environments, metric],
   );
   const usageWindow = data.snapshot?.window;
-  const answered = selected.filter((value) => value.summary !== null).length;
-  const stillReporting = selected.filter(
+  const answered = environments.filter(
+    (value) => value.summary !== null,
+  ).length;
+  const stillReporting = environments.filter(
     (value) => value.summary === null && !value.error,
   ).length;
   const presentations: LimitPresentations = new Map(
-    selected.map((value) => [
+    environments.map((value) => [
       value.environmentId,
       {
         entry: { target: { label: value.label } },
@@ -90,7 +93,7 @@ export function UsagePage({
   );
   const sourceMessages = [
     ...new Set(
-      selected.flatMap(
+      environments.flatMap(
         (value) =>
           value.summary?.sources.flatMap((source) =>
             source.message &&
@@ -102,8 +105,8 @@ export function UsagePage({
     ),
   ];
   const hasNoHistory =
-    selected.length > 0 &&
-    selected.every(
+    environments.length > 0 &&
+    environments.every(
       (value) => !value.summary || value.summary.sources.length === 0,
     );
   const refreshStatus = useRefreshStatus();
@@ -111,11 +114,9 @@ export function UsagePage({
     data.isBusy && answered === 0 && metric !== "limits"
       ? t("Scanning…")
       : data.snapshot
-        ? selected.length === 0
-          ? t("No environments selected")
-          : answered === 0 && metric !== "limits" && !data.isBusy
-            ? t("Unavailable")
-            : refreshStatus
+        ? answered === 0 && metric !== "limits" && !data.isBusy
+          ? t("Unavailable")
+          : refreshStatus
         : t("Loading…");
   return (
     <section
@@ -165,14 +166,15 @@ export function UsagePage({
         )}
       </PageHeader>
       <PageBody>
-        {(data.error || selected.some((environment) => environment.error)) && (
+        {(data.error ||
+          environments.some((environment) => environment.error)) && (
           <div className="flex flex-col gap-2">
             {data.error && <Notice tone="error">{data.error}</Notice>}
-            {selected
+            {environments
               .filter((environment) => environment.error)
               .map((environment) => (
                 <Notice tone="error" key={environment.environmentId}>
-                  {environment.label}: {localizeEnvironmentError(environment)}
+                  {localizeEnvironmentError(environment)}
                 </Notice>
               ))}
           </div>
@@ -182,25 +184,15 @@ export function UsagePage({
             <UsageLimitsPooled
               presentations={presentations}
               now={limitsNow}
-              cycleValues={indexCycleValues(selected)}
+              cycleValues={indexCycleValues(environments)}
             />
             {commitMarker}
           </Suspense>
         ) : (
           usageWindow && (
             <>
-              {((answered > 0 && stillReporting > 0) ||
-                sourceMessages.length > 0 ||
-                hasNoHistory) && (
+              {(sourceMessages.length > 0 || hasNoHistory) && (
                 <div className="flex flex-col gap-2">
-                  {answered > 0 && stillReporting > 0 && (
-                    <Notice>
-                      {t(
-                        "Some environments are still reporting. Totals include {count} available environments.",
-                        { count: answered },
-                      )}
-                    </Notice>
-                  )}
                   {sourceMessages.map((message) => (
                     <Notice key={message}>{message}</Notice>
                   ))}
@@ -226,13 +218,9 @@ export function UsagePage({
               {answered === 0 ? (
                 <>
                   <EmptyState>
-                    {selected.length === 0
-                      ? t("Select an environment to view usage.")
-                      : stillReporting > 0
-                        ? t("Waiting for usage reports…")
-                        : t(
-                            "No usage report is available. Review the selected environments.",
-                          )}
+                    {stillReporting > 0
+                      ? t("Waiting for usage reports…")
+                      : t("No usage report is available.")}
                   </EmptyState>
                   {commitMarker}
                 </>
@@ -244,9 +232,9 @@ export function UsagePage({
                 >
                   <UsageStatsPanel
                     merged={merged}
-                    environments={selected}
+                    environments={environments}
                     metric={metric === "tokens" ? "tokens" : "cost"}
-                    hasChatGptSharing={selected.some((value) =>
+                    hasChatGptSharing={environments.some((value) =>
                       value.serverConfig?.providers.some(usesChatGptSharing),
                     )}
                     onManageChatGpt={() =>

@@ -251,8 +251,8 @@ function CycleValueSection({ value }: { readonly value: CycleValue }) {
 }
 
 /**
- * Everything about one account in one window: plan, where it is signed in,
- * the email on request, reset time and share of the pool it restores, and the
+ * Everything about one account in one window: plan, the quota source it
+ * comes from, the email on request, reset time and share of the pool it restores, and the
  * reset-credit action. Opens on hover for a glance, on click to act.
  */
 function SegmentPopover({
@@ -279,10 +279,6 @@ function SegmentPopover({
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
   const resetDuration = formatResetDuration(window, now);
-  const where =
-    account.environments.length > 0
-      ? account.environments.map((environment) => environment.label).join(", ")
-      : account.sourceLabel;
   const credits = account.limits.resetCredits?.availableCount
     ? account.limits.resetCredits
     : null;
@@ -307,16 +303,14 @@ function SegmentPopover({
           />
         ) : null}
       </div>
-      <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
-        {account.plan ? <Row label={t("Plan")}>{account.plan}</Row> : null}
-        {where ? (
-          <Row
-            label={account.environments.length > 0 ? t("Signed in") : t("Via")}
-          >
-            {where}
-          </Row>
-        ) : null}
-      </div>
+      {account.plan || account.sourceLabel ? (
+        <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
+          {account.plan ? <Row label={t("Plan")}>{account.plan}</Row> : null}
+          {account.sourceLabel ? (
+            <Row label={t("Via")}>{account.sourceLabel}</Row>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5">
         <Row label={t("Left")}>{remaining}%</Row>
         {window.resetsAt ? (
@@ -858,9 +852,7 @@ export function UsageLimitsPooled({
       notices.length === 0 &&
       externalLinks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {t(
-            "No provider on the selected environments reports subscription limits.",
-          )}
+          {t("No provider reports subscription limits.")}
         </p>
       ) : null}
       <SegmentPopoverContext value={segmentPopover}>

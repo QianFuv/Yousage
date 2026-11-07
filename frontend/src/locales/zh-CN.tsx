@@ -143,10 +143,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Display & behavior": "显示与行为",
   Effects: "效果",
   "Enable {label}": "启用 {label}",
-  Environment: "环境",
-  "Environment comparison": "环境对比",
-  "Environment values can overlap when they share history.":
-    "共享历史记录的环境，数值可能重叠。",
   Export: "导出",
   "Export cancelled.": "已取消导出。",
   Fast: "快速",
@@ -211,17 +207,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Muted: "弱化背景",
   "Muted Foreground": "弱化文字",
   "No activity in this window.": "此时间段内没有活动。",
-  "No environments selected": "未选择环境",
   "No history location detected yet": "尚未检测到历史记录位置",
   "No previous successful limits are available.":
     "没有上次成功读取的额度可用。",
-  "No provider on the selected environments reports subscription limits.":
-    "所选环境中没有可报告订阅额度的 Provider。",
+  "No provider reports subscription limits.": "没有可报告订阅额度的 Provider。",
   "No reset credit left.": "没有剩余的重置券。",
   "No reset credits banked": "没有可用的重置券",
   "No saved history has been scanned yet.": "尚未扫描到已保存的历史记录。",
-  "No usage report is available. Review the selected environments.":
-    "暂无用量报告，请检查所选环境。",
+  "No usage report is available.": "暂无用量报告。",
   None: "无",
   "Not detected yet.": "尚未识别。",
   "Not detected. Install the provider or configure its standard location, then detect again.":
@@ -288,7 +281,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Secondary Foreground": "次要背景文字",
   "Secondary Label": "次要标签",
   Segment: "分段",
-  "Select an environment to view usage.": "选择环境以查看用量。",
   "Selected themes removed.": "已删除所选主题。",
   Session: "会话",
   Settings: "设置",
@@ -301,10 +293,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Sidebar Row Active": "侧边栏行激活",
   "Sidebar Row Hover": "侧边栏行悬停",
   "Sidebar Row Selected": "侧边栏行选中",
-  "Signed in": "登录位置",
   "Snapshot uploaded.": "快照已上传。",
-  "Some environments are still reporting. Totals include {count} available environments.":
-    "部分环境仍在上报，合计仅包含 {count} 个可用环境。",
   Sources: "来源",
   "Sources & connections": "数据来源",
   Spent: "已花费",
@@ -382,7 +371,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "此操作只能在桌面端进行。",
   "This address uses plain HTTP, so the relay token travels unencrypted. Use HTTPS, for example through a cloudflared tunnel.":
     "此地址使用明文 HTTP，relay 令牌会以未加密的方式传输。请改用 HTTPS，例如通过 cloudflared 隧道。",
-  "This device": "本机",
   "This link is incomplete": "链接不完整",
   "This page cannot be opened": "无法打开此页面",
   "This page is no longer available": "此页面已不可用",

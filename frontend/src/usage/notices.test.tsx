@@ -21,7 +21,6 @@ vi.mock("./controller", () => ({
       environments: page.environments,
       window: undefined,
     },
-    selected: null,
     error: "",
     isBusy: false,
     display: {
@@ -292,7 +291,7 @@ describe("rendered notices", () => {
     expect(english).toContain(`Server · ${sentenceLabel}: ${FAILURES[12]}`);
   });
 
-  it("localizes the composed environment error on the usage page", () => {
+  it("localizes the composed environment error on the usage page, without the lone environment's name", () => {
     const error = `Claude: ${FAILURES[2]} ${RETAINED} Claude Work: ${FAILURES[10]} ${NO_PREVIOUS}`;
     page.environments = [
       environment(
@@ -309,9 +308,10 @@ describe("rendered notices", () => {
       );
     setLanguage("zh-CN");
     expect(render()).toContain(
-      `This device: Claude: ${t(FAILURES[2])} ${t(RETAINED)} Claude Work: ${t(FAILURES[10])} ${t(NO_PREVIOUS)}`,
+      `>Claude: ${t(FAILURES[2])} ${t(RETAINED)} Claude Work: ${t(FAILURES[10])} ${t(NO_PREVIOUS)}`,
     );
     setLanguage("en");
-    expect(render()).toContain(`This device: ${error}`);
+    expect(render()).toContain(`>${error}`);
+    expect(render()).not.toContain("This device:");
   });
 });

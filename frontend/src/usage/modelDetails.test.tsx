@@ -1,13 +1,11 @@
-/** Model details keep their figures exact in the original grid and table, inside an inset dialog. */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+/** Model details keep their figures exact in the original grid, inside an inset dialog. */
+import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { setLanguage } from "../i18n";
 import { ZH_CN } from "../locales/zh-CN";
 import { mergeAnsweredUsage, type EnvironmentUsageStatus } from "./data";
-import { environmentComparisonRows, modelDetailStats } from "./modelDetails";
+import { modelDetailStats } from "./modelDetails";
 import type { UsageBucket } from "./contracts";
 import { ReadOnlyContext } from "../web/readOnly";
 import { UsageModelDialog } from "../../vendor/UsageModelDialog";
@@ -183,19 +181,6 @@ const ENVIRONMENTS = [
 ];
 
 /**
- * Inner markup of every element with the given tag, in document order.
- *
- * @param markup - Static markup to search.
- * @param tag - Element tag name without attributes.
- * @returns Each element's inner markup.
- */
-function inner(markup: string, tag: string): string[] {
-  return [
-    ...markup.matchAll(new RegExp(`<${tag}(?: [^>]*)?>(.*?)</${tag}>`, "gs")),
-  ].map((match) => match[1]);
-}
-
-/**
  * The merged totals of the long-named model across the given environments.
  *
  * @param environments - Environments to merge.
@@ -227,61 +212,6 @@ describe("model detail figures", () => {
       "1.20K",
       "60.0%",
     ]);
-  });
-
-  it("keeps unanswered, unpriced and idle environments distinct", () => {
-    const rows = environmentComparisonRows(ENVIRONMENTS, "codex", LONG_MODEL);
-    expect(rows).toEqual([
-      {
-        id: "local",
-        label: LONG_ENVIRONMENT,
-        cost: "$12,345,678.90",
-        tokens: "1.20T",
-        cachedInput: "600B",
-      },
-      {
-        id: "unpriced",
-        label: "Unpriced host",
-        cost: "Unpriced",
-        tokens: "1.20K",
-        cachedInput: "600",
-      },
-      {
-        id: "idle",
-        label: "Idle host",
-        cost: "$0.00",
-        tokens: "0",
-        cachedInput: "0",
-      },
-      {
-        id: "offline",
-        label: "Offline host",
-        cost: "Unavailable",
-        tokens: "—",
-        cachedInput: "—",
-      },
-    ]);
-  });
-});
-
-describe("model detail localization", () => {
-  afterEach(() => setLanguage("en"));
-
-  it("localizes comparison states in the active language so the dialog must recompute them", () => {
-    setLanguage("zh-CN");
-    const rows = environmentComparisonRows(ENVIRONMENTS, "codex", LONG_MODEL);
-    expect(rows.map((row) => row.cost)).toEqual([
-      "$12,345,678.90",
-      ZH_CN["Unpriced"],
-      "$0.00",
-      ZH_CN["Unavailable"],
-    ]);
-    setLanguage("en");
-    expect(
-      environmentComparisonRows(ENVIRONMENTS, "codex", LONG_MODEL).map(
-        (row) => row.cost,
-      ),
-    ).toEqual(["$12,345,678.90", "Unpriced", "$0.00", "Unavailable"]);
   });
 });
 
@@ -330,56 +260,6 @@ function slotClasses(markup: string, slot: string): string[] {
   );
 }
 
-/**
- * Inline style of each cell in a table row, in column order.
- *
- * @param row - Inner markup of the row.
- * @returns Each cell's declarations by property, empty when it has no inline style.
- */
-function cellStyles(row: string): Record<string, string>[] {
-  return [...row.matchAll(/<t[hd]([^>]*)>/g)].map(([, attributes]) =>
-    Object.fromEntries(
-      (/ style="([^"]*)"/.exec(attributes)?.[1] ?? "")
-        .split(";")
-        .filter(Boolean)
-        .map((declaration) => declaration.split(":")),
-    ),
-  );
-}
-
-/**
- * Declarations of one rule in the app stylesheet.
- *
- * @param selector - The rule's exact selector text.
- * @returns Its declarations by property, empty when the rule is absent.
- */
-function stylesheetRule(selector: string): Record<string, string> {
-  const css = readFileSync(join(__dirname, "..", "style.css"), "utf8").replace(
-    /\r\n/g,
-    "\n",
-  );
-  const start = css.indexOf(`${selector} {`);
-  if (start === -1) return {};
-  return Object.fromEntries(
-    css
-      .slice(start + selector.length + 2, css.indexOf("}", start))
-      .split(";")
-      .map((declaration) => declaration.split(":").map((part) => part.trim()))
-      .filter(([property]) => property),
-  );
-}
-
-/**
- * A rem length as a number.
- *
- * @param length - A CSS length such as `12rem`.
- * @returns The number of rems, or NaN for any other unit.
- */
-function rems(length: string | undefined): number {
-  const match = /^(\d+(?:\.\d+)?)rem$/.exec(length ?? "");
-  return match ? Number(match[1]) : Number.NaN;
-}
-
 describe("model detail dialog", () => {
   it("is an inset dialog with rounded corners on every side rather than a sheet stuck to the bottom of phones", () => {
     const markup = renderDialog(ENVIRONMENTS, true);
@@ -421,78 +301,12 @@ describe("model detail dialog", () => {
     ]);
   });
 
-  it("compares every environment in one table at every width, with no separate phone list", () => {
+  it("shows no environment comparison, since only this device reports usage", () => {
     const markup = renderDialog(ENVIRONMENTS, true);
-    const rows = environmentComparisonRows(ENVIRONMENTS, "codex", LONG_MODEL);
-    expect(markup).not.toContain("<ul");
-    expect(markup).not.toContain("sm:hidden");
-    expect(markup).toMatch(/<div class="usage-table-scroll"[^>]*><table>/);
-    expect(inner(inner(markup, "thead")[0], "th")).toEqual([
-      "Environment",
-      "Cost",
-      "Tokens",
-      "Cached input",
-    ]);
-    expect(
-      inner(inner(markup, "tbody")[0], "tr").map((row) => inner(row, "td")),
-    ).toEqual(
-      rows.map((row) => [row.label, row.cost, row.tokens, row.cachedInput]),
-    );
-    expect(markup).toContain(
-      "Environment values can overlap when they share history.",
-    );
-  });
-
-  it("keeps a long environment name readable several words a line, with every figure of every row complete and unwrapped", () => {
-    const markup = renderDialog(ENVIRONMENTS, true);
-    const [header] = inner(inner(markup, "thead")[0], "tr");
-    const body = inner(inner(markup, "tbody")[0], "tr");
-    expect(inner(body[0], "td")).toEqual([
-      LONG_ENVIRONMENT,
-      "$12,345,678.90",
-      "1.20T",
-      "600B",
-    ]);
-    const [headerName, ...headerFigures] = cellStyles(header);
-    expect(headerName).toMatchObject({ "white-space": "normal" });
-    expect(headerName).not.toHaveProperty("overflow-wrap");
-    // At the table's 0.75rem text, 10rem holds about 26 characters, so whole
-    // words such as "workstation" and "deliberately" never break mid-word.
-    expect(rems(headerName["min-width"])).toBeGreaterThanOrEqual(10);
-    expect(headerFigures).toEqual([{}, {}, {}]);
-    for (const row of body) {
-      const [name, ...figures] = cellStyles(row);
-      expect(name).toEqual({
-        "white-space": "normal",
-        "overflow-wrap": "anywhere",
-        "min-width": headerName["min-width"],
-      });
-      expect(figures).toEqual([{}, {}, {}]);
-    }
-    expect(
-      stylesheetRule(".usage-table-scroll th,\n.usage-table-scroll td"),
-    ).toEqual({ "white-space": "nowrap" });
-  });
-
-  it("pans a comparison wider than the dialog inside its own labelled region rather than widening the dialog or page", () => {
-    const markup = renderDialog(ENVIRONMENTS, true);
-    const heading = /<h3 id="([^"]+)"[^>]*>([^<]*)<\/h3>/.exec(markup);
-    expect(heading?.[2]).toBe("Environment comparison");
-    // Not a tab stop until it is measured overflowing in a browser.
-    expect(markup).toContain(
-      `<div class="usage-table-scroll" role="region" aria-labelledby="${heading?.[1]}"><table>`,
-    );
-    expect(stylesheetRule(".usage-table-scroll")).toEqual({
-      overflow: "auto",
-      "min-width": "0",
-    });
-    expect(slotClasses(markup, "dialog-popup").join(" ")).not.toMatch(/min-w-/);
-  });
-
-  it("omits the overlap note for a single environment", () => {
-    const markup = renderDialog(ENVIRONMENTS.slice(1, 2), true);
-    expect(markup).not.toContain("overlap");
-    expect(markup).toContain("Unpriced");
+    expect(markup).not.toContain("<table");
+    expect(markup).not.toContain("usage-table-scroll");
+    expect(markup).not.toContain("Environment");
+    expect(markup).not.toContain(LONG_ENVIRONMENT);
   });
 
   it("explains unpriced tokens without offering to edit prices", () => {
@@ -509,8 +323,7 @@ describe("model detail dialog", () => {
     setLanguage("zh-CN");
     try {
       const markup = renderDialog(ENVIRONMENTS, true);
-      expect(markup).toContain(ZH_CN["Environment comparison"]);
-      expect(markup).toContain(ZH_CN["Unavailable"]);
+      expect(markup).toContain(ZH_CN["Per 1M tokens"]);
       expect(markup).toContain("$12,345,678.90");
     } finally {
       setLanguage("en");

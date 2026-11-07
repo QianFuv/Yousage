@@ -32,8 +32,6 @@ const IDLE_REFRESH: RefreshState = {
 type DataContextValue = {
   snapshot: UsageSnapshot | null;
   display: SavedDisplay;
-  selected: Set<string> | null;
-  setSelected: (selected: Set<string> | null) => void;
   error: string;
   isBusy: boolean;
   refreshState: RefreshState;
@@ -62,7 +60,6 @@ export function DataProvider({
   const displayRef = useRef(display);
   displayRef.current = display;
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
-  const [selected, setSelected] = useState<Set<string> | null>(null);
   const [error, setError] = useState("");
   const hasSnapshot = useRef(false);
   const [isSavingDisplay, setIsSavingDisplay] = useState(false);
@@ -175,8 +172,6 @@ export function DataProvider({
       value={{
         snapshot,
         display,
-        selected,
-        setSelected,
         error,
         isBusy: refreshState.isRefreshing,
         refreshState,
