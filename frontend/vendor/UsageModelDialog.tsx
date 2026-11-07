@@ -21,7 +21,6 @@ import {
   modelDetailStats,
 } from "../src/usage/modelDetails";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
-import { Button } from "../../tools/parity/upstream/apps/web/src/components/ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -105,14 +104,12 @@ export function UsageModelDialog({
   environments,
   metric,
   chartWindow,
-  onSetPrice,
   onClose,
 }: {
   readonly model: ModelTotals;
   readonly environments: readonly EnvironmentUsageStatus[];
   readonly metric: UsageChartMetric;
   readonly chartWindow: UsageChartWindow;
-  readonly onSetPrice: () => void;
   readonly onClose: () => void;
 }) {
   const isReadOnly = useIsReadOnly();
@@ -271,9 +268,6 @@ export function UsageModelDialog({
                 tokens: formatTokens(model.unpricedTokens),
               })}
             </span>
-            {!isReadOnly && (
-              <Button onClick={onSetPrice}>{t("Set price")}</Button>
-            )}
           </DialogFooter>
         ) : null}
       </DialogPopup>

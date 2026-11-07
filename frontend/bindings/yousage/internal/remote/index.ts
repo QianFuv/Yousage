@@ -7,7 +7,6 @@ export {
     Environment,
     Pricing,
     Provider,
-    SaveOutcome,
     Settings,
     SlashCommand,
     Source,

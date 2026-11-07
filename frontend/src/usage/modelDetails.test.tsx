@@ -309,7 +309,6 @@ function renderDialog(
           timeZone: "UTC",
           referenceTime: undefined,
         }}
-        onSetPrice={() => {}}
         onClose={() => {}}
       />
     </ReadOnlyContext>,
@@ -496,14 +495,14 @@ describe("model detail dialog", () => {
     expect(markup).toContain("Unpriced");
   });
 
-  it("explains unpriced tokens everywhere but offers Set price only where prices can be edited", () => {
+  it("explains unpriced tokens without offering to edit prices", () => {
     const readOnly = renderDialog(ENVIRONMENTS.slice(1, 2), true);
     const desktop = renderDialog(ENVIRONMENTS.slice(1, 2), false);
     for (const markup of [readOnly, desktop]) {
       expect(markup).toContain("1.20K tokens have no known price");
     }
     expect(readOnly).not.toContain("Set price");
-    expect(desktop).toContain("Set price");
+    expect(desktop).not.toContain("Set price");
   });
 
   it("renders its figures and states in the active language", () => {

@@ -62,39 +62,6 @@ export class Display {
     }
 }
 
-export class PricingPatch {
-    "overrides": { [_ in string]?: domain$0.PriceOverride | null };
-    "aliases": { [_ in string]?: string | null };
-
-    /** Creates a new PricingPatch instance. */
-    constructor($$source: Partial<PricingPatch> = {}) {
-        if (!("overrides" in $$source)) {
-            this["overrides"] = {};
-        }
-        if (!("aliases" in $$source)) {
-            this["aliases"] = {};
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new PricingPatch instance from a string or object.
-     */
-    static createFrom($$source: any = {}): PricingPatch {
-        const $$createField0_0 = $$createType2;
-        const $$createField1_0 = $$createType3;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("overrides" in $$parsedSource) {
-            $$parsedSource["overrides"] = $$createField0_0($$parsedSource["overrides"]);
-        }
-        if ("aliases" in $$parsedSource) {
-            $$parsedSource["aliases"] = $$createField1_0($$parsedSource["aliases"]);
-        }
-        return new PricingPatch($$parsedSource as Partial<PricingPatch>);
-    }
-}
-
 export class SavedDisplay {
     "revision": number;
     "value": Display;
@@ -115,7 +82,7 @@ export class SavedDisplay {
      * Creates a new SavedDisplay instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedDisplay {
-        const $$createField1_0 = $$createType4;
+        const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -162,8 +129,4 @@ export class Source {
 }
 
 // Private type creation functions
-const $$createType0 = domain$0.PriceOverride.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Map($Create.Any, $$createType1);
-const $$createType3 = $Create.Map($Create.Any, $Create.Any);
-const $$createType4 = Display.createFrom;
+const $$createType0 = Display.createFrom;

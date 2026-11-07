@@ -412,7 +412,6 @@ function renderUsage(
       metric={metric}
       hasChatGptSharing={false}
       onManageChatGpt={() => {}}
-      onSetPrice={() => {}}
     />,
   );
 }

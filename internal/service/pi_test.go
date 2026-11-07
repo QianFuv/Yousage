@@ -237,25 +237,4 @@ func TestPiHistoryFeedsEveryReport(test *testing.T) {
 			test.Fatal("unrelated contexts fabricated losses", loss, err)
 		}
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		test.Fatal(err)
-	}
-	pricing.Value.Overrides["deepseek/custom"] = domain.PriceOverride{}
-	pricing.Value.Overrides["replacement"] = domain.PriceOverride{OutputCostPerMillionTokens: 2}
-	pricing.Value.Aliases["anthropic/claude-test"] = "replacement"
-	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
-		test.Fatal(err)
-	}
-	window, _ := accounting.BuildWindow(now, 7, "UTC")
-	repriced, err := service.localSummary(ctx, window)
-	var repricedTokens int64
-	var repricedCost float64
-	for _, bucket := range repriced.Buckets {
-		repricedTokens += bucket.Totals.Total()
-		repricedCost += bucket.CostUsd
-	}
-	if err != nil || math.Abs(repricedCost-0.50008) > 1e-9 || repricedTokens != 152 {
-		test.Fatal("persisted Pi facts did not reprice with aliases and explicit free overrides", repricedCost, repricedTokens, err)
-	}
 }

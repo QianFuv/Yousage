@@ -5,33 +5,6 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-export class PriceOverride {
-    "inputCostPerMillionTokens": number;
-    "outputCostPerMillionTokens": number;
-    "cacheReadCostPerMillionTokens"?: number | null;
-    "cacheWriteCostPerMillionTokens"?: number | null;
-
-    /** Creates a new PriceOverride instance. */
-    constructor($$source: Partial<PriceOverride> = {}) {
-        if (!("inputCostPerMillionTokens" in $$source)) {
-            this["inputCostPerMillionTokens"] = 0;
-        }
-        if (!("outputCostPerMillionTokens" in $$source)) {
-            this["outputCostPerMillionTokens"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new PriceOverride instance from a string or object.
-     */
-    static createFrom($$source: any = {}): PriceOverride {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new PriceOverride($$parsedSource as Partial<PriceOverride>);
-    }
-}
-
 export enum Provider {
     /**
      * The Go zero value for the underlying type of the enum.

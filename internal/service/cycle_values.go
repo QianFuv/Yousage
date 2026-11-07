@@ -198,10 +198,6 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 	if err != nil {
 		return nil
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		return nil
-	}
 	rates := service.Rates(ctx)
 	series := []quota.CycleSeries{}
 	if _, err = service.Store.ReadSetting(ctx, "quota-samples", &series); err != nil {
@@ -247,7 +243,7 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 			}
 		}
 	}
-	historyInputs := []any{"robust-cycle-fit-cache-v3", selection, pricing.Value, rates.encodedRates, service.Scope}
+	historyInputs := []any{"robust-cycle-fit-cache-v3", selection, rates.encodedRates, service.Scope}
 	for _, stored := range series {
 		for _, observation := range stored.Observations {
 			reset, _ := time.Parse(time.RFC3339Nano, observation.ResetsAt)
@@ -326,8 +322,7 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 	if service.cycleCache.values != nil && service.cycleCache.key == cacheKey && !now.Before(service.cycleCache.validSince) && now.Before(service.cycleCache.validUntil) {
 		return service.cycleCache.values
 	}
-	overrides, aliases := accounting.OverrideRates(pricing.Value.Overrides), accounting.ResolveAliases(pricing.Value.Aliases)
-	pricer := accounting.NewPricer(rates.Rates, overrides)
+	pricer := accounting.NewPricer(rates.Rates, nil)
 	histories := map[string]quota.CostHistory{}
 	logSeries := map[string][]quota.CycleObservation{}
 	completed := map[string][]quota.FittedCycle{}
@@ -465,9 +460,6 @@ func (service *Service) localCycleValues(ctx context.Context, config remote.Conf
 					}
 					if record.IsQuotaOnly || record.ErrorKind != "" || provider.Driver == "codex" && record.QuotaBucket != "" && record.QuotaBucket != "codex" {
 						continue
-					}
-					if model, exists := aliases[record.Model]; exists {
-						record.Model, record.RateModel = model, ""
 					}
 					priced := pricer.Price(record)
 					records = append(records, quota.BucketCostRecord{CostRecord: quota.CostRecord{At: time.UnixMilli(record.TimestampMs), CostUsd: priced.CostUsd, IsUnpriced: priced.CostSource == "unpriced"}, Bucket: record.QuotaBucket})

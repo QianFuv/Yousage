@@ -48,7 +48,6 @@ import {
   SettingsIcon,
   SlidersHorizontalIcon,
   SmartphoneIcon,
-  TagsIcon,
   TimerIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -93,11 +92,6 @@ const SyncPanel = lazy(() =>
     default: module.SyncPanel,
   })),
 );
-const PricingPanel = lazy(() =>
-  import("./usage/PricingPanel").then((module) => ({
-    default: module.PricingPanel,
-  })),
-);
 const ThemePanel = lazy(() =>
   import("./theme/ThemePanel").then((module) => ({
     default: module.ThemePanel,
@@ -138,16 +132,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
       })
       .catch(() => {});
   }, [data.display.value.language, systemLocale]);
-  const [priceModel, setPriceModel] = useState<string>();
-  const [pricingState, setPricingState] = useState({
-    isDirty: false,
-    isPending: false,
-  });
-  const changePricingState = useCallback(
-    (isDirty: boolean, isPending: boolean) =>
-      setPricingState({ isDirty, isPending }),
-    [],
-  );
   const [route, setRoute] = useState<PageRoute | "settings">("statistics");
   const [section, setSection] = useState<SettingsSection>("appearance");
   const usageRoute = useRef<PageRoute>("statistics");
@@ -209,12 +193,9 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
   const [status, setStatus] = useState("");
   const closeState = useRef({ isDirty: false, isPending: false });
   closeState.current = {
-    isDirty: pricingState.isDirty || sourcesState.isDirty || isThemeDirty,
+    isDirty: sourcesState.isDirty || isThemeDirty,
     isPending:
-      data.isSavingDisplay ||
-      pricingState.isPending ||
-      sourcesState.isPending ||
-      appearance.isBusy,
+      data.isSavingDisplay || sourcesState.isPending || appearance.isBusy,
   };
   useEffect(() => {
     /** Reveal a window hidden in the tray before asking about its drafts. */
@@ -283,7 +264,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
     };
   }, []);
   const sectionState: Partial<Record<SettingsSection, boolean>> = {
-    pricing: pricingState.isDirty,
     sources: sourcesState.isDirty,
     appearance: isThemeDirty,
   };
@@ -377,10 +357,7 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
           <UsagePage
             isActive={route === "statistics" || route === "quota"}
             view={route === "statistics" ? "statistics" : "limits"}
-            onSettings={(next, model) => {
-              if (model) setPriceModel(model);
-              navigate("settings", next);
-            }}
+            onSettings={(next) => navigate("settings", next)}
           />
         </div>
         <Suspense fallback={null}>
@@ -402,14 +379,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
             </p>
           }
         >
-          {visitedSections.has("pricing") && (
-            <div hidden={route !== "settings" || section !== "pricing"}>
-              <PricingPanel
-                model={priceModel}
-                onDirtyChange={changePricingState}
-              />
-            </div>
-          )}
           {visitedSections.has("appearance") && (
             <div hidden={route !== "settings" || section !== "appearance"}>
               <ThemePanel
@@ -492,7 +461,6 @@ type SettingsSection =
   | "appearance"
   | "display"
   | "diagnostics"
-  | "pricing"
   | "sources"
   | "sync";
 
@@ -514,12 +482,6 @@ const SETTINGS_SECTIONS: readonly {
     label: msg("Sources & connections"),
     shortLabel: msg("Sources"),
     icon: PlugIcon,
-  },
-  {
-    id: "pricing",
-    label: msg("Prices & mappings"),
-    shortLabel: msg("Prices"),
-    icon: TagsIcon,
   },
   {
     id: "sync",

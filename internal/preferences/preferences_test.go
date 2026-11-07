@@ -39,7 +39,7 @@ func TestLegacyReceiptDayStartPreference(test *testing.T) {
 	}
 }
 
-func TestSavedDisplayPricingAndSources(t *testing.T) {
+func TestSavedDisplayAndSources(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "preferences.sqlite"))
 	if err != nil {
 		t.Fatal(err)
@@ -63,33 +63,6 @@ func TestSavedDisplayPricingAndSources(t *testing.T) {
 	recovered, err := service.Display(ctx)
 	if err != nil || recovered.Value.Zoom != 2 {
 		t.Fatal(recovered, err)
-	}
-	pricing, err := service.Pricing(ctx, "local")
-	if err != nil {
-		t.Fatal(err)
-	}
-	zero := 0.0
-	pricing.Value.Overrides["Exact[1m]"] = domain.PriceOverride{CacheReadCostPerMillionTokens: &zero}
-	pricing.Value.Aliases["source"] = "target"
-	if _, err := service.SavePricing(ctx, "local", pricing); err != nil {
-		t.Fatal(err)
-	}
-	recoveredPricing, err := service.Pricing(ctx, "local")
-	if err != nil {
-		t.Fatal(err)
-	}
-	price := recoveredPricing.Value.Overrides["Exact[1m]"]
-	if price.CacheReadCostPerMillionTokens == nil || *price.CacheReadCostPerMillionTokens != 0 || price.CacheWriteCostPerMillionTokens != nil {
-		t.Fatal("blank vs zero lost")
-	}
-	target := "target"
-	patched, err := service.PatchPricing(ctx, "local", recoveredPricing.Revision, PricingPatch{Aliases: map[string]*string{"Exact[1m]": &target}})
-	if err != nil || len(patched.Value.Overrides) != 0 || patched.Value.Aliases["source"] != "target" {
-		t.Fatal("alias patch failed to clear only source price", patched, err)
-	}
-	remote, err := service.Pricing(ctx, "remote")
-	if err != nil || len(remote.Value.Overrides) != 0 {
-		t.Fatal("environment preferences leaked", remote, err)
 	}
 	sources := []Source{{Id: "source", Provider: domain.Codex, Root: "/fixture", IsEnabled: false}}
 	if _, err := service.SaveSources(ctx, sources, 0); err != nil {
@@ -177,25 +150,5 @@ func TestDisplayLanguageIsValidated(test *testing.T) {
 	}
 	if _, err := service.Display(ctx); err == nil {
 		test.Fatal("invalid stored language was silently replaced")
-	}
-}
-
-func TestEmptySavedPricingCanBePatched(t *testing.T) {
-	store, err := storage.Open(filepath.Join(t.TempDir(), "empty.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	service := New(store)
-	ctx := context.Background()
-	saved, err := service.SavePricing(ctx, "local", SavedPricing{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	target := "target"
-	price := domain.PriceOverride{InputCostPerMillionTokens: 1, OutputCostPerMillionTokens: 2}
-	patched, err := service.PatchPricing(ctx, "local", saved.Revision, PricingPatch{Overrides: map[string]*domain.PriceOverride{"priced": &price}, Aliases: map[string]*string{"source": &target}})
-	if err != nil || len(patched.Value.Overrides) != 1 || patched.Value.Aliases["source"] != "target" {
-		t.Fatal(patched, err)
 	}
 }

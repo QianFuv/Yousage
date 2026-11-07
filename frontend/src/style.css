@@ -391,53 +391,6 @@ html [data-slot="input-control"].font-mono input {
     max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
     max(1rem, env(safe-area-inset-left));
 }
-/* Vendored price editor: page chrome is provided by the settings layout. */
-.pricing-panel {
-  display: grid;
-  gap: 1rem;
-  min-width: 0;
-}
-.pricing-panel > header {
-  display: flex;
-  align-items: center;
-  min-height: 1.75rem;
-  padding: 0 0.25rem;
-}
-.pricing-panel > header h2 {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-.pricing-content {
-  display: grid;
-  gap: 1rem;
-  min-width: 0;
-}
-.pricing-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-/* Narrow screens scroll the price grid sideways: keep the empty message in
-   the visible area and the add and remove buttons pinned to the right edge. */
-@media (width < 48rem) {
-  .pricing-panel [data-slot="table-container"] {
-    container-type: inline-size;
-  }
-  .pricing-panel [data-slot="table-container"] td[colspan="7"] > p {
-    position: sticky;
-    left: 0.5rem;
-    width: calc(100cqw - 1rem);
-  }
-  .pricing-panel
-    [data-slot="table-container"]
-    :is(th, td):last-child:not([colspan]) {
-    position: sticky;
-    right: 0;
-    background: var(--background);
-  }
-}
 
 /* Vendored theme editor at very narrow widths ---------------------------- */
 @media (max-width: 360px) {

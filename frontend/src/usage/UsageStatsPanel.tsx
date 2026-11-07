@@ -85,7 +85,6 @@ export function UsageStatsPanel({
   metric,
   hasChatGptSharing,
   onManageChatGpt,
-  onSetPrice,
 }: {
   hasChatGptSharing: boolean;
   onManageChatGpt: () => void;
@@ -93,7 +92,6 @@ export function UsageStatsPanel({
   environments: readonly EnvironmentUsageStatus[];
   chartWindow: UsageChartWindow;
   metric: "cost" | "tokens";
-  onSetPrice: (model?: string) => void;
 }) {
   const data = useData();
   const breakdown = data.display.value.breakdown;
@@ -498,10 +496,6 @@ export function UsageStatsPanel({
           environments={environments}
           metric={metric}
           chartWindow={chartWindow}
-          onSetPrice={() => {
-            setSelectedModelKey(null);
-            onSetPrice(selectedModel.model);
-          }}
           onClose={() => setSelectedModelKey(null)}
         />
       )}

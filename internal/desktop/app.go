@@ -18,7 +18,6 @@ import (
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
 	"yousage/internal/refresh"
-	"yousage/internal/remote"
 	dataservice "yousage/internal/service"
 	"yousage/internal/storage"
 	datasync "yousage/internal/sync"
@@ -283,11 +282,6 @@ func (service *App) RefreshLimits(selected []string, request refresh.Request) (r
 		service.triggerSync()
 	}
 	return err
-}
-
-// ApplyPricing saves each destination independently and reports ambiguous remote writes.
-func (service *App) ApplyPricing(identities []string, patch preferences.PricingPatch) []remote.SaveOutcome {
-	return service.usage.ApplyPricing(service.context, identities, patch)
 }
 
 // ConsumeResetCredit uses an explicit caller operation identity and durable recovery before sending.

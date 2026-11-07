@@ -85,19 +85,9 @@ func TestRawHistoryToDesktopSummaryAndRepricing(test *testing.T) {
 			}
 		}
 	}
-	free := domain.PriceOverride{}
-	outcomes := service.ApplyPricing(ctx, []string{service.LocalId}, preferences.PricingPatch{Overrides: map[string]*domain.PriceOverride{"fixture": &free}})
-	if !outcomes[0].IsSaved {
-		test.Fatal(outcomes)
-	}
 	snapshot, err := service.Usage(ctx, 30, "UTC")
 	if err != nil {
 		test.Fatal(err)
-	}
-	for _, bucket := range snapshot.Environments[0].Summary.Buckets {
-		if bucket.CostUsd != 0 || bucket.CostSource != "modelPriced" {
-			test.Fatal("override failed to reprice retained records", bucket)
-		}
 	}
 	encoded, err := json.Marshal(snapshot)
 	if err != nil || !json.Valid(encoded) {

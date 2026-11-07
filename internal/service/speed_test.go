@@ -16,7 +16,7 @@ func TestSpeedAggregation(test *testing.T) {
 	window, _ := accounting.BuildWindow(now, 7, "Asia/Shanghai")
 	records := []domain.Record{}
 	for index, output := range []int64{10, 40, 90} {
-		records = append(records, domain.Record{Provider: domain.Codex, Model: "alias", Speed: "standard", TimestampMs: now.Add(-time.Hour).UnixMilli(), Totals: domain.Tokens{OutputTokens: output, ReasoningTokens: output / 2}, GenerationMs: int64(index+1) * 1000})
+		records = append(records, domain.Record{Provider: domain.Codex, Model: "model", Speed: "standard", TimestampMs: now.Add(-time.Hour).UnixMilli(), Totals: domain.Tokens{OutputTokens: output, ReasoningTokens: output / 2}, GenerationMs: int64(index+1) * 1000})
 	}
 	records = append(records,
 		domain.Record{Provider: domain.Codex, Model: "model", Speed: "standard", TimestampMs: now.Add(-time.Hour).UnixMilli(), Totals: domain.Tokens{OutputTokens: 999}},
@@ -27,7 +27,7 @@ func TestSpeedAggregation(test *testing.T) {
 		domain.Record{Provider: domain.Claude, TimestampMs: now.Add(-time.Hour).UnixMilli(), ErrorKind: "server"},
 		domain.Record{Provider: domain.Codex, TimestampMs: now.Add(-time.Hour).UnixMilli(), IsQuotaOnly: true},
 	)
-	report := analyzeSpeed(records, window, map[string]string{"alias": "model"}, now)
+	report := analyzeSpeed(records, window, now)
 	if report.MeasuredRequests != 4 || report.UnmeasuredRequests != 2 || len(report.Models) != 3 || len(report.Buckets) != 7 {
 		test.Fatal(report)
 	}
@@ -75,7 +75,7 @@ func TestSpeedWindowBuckets(test *testing.T) {
 		for _, instant := range []time.Time{start.Add(-time.Millisecond), start, start.Add(time.Hour), end.Add(-time.Millisecond), end} {
 			records = append(records, domain.Record{Provider: domain.Codex, Model: "model", Speed: "standard", TimestampMs: instant.UnixMilli(), Totals: domain.Tokens{OutputTokens: 10}, GenerationMs: 1000})
 		}
-		report := analyzeSpeed(records, window, nil, now)
+		report := analyzeSpeed(records, window, now)
 		expectedBuckets := days
 		if days == 1 {
 			expectedBuckets = 24
@@ -92,17 +92,12 @@ func TestSpeedWindowBuckets(test *testing.T) {
 	}
 }
 
-// TestSpeedReportLocalHistory verifies persistence, source deduplication and pricing aliases through the service.
+// TestSpeedReportLocalHistory verifies persistence and source deduplication through the service.
 func TestSpeedReportLocalHistory(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
-	record := domain.Record{Provider: domain.Codex, Model: "alias", Speed: "fast", SessionId: "session", TimestampMs: service.Now().Add(-time.Hour).UnixMilli(), GenerationMs: 2000, Totals: domain.Tokens{OutputTokens: 100}, DedupeKey: "request"}
+	record := domain.Record{Provider: domain.Codex, Model: "model", Speed: "fast", SessionId: "session", TimestampMs: service.Now().Add(-time.Hour).UnixMilli(), GenerationMs: 2000, Totals: domain.Tokens{OutputTokens: 100}, DedupeKey: "request"}
 	seedReportRecords(test, service, []domain.Record{record, record})
-	pricing, _ := service.Preferences.Pricing(ctx, service.LocalId)
-	pricing.Value.Aliases["alias"] = "model"
-	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
-		test.Fatal(err)
-	}
 	report, err := service.SpeedReport(ctx, 1, "UTC")
 	if err != nil || report.MeasuredRequests != 1 || len(report.Models) != 1 || report.Models[0].Model != "model" || report.Models[0].TokensPerSecond != 50 || len(report.Buckets) != 24 {
 		test.Fatal(report, err)
@@ -128,7 +123,7 @@ func TestSpeedLatencyAndContextMetrics(test *testing.T) {
 		codex(40, 800, 0, 0, 700),
 		{Provider: domain.Claude, Model: "claude", Speed: "standard", TimestampMs: at, Totals: domain.Tokens{UncachedInputTokens: 1000, OutputTokens: 200}, GenerationMs: 1000},
 	}
-	report := analyzeSpeed(records, window, nil, now)
+	report := analyzeSpeed(records, window, now)
 	near := func(actual, expected float64) bool { return math.Abs(actual-expected) < 1e-9 }
 	model := report.Models[0].SpeedStats
 	if report.Models[0].Provider != "codex" || model.Requests != 2 || model.UnmeasuredRequests != 2 || model.TtftRequests != 3 || model.MedianTtftMs != 700 || !near(model.P90TtftMs, 940) {

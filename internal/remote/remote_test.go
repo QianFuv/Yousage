@@ -254,33 +254,6 @@ func TestMalformedWriteReplyIsUnknown(t *testing.T) {
 	}
 }
 
-func TestSlowDestinationDoesNotBlockHealthySave(t *testing.T) {
-	healthySaved := make(chan struct{}, 1)
-	slow := newServer(t, func(context.Context, *websocket.Conn, frame) {})
-	healthy := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
-		if message.Tag == "Request" {
-			healthySaved <- struct{}{}
-			writeFrame(t, ctx, socket, success(message.Id, true))
-		}
-	})
-	slowClient, healthyClient := connectFixture(t, slow), connectFixture(t, healthy)
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	done := make(chan []SaveOutcome, 1)
-	go func() {
-		done <- SaveSettings(ctx, []SaveTarget{{"slow", slowClient}, {"healthy", healthyClient}}, SettingsPatch{})
-	}()
-	select {
-	case <-healthySaved:
-	case <-ctx.Done():
-		t.Fatal("healthy save blocked by slow target")
-	}
-	outcomes := <-done
-	if !outcomes[1].IsSaved || outcomes[0].IsSaved || !outcomes[0].IsOutcomeUnknown {
-		t.Fatal(outcomes)
-	}
-}
-
 func TestObjectBatchCorrelationAndPingPong(t *testing.T) {
 	pong := make(chan struct{}, 1)
 	fixture := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
@@ -352,69 +325,6 @@ func TestSubscriptionAckAfterConsumptionAndInterrupt(t *testing.T) {
 	case <-interrupt:
 	case <-time.After(time.Second):
 		t.Fatal("Interrupt missing")
-	}
-}
-
-func TestReadOnlyFailuresAndUnknownWriteOutcomeNoReplay(t *testing.T) {
-	var calls atomic.Int32
-	fixture := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
-		if message.Tag != "Request" {
-			return
-		}
-		calls.Add(1)
-		_ = socket.CloseNow()
-	})
-	client := connectFixture(t, fixture)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	price := domain.PriceOverride{InputCostPerMillionTokens: 2, OutputCostPerMillionTokens: 8}
-	_, err := client.UpdateSettings(ctx, SettingsPatch{Prices: map[string]*domain.PriceOverride{"fixture": &price}})
-	var failure *CallError
-	if !errors.As(err, &failure) || !failure.IsOutcomeUnknown || calls.Load() != 1 {
-		t.Fatal(err, calls.Load())
-	}
-	_, _ = client.UpdateSettings(ctx, SettingsPatch{Prices: map[string]*domain.PriceOverride{"fixture": &price}})
-	if calls.Load() != 1 {
-		t.Fatal("replayed offline write")
-	}
-	readOnly := newServer(t, nil)
-	readOnly.isReadOnly = true
-	reader := connectFixture(t, readOnly)
-	_, err = reader.UpdateSettings(ctx, SettingsPatch{Prices: map[string]*domain.PriceOverride{"fixture": &price}})
-	if !errors.As(err, &failure) || !failure.IsAuthorization || failure.IsOutcomeUnknown {
-		t.Fatal(err)
-	}
-}
-
-func TestAtomicPatchAndRetryOnlyFailedDestination(t *testing.T) {
-	var goodCalls, badCalls atomic.Int32
-	good := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
-		if message.Tag != "Request" {
-			return
-		}
-		goodCalls.Add(1)
-		if message.Method != "server.updateSettings" || !strings.Contains(string(message.Payload), `"fixture":null`) || !strings.Contains(string(message.Payload), `"usageModelAliases"`) {
-			t.Error("patch lost deletes or aliases")
-		}
-		writeFrame(t, ctx, socket, success(message.Id, map[string]bool{"saved": true}))
-	})
-	bad := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
-		if message.Tag != "Request" {
-			return
-		}
-		badCalls.Add(1)
-		writeFrame(t, ctx, socket, map[string]any{"_tag": "Exit", "requestId": message.Id, "exit": map[string]any{"_tag": "Failure", "cause": []any{map[string]any{"_tag": "Fail", "error": map[string]string{"_tag": "EnvironmentAuthorizationError", "message": "sensitive error details"}}}}})
-	})
-	goodClient, badClient := connectFixture(t, good), connectFixture(t, bad)
-	target := "target"
-	patch := SettingsPatch{Prices: map[string]*domain.PriceOverride{"fixture": nil}, Aliases: map[string]*string{"fixture": &target}}
-	outcomes := SaveSettings(context.Background(), []SaveTarget{{"good", goodClient}, {"bad", badClient}}, patch)
-	if !outcomes[0].IsSaved || outcomes[1].IsSaved || outcomes[1].Error != "environment grants read-only access" {
-		t.Fatal(outcomes)
-	}
-	_ = SaveSettings(context.Background(), []SaveTarget{{"bad", badClient}}, patch)
-	if goodCalls.Load() != 1 || badCalls.Load() != 2 {
-		t.Fatal(goodCalls.Load(), badCalls.Load())
 	}
 }
 
@@ -493,7 +403,7 @@ func TestHttpAuthProtocolAndRedirectFailures(t *testing.T) {
 	}
 }
 
-func TestPendingCallCancellationInterruptAndCapabilityCheck(t *testing.T) {
+func TestPendingCallCancellationInterrupt(t *testing.T) {
 	requested, interrupted := make(chan struct{}, 1), make(chan struct{}, 1)
 	fixture := newServer(t, func(ctx context.Context, socket *websocket.Conn, message frame) {
 		if message.Tag == "Request" {
@@ -517,10 +427,5 @@ func TestPendingCallCancellationInterruptAndCapabilityCheck(t *testing.T) {
 	case <-interrupted:
 	case <-time.After(time.Second):
 		t.Fatal("cancel interrupt missing")
-	}
-	delete(client.Environment.Capabilities, "usageModelAliases")
-	target := "target"
-	if _, err := client.UpdateSettings(context.Background(), SettingsPatch{Aliases: map[string]*string{"fixture": &target}}); err == nil || !strings.Contains(err.Error(), "update server") {
-		t.Fatal(err)
 	}
 }

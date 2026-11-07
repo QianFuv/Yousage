@@ -54,15 +54,7 @@ func TestProjectionReplayAndCapabilityReplacement(test *testing.T) {
 	}
 }
 
-func TestSettingsRejectNullPricesAndAliases(test *testing.T) {
-	for _, raw := range []string{`{"usagePriceOverrides":{"model":{"inputCostPerMillionTokens":null,"outputCostPerMillionTokens":1}}}`, `{"usageModelAliases":null}`, `{"usagePriceOverrides":{" model":{"inputCostPerMillionTokens":0,"outputCostPerMillionTokens":1}}}`} {
-		if _, err := decodeSettings(json.RawMessage(raw)); err == nil {
-			test.Fatal("invalid settings accepted", raw)
-		}
-	}
-	if _, err := decodeSettings(json.RawMessage(`{"usagePriceOverrides":{"model":{"inputCostPerMillionTokens":0,"outputCostPerMillionTokens":1e-8}},"usageModelAliases":{}}`)); err != nil {
-		test.Fatal("valid zero/scientific price rejected", err)
-	}
+func TestPublishedIdentityLimit(test *testing.T) {
 	if publishedIdentity.MatchString(strings.Repeat("a", 49)) {
 		test.Fatal("published identity exceeds pinned 48-character limit")
 	}

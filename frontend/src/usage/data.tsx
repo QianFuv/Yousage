@@ -5,8 +5,6 @@ import type {
   UsageSummary,
   ServerProvider,
   UsageLimitSourceSnapshots,
-  UsagePriceOverrides,
-  UsageModelAliases,
 } from "./contracts";
 
 export type EnvironmentUsageStatus = {
@@ -18,10 +16,6 @@ export type EnvironmentUsageStatus = {
   serverConfig: {
     providers: ServerProvider[];
     usageLimitSources: UsageLimitSourceSnapshots;
-    settings: {
-      usagePriceOverrides: UsagePriceOverrides;
-      usageModelAliases: UsageModelAliases;
-    };
     environment: {
       capabilities: Record<string, boolean>;
       orchestrationProtocolVersion?: number;

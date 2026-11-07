@@ -1,4 +1,4 @@
-/** Usage navigation presents observations; pricing, source and display configuration live in Settings. */
+/** Usage navigation presents observations; source and display configuration live in Settings. */
 import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import {
   enumerateDays,
@@ -45,7 +45,7 @@ export function UsagePage({
 }: {
   isActive: boolean;
   view: "limits" | "statistics";
-  onSettings: (section: "pricing" | "sources", model?: string) => void;
+  onSettings: (section: "sources") => void;
 }) {
   const data = useData();
   const isReadOnly = useIsReadOnly();
@@ -256,7 +256,6 @@ export function UsagePage({
                         data.display.value.timestampFormat,
                       ),
                     }}
-                    onSetPrice={(model) => onSettings("pricing", model)}
                   />
                   {commitMarker}
                 </Suspense>

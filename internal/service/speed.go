@@ -108,10 +108,6 @@ func (service *Service) SpeedReport(ctx context.Context, days int, timeZone stri
 	if err != nil {
 		return SpeedReport{}, err
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		return SpeedReport{}, err
-	}
 	recordCount := 0
 	for _, sourceRecords := range bySource {
 		recordCount += len(sourceRecords)
@@ -120,7 +116,7 @@ func (service *Service) SpeedReport(ctx context.Context, days int, timeZone stri
 	for _, sourceRecords := range bySource {
 		records = append(records, sourceRecords...)
 	}
-	return analyzeSpeed(records, window, accounting.ResolveAliases(pricing.Value.Aliases), now), nil
+	return analyzeSpeed(records, window, now), nil
 }
 
 // speedKey identifies a model at one provider and billing tier.
@@ -191,7 +187,7 @@ func (held *speedAccumulator) finish() SpeedStats {
 
 // analyzeSpeed computes weighted aggregate rates and equally weighted request percentiles,
 // per model and billing tier and per provider.
-func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map[string]string, now time.Time) SpeedReport {
+func analyzeSpeed(records []domain.Record, window accounting.Window, now time.Time) SpeedReport {
 	result := SpeedReport{Window: window, Models: []SpeedModel{}, Providers: []SpeedProvider{}, Buckets: []SpeedBucket{}}
 	location := accounting.Location(window.TimeZone)
 	positions := map[string]int{}
@@ -218,9 +214,6 @@ func analyzeSpeed(records []domain.Record, window accounting.Window, aliases map
 		label, isIncluded := reportBucket(window, location, record.TimestampMs, now)
 		if !isIncluded {
 			continue
-		}
-		if model, exists := aliases[record.Model]; exists {
-			record.Model = model
 		}
 		key := speedKey{string(record.Provider), record.Model, record.Speed}
 		held := models[key]

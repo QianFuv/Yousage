@@ -6,7 +6,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
@@ -219,81 +218,4 @@ func (client *Client) Summary(ctx context.Context, window accounting.Window) (Su
 		return Summary{}, err
 	}
 	return DecodeSummary(data)
-}
-
-type SettingsPatch struct {
-	Prices  map[string]*domain.PriceOverride `json:"usagePriceOverrides,omitempty"`
-	Aliases map[string]*string               `json:"usageModelAliases,omitempty"`
-}
-
-func (client *Client) UpdateSettings(ctx context.Context, patch SettingsPatch) (json.RawMessage, error) {
-	if len(patch.Prices) > 0 {
-		if err := client.requireCapability("usagePriceOverrides"); err != nil {
-			return nil, err
-		}
-	}
-	if len(patch.Aliases) > 0 {
-		if err := client.requireCapability("usageModelAliases"); err != nil {
-			return nil, err
-		}
-	}
-	for model, price := range patch.Prices {
-		if strings.TrimSpace(model) == "" {
-			return nil, errors.New("price model is empty")
-		}
-		if price != nil {
-			if err := price.Validate(); err != nil {
-				return nil, err
-			}
-		}
-	}
-	for model, target := range patch.Aliases {
-		if strings.TrimSpace(model) == "" || (target != nil && strings.TrimSpace(*target) == "") {
-			return nil, errors.New("model alias is empty")
-		}
-	}
-	return client.Call(ctx, "server.updateSettings", map[string]any{"patch": patch}, true)
-}
-
-type SaveTarget struct {
-	Id     string
-	Client *Client
-}
-type SaveOutcome struct {
-	Id               string `json:"id"`
-	IsSaved          bool   `json:"saved"`
-	Error            string `json:"error,omitempty"`
-	IsOutcomeUnknown bool   `json:"outcomeUnknown"`
-}
-
-// SaveSettings settles environments independently; the caller retries only explicitly selected failed targets.
-func SaveSettings(ctx context.Context, targets []SaveTarget, patch SettingsPatch) []SaveOutcome {
-	outcomes := make([]SaveOutcome, len(targets))
-	var workers sync.WaitGroup
-	for index, target := range targets {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			deadline, cancel := context.WithTimeout(ctx, 20*time.Second)
-			defer cancel()
-			outcome := SaveOutcome{Id: target.Id}
-			if target.Client == nil {
-				outcome.Error = "environment is offline"
-			} else {
-				_, err := target.Client.UpdateSettings(deadline, patch)
-				if err == nil {
-					outcome.IsSaved = true
-				} else {
-					outcome.Error = err.Error()
-					var failure *CallError
-					if errors.As(err, &failure) {
-						outcome.IsOutcomeUnknown = failure.IsOutcomeUnknown
-					}
-				}
-			}
-			outcomes[index] = outcome
-		}()
-	}
-	workers.Wait()
-	return outcomes
 }

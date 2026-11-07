@@ -120,7 +120,6 @@ function environment(
     serverConfig: {
       providers,
       usageLimitSources: [],
-      settings: { usagePriceOverrides: {}, usageModelAliases: {} },
       environment: { capabilities: {} },
     },
     summary: null,

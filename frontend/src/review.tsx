@@ -162,21 +162,6 @@ const ENVIRONMENTS: {
     ],
   },
 ];
-const SETTINGS = Object.fromEntries(
-  ENVIRONMENTS.map(({ id }) => [
-    id,
-    {
-      usagePriceOverrides: {
-        "fixture-model": {
-          inputCostPerMillionTokens: id === "local-fixture" ? 1 : 3,
-          outputCostPerMillionTokens: 2,
-        },
-      } as Record<string, unknown>,
-      usageModelAliases: {} as Record<string, string>,
-    },
-  ]),
-);
-
 /**
  * The synthetic report window for a trailing period.
  *
@@ -279,9 +264,8 @@ function usageFixture(days: number, zone: string) {
         environment: {
           environmentId: environment.id,
           orchestrationProtocolVersion: 2,
-          capabilities: { usagePriceOverrides: true, usageModelAliases: true },
+          capabilities: {},
         },
-        settings: SETTINGS[environment.id],
         providers: [
           {
             instanceId: "codex-account",
@@ -713,19 +697,6 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
     lastCompletedAt: new Date(REFERENCE_MS).toISOString(),
     lastError: "",
   }),
-  ApplyPricing: (
-    ids: string[],
-    patch: {
-      overrides: Record<string, unknown>;
-      aliases: Record<string, string>;
-    },
-  ) => {
-    for (const identity of ids) {
-      Object.assign(SETTINGS[identity]!.usagePriceOverrides, patch.overrides);
-      Object.assign(SETTINGS[identity]!.usageModelAliases, patch.aliases);
-    }
-    return ids.map((id) => ({ id, saved: true, outcomeUnknown: false }));
-  },
   GetSync: () => structuredClone(syncState),
   SaveSync: (input: {
     isEnabled: boolean;

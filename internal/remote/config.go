@@ -39,10 +39,8 @@ type SlashCommand struct {
 	ArgumentHint string `json:"argumentHint,omitempty"`
 }
 type Settings struct {
-	DefaultTheme      string                          `json:"defaultTheme"`
-	DefaultThemeSetAt string                          `json:"defaultThemeSetAt"`
-	Prices            map[string]domain.PriceOverride `json:"usagePriceOverrides"`
-	Aliases           map[string]string               `json:"usageModelAliases"`
+	DefaultTheme      string `json:"defaultTheme"`
+	DefaultThemeSetAt string `json:"defaultThemeSetAt"`
 }
 type Config struct {
 	Environment Environment         `json:"environment"`
@@ -68,31 +66,6 @@ func decodeSettings(raw json.RawMessage) (Settings, error) {
 	_ = json.Unmarshal(raw, &fields)
 	if fields == nil {
 		return value, errors.New("invalid environment settings")
-	}
-	if value.Prices == nil {
-		value.Prices = map[string]domain.PriceOverride{}
-	}
-	if value.Aliases == nil {
-		value.Aliases = map[string]string{}
-	}
-	var priceFields map[string]json.RawMessage
-	if prices, exists := fields["usagePriceOverrides"]; exists {
-		if string(prices) == "null" || json.Unmarshal(prices, &priceFields) != nil {
-			return value, errors.New("invalid environment prices")
-		}
-	}
-	for model, price := range value.Prices {
-		if model == "" || strings.TrimSpace(model) != model || !validPriceFields(priceFields[model]) || price.Validate() != nil {
-			return value, errors.New("invalid environment prices")
-		}
-	}
-	if aliases, exists := fields["usageModelAliases"]; exists && string(aliases) == "null" {
-		return value, errors.New("invalid environment model mappings")
-	}
-	for model, target := range value.Aliases {
-		if model == "" || target == "" || strings.TrimSpace(model) != model || strings.TrimSpace(target) != target {
-			return value, errors.New("invalid environment model mappings")
-		}
 	}
 	return value, nil
 }
@@ -328,25 +301,6 @@ func (client *Client) Config(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return decodeConfig(data, client.Environment.Id)
-}
-
-func validPriceFields(raw json.RawMessage) bool {
-	var fields map[string]json.RawMessage
-	if json.Unmarshal(raw, &fields) != nil {
-		return false
-	}
-	for _, key := range []string{"inputCostPerMillionTokens", "outputCostPerMillionTokens"} {
-		value, ok := fields[key]
-		if !ok || string(value) == "null" {
-			return false
-		}
-	}
-	for _, key := range []string{"cacheReadCostPerMillionTokens", "cacheWriteCostPerMillionTokens"} {
-		if value, ok := fields[key]; ok && string(value) == "null" {
-			return false
-		}
-	}
-	return true
 }
 
 func validInstant(raw json.RawMessage) bool {

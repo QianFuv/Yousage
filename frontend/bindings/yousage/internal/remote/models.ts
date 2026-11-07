@@ -254,41 +254,9 @@ export class Provider {
     }
 }
 
-export class SaveOutcome {
-    "id": string;
-    "saved": boolean;
-    "error"?: string;
-    "outcomeUnknown": boolean;
-
-    /** Creates a new SaveOutcome instance. */
-    constructor($$source: Partial<SaveOutcome> = {}) {
-        if (!("id" in $$source)) {
-            this["id"] = "";
-        }
-        if (!("saved" in $$source)) {
-            this["saved"] = false;
-        }
-        if (!("outcomeUnknown" in $$source)) {
-            this["outcomeUnknown"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new SaveOutcome instance from a string or object.
-     */
-    static createFrom($$source: any = {}): SaveOutcome {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new SaveOutcome($$parsedSource as Partial<SaveOutcome>);
-    }
-}
-
 export class Settings {
     "defaultTheme": string;
     "defaultThemeSetAt": string;
-    "usagePriceOverrides": { [_ in string]?: domain$0.PriceOverride };
-    "usageModelAliases": { [_ in string]?: string };
 
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
@@ -298,12 +266,6 @@ export class Settings {
         if (!("defaultThemeSetAt" in $$source)) {
             this["defaultThemeSetAt"] = "";
         }
-        if (!("usagePriceOverrides" in $$source)) {
-            this["usagePriceOverrides"] = {};
-        }
-        if (!("usageModelAliases" in $$source)) {
-            this["usageModelAliases"] = {};
-        }
 
         Object.assign(this, $$source);
     }
@@ -312,15 +274,7 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField2_0 = $$createType17;
-        const $$createField3_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("usagePriceOverrides" in $$parsedSource) {
-            $$parsedSource["usagePriceOverrides"] = $$createField2_0($$parsedSource["usagePriceOverrides"]);
-        }
-        if ("usageModelAliases" in $$parsedSource) {
-            $$parsedSource["usageModelAliases"] = $$createField3_0($$parsedSource["usageModelAliases"]);
-        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -391,7 +345,7 @@ export class Source {
      * Creates a new Source instance from a string or object.
      */
     static createFrom($$source: any = {}): Source {
-        const $$createField0_0 = $$createType19;
+        const $$createField0_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("fingerprint" in $$parsedSource) {
             $$parsedSource["fingerprint"] = $$createField0_0($$parsedSource["fingerprint"]);
@@ -448,9 +402,9 @@ export class Summary {
      * Creates a new Summary instance from a string or object.
      */
     static createFrom($$source: any = {}): Summary {
-        const $$createField5_0 = $$createType21;
-        const $$createField6_0 = $$createType23;
-        const $$createField7_0 = $$createType24;
+        const $$createField5_0 = $$createType18;
+        const $$createField6_0 = $$createType20;
+        const $$createField7_0 = $$createType21;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("buckets" in $$parsedSource) {
             $$parsedSource["buckets"] = $$createField5_0($$parsedSource["buckets"]);
@@ -489,12 +443,9 @@ const $$createType14 = $Create.Struct({
     "slashCommands": $$createType13,
 });
 const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = domain$0.PriceOverride.createFrom;
-const $$createType17 = $Create.Map($Create.Any, $$createType16);
-const $$createType18 = $Create.Map($Create.Any, $Create.Any);
-const $$createType19 = domain$0.SourceFingerprint.createFrom;
-const $$createType20 = accounting$0.Bucket.createFrom;
-const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = Source.createFrom;
-const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = Pricing.createFrom;
+const $$createType16 = domain$0.SourceFingerprint.createFrom;
+const $$createType17 = accounting$0.Bucket.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = Source.createFrom;
+const $$createType20 = $Create.Array($$createType19);
+const $$createType21 = Pricing.createFrom;

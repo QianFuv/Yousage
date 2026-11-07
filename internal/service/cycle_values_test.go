@@ -425,26 +425,21 @@ func TestUsageCycleValuesPricesAndCoverage(test *testing.T) {
 				offset time.Duration
 				tokens int64
 			}{{-time.Minute, 100}, {0, 1}, {20 * time.Minute, 5}, {58 * time.Minute, 2}, {61 * time.Minute, 4}, {62 * time.Minute, 8}, {62*time.Minute + time.Millisecond, 16}, {90 * time.Minute, 32}} {
-				records = append(records, domain.Record{Provider: provider, QuotaBucket: "codex", TimestampMs: base.Add(fixture.offset).UnixMilli(), Model: "alias", RateModel: "wrong", Speed: "standard", SessionId: "session", DedupeKey: string(rune('a' + index)), Totals: domain.Tokens{UncachedInputTokens: fixture.tokens}})
+				records = append(records, domain.Record{Provider: provider, QuotaBucket: "codex", TimestampMs: base.Add(fixture.offset).UnixMilli(), Model: "priced", Speed: "standard", SessionId: "session", DedupeKey: string(rune('a' + index)), Totals: domain.Tokens{UncachedInputTokens: fixture.tokens}})
 			}
 			if err := service.storeSnapshot(ctx, fingerprint, records, "ok", "", now); err != nil {
 				test.Fatal(err)
 			}
 			entries := []sourceIndex{{Source: remote.Source{Fingerprint: fingerprint, Status: "ok"}, IsSnapshot: true}}
 			other := service.fingerprint(provider, test.TempDir())
-			if err := service.storeSnapshot(ctx, other, []domain.Record{{Provider: provider, QuotaBucket: "codex", TimestampMs: base.Add(20 * time.Minute).UnixMilli(), Model: "alias", Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: 999}}}, "ok", "", now); err != nil {
+			if err := service.storeSnapshot(ctx, other, []domain.Record{{Provider: provider, QuotaBucket: "codex", TimestampMs: base.Add(20 * time.Minute).UnixMilli(), Model: "priced", Speed: "standard", Totals: domain.Tokens{UncachedInputTokens: 999}}}, "ok", "", now); err != nil {
 				test.Fatal(err)
 			}
 			entries = append(entries, sourceIndex{Source: remote.Source{Fingerprint: other, Status: "ok"}, IsSnapshot: true})
 			if _, err := service.Store.WriteSetting(ctx, "history-index", 0, entries); err != nil {
 				test.Fatal(err)
 			}
-			if _, err := service.Store.WriteSetting(ctx, "public-model-rates", 0, RateSnapshot{Rates: accounting.RateTable{"priced": accounting.ModelRate{TokenRates: accounting.TokenRates{Input: 2}}}}); err != nil {
-				test.Fatal(err)
-			}
-			pricing, _ := service.Preferences.Pricing(ctx, service.LocalId)
-			alias := "priced"
-			if _, err := service.Preferences.PatchPricing(ctx, service.LocalId, pricing.Revision, preferences.PricingPatch{Aliases: map[string]*string{"alias": &alias}, Overrides: map[string]*domain.PriceOverride{"priced": {InputCostPerMillionTokens: 1e6}}}); err != nil {
+			if _, err := service.Store.WriteSetting(ctx, "public-model-rates", 0, RateSnapshot{Rates: accounting.RateTable{"priced": accounting.ModelRate{TokenRates: accounting.TokenRates{Input: 1}}}}); err != nil {
 				test.Fatal(err)
 			}
 			saved, _ := service.Configuration(ctx)

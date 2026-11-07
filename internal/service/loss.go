@@ -99,10 +99,6 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 	if err != nil {
 		return LossReport{}, err
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		return LossReport{}, err
-	}
 	rates := service.Rates(ctx)
 	recordCount := 0
 	for _, sourceRecords := range bySource {
@@ -112,7 +108,7 @@ func (service *Service) LossReport(ctx context.Context, days int, timeZone strin
 	for _, sourceRecords := range bySource {
 		records = append(records, sourceRecords...)
 	}
-	return analyzeLoss(records, accounting.AggregateOptions{Window: window, Rates: rates.Rates, Overrides: accounting.OverrideRates(pricing.Value.Overrides), Aliases: accounting.ResolveAliases(pricing.Value.Aliases)}, now), nil
+	return analyzeLoss(records, accounting.AggregateOptions{Window: window, Rates: rates.Rates}, now), nil
 }
 
 // cacheRewrite recognizes context reuse that collapsed, independently of its cause.

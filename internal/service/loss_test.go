@@ -289,18 +289,15 @@ func TestLossWindowContextAndDetailCap(test *testing.T) {
 	}
 }
 
-func TestLossReportLocalFactsAndAliases(t *testing.T) {
+func TestLossReportLocalFacts(t *testing.T) {
 	service := testService(t)
 	before, after, _, _ := lossFixture()
-	before.Model, after.Model = "alias", "alias"
+	before.Model, after.Model = "fixture", "fixture"
 	failure := domain.Record{Provider: domain.Claude, SessionId: before.SessionId, TimestampMs: after.TimestampMs - 1000, ErrorKind: "streamDisconnected"}
 	seedReportRecords(t, service, []domain.Record{before, after, failure})
 	ctx := context.Background()
-	pricing, _ := service.Preferences.Pricing(ctx, service.LocalId)
-	pricing.Value.Aliases["alias"] = "fixture"
-	read, write := 0.2, 2.5
-	pricing.Value.Overrides["fixture"] = domain.PriceOverride{InputCostPerMillionTokens: 2, OutputCostPerMillionTokens: 10, CacheReadCostPerMillionTokens: &read, CacheWriteCostPerMillionTokens: &write}
-	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
+	rates := accounting.RateTable{"fixture": {TokenRates: accounting.TokenRates{Input: 2e-6, Output: 10e-6, CacheRead: 0.2e-6, CacheCreation: 2.5e-6}}}
+	if _, err := service.Store.WriteSetting(ctx, "public-model-rates", 0, RateSnapshot{Rates: rates, FetchedAtMs: service.Now().UnixMilli()}); err != nil {
 		t.Fatal(err)
 	}
 	report, err := service.LossReport(ctx, 7, "UTC")

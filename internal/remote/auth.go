@@ -43,7 +43,7 @@ func (capabilities *Capabilities) UnmarshalJSON(data []byte) error {
 		var enabled bool
 		if string(raw) != "null" && json.Unmarshal(raw, &enabled) == nil {
 			result[name] = enabled
-		} else if name == "environmentThemes" || name == "usageLimitSources" || name == "usagePriceOverrides" || name == "usageModelAliases" {
+		} else if name == "environmentThemes" || name == "usageLimitSources" {
 			return errors.New("invalid environment feature capability")
 		}
 

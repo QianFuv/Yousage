@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 	"yousage/internal/accounting"
-	"yousage/internal/preferences"
 	"yousage/internal/refresh"
 	"yousage/internal/remote"
 	"yousage/internal/theme"
@@ -354,55 +353,6 @@ func (service *Service) RefreshUsage(ctx context.Context, days int, zone string,
 		}
 	}
 	return errors.Join(failures...)
-}
-
-// ApplyPricing settles the exact target list independently; callers retain only failed target drafts.
-func (service *Service) ApplyPricing(ctx context.Context, identities []string, patch preferences.PricingPatch) []remote.SaveOutcome {
-	owned, done, err := service.ownOperation(ctx)
-	if err != nil {
-		outcomes := make([]remote.SaveOutcome, len(identities))
-		for index, identity := range identities {
-			outcomes[index] = remote.SaveOutcome{Id: identity, Error: "Application is closing."}
-		}
-		return outcomes
-	}
-	defer done()
-	ctx = owned
-
-	results := make([]remote.SaveOutcome, len(identities))
-	var pending sync.WaitGroup
-	for index, identity := range identities {
-		pending.Add(1)
-		go func() {
-			defer pending.Done()
-			outcome := remote.SaveOutcome{Id: identity}
-			if identity == service.LocalId {
-				saved, err := service.Preferences.Pricing(ctx, identity)
-				if err == nil {
-					_, err = service.Preferences.PatchPricing(ctx, identity, saved.Revision, patch)
-				}
-				if err != nil {
-					outcome.Error = err.Error()
-				} else {
-					outcome.IsSaved = true
-				}
-			} else {
-				service.mutex.Lock()
-				state := service.connections[identity]
-				var client *remote.Client
-				if state != nil {
-					client = state.client
-				}
-				service.mutex.Unlock()
-				settled := remote.SaveSettings(ctx, []remote.SaveTarget{{Id: identity, Client: client}}, remote.SettingsPatch{Prices: patch.Overrides, Aliases: patch.Aliases})
-				outcome = settled[0]
-			}
-			results[index] = outcome
-		}()
-	}
-	pending.Wait()
-	service.emit("usage-invalidated", nil)
-	return results
 }
 
 // viewWindow anchors rolling queries across completion, cache reads and offline navigation.

@@ -167,13 +167,9 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 	if err != nil {
 		return summary, err
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		return summary, err
-	}
 	rates := service.Rates(ctx)
 	summary.Pricing = rates.Provenance(now)
-	inputs := []any{window, entries, pricing, rates.encodedRates, service.Scope, now.UTC().Format(time.DateOnly)}
+	inputs := []any{window, entries, rates.encodedRates, service.Scope, now.UTC().Format(time.DateOnly)}
 	for _, entry := range entries {
 		key, err := service.Store.HistoryCacheKey(ctx, entry.Source.Fingerprint.Id())
 		if err != nil {
@@ -193,7 +189,7 @@ func (service *Service) localSummary(ctx context.Context, window accounting.Wind
 		cached.ScanDurationMs = max(0, service.Now().Sub(now).Milliseconds())
 		return cached, nil
 	}
-	options := accounting.AggregateOptions{Window: window, Rates: rates.Rates, Overrides: accounting.OverrideRates(pricing.Value.Overrides), Aliases: accounting.ResolveAliases(pricing.Value.Aliases)}
+	options := accounting.AggregateOptions{Window: window, Rates: rates.Rates}
 	since := windowStart(window).Add(-36 * time.Hour)
 	recordSince := since
 	if window.Resolution == "hour" {

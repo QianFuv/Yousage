@@ -8,7 +8,6 @@ import (
 	"time"
 	"yousage/internal/accounting"
 	"yousage/internal/domain"
-	"yousage/internal/preferences"
 	"yousage/internal/refresh"
 	"yousage/internal/remote"
 )
@@ -21,15 +20,19 @@ func TestUsageCachesMatchColdRebuilds(test *testing.T) {
 	service.Now = func() time.Time { return now }
 	records := []domain.Record{}
 	for index, offset := range []time.Duration{-80 * 24 * time.Hour, -25 * 24 * time.Hour, -time.Hour, time.Minute} {
-		records = append(records, domain.Record{Provider: domain.Codex, Model: "alias", SessionId: "shared", DedupeKey: string(rune('a' + index)), Speed: "fast", TimestampMs: now.Add(offset).UnixMilli(), Totals: domain.Tokens{UncachedInputTokens: 1234567, CachedInputTokens: 12345, OutputTokens: 34}})
+		records = append(records, domain.Record{Provider: domain.Codex, Model: "gpt-5.4", SessionId: "shared", DedupeKey: string(rune('a' + index)), Speed: "fast", TimestampMs: now.Add(offset).UnixMilli(), Totals: domain.Tokens{UncachedInputTokens: 1234567, CachedInputTokens: 12345, OutputTokens: 34}})
 	}
 	seedReportRecords(test, service, records)
-	pricing, _ := service.Preferences.Pricing(ctx, service.LocalId)
-	pricing.Value = preferences.Pricing{Aliases: map[string]string{"alias": "gpt-5.4"}, Overrides: map[string]domain.PriceOverride{"gpt-5.4": {InputCostPerMillionTokens: 2.3, OutputCostPerMillionTokens: 7.9}}}
-	pricing, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing)
-	if err != nil {
-		test.Fatal(err)
+	setRates := func(input, output float64) {
+		test.Helper()
+		var saved RateSnapshot
+		revision, _ := service.Store.ReadSetting(ctx, "public-model-rates", &saved)
+		rates := accounting.RateTable{"gpt-5.4": {TokenRates: accounting.TokenRates{Input: input / 1e6, Output: output / 1e6, CacheRead: input / 1e6, CacheCreation: input / 1e6}}}
+		if _, err := service.Store.WriteSetting(ctx, "public-model-rates", revision, RateSnapshot{Rates: rates, FetchedAtMs: now.UnixMilli()}); err != nil {
+			test.Fatal(err)
+		}
 	}
+	setRates(2.3, 7.9)
 	compare := func() {
 		test.Helper()
 		cold, err := New(ctx, service.Store, nil)
@@ -57,10 +60,7 @@ func TestUsageCachesMatchColdRebuilds(test *testing.T) {
 	compare()
 	now = now.Add(2 * time.Minute)
 	compare()
-	pricing.Value.Overrides["gpt-5.4"] = domain.PriceOverride{InputCostPerMillionTokens: 3.7, OutputCostPerMillionTokens: 9.2}
-	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
-		test.Fatal(err)
-	}
+	setRates(3.7, 9.2)
 	compare()
 	entries, _, _ := service.sourceIndex(ctx)
 	checkpoint, err := service.Store.Checkpoint(ctx, entries[0].Source.Fingerprint.Id(), "complete-snapshot")

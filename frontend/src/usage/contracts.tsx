@@ -129,10 +129,6 @@ export type ServerProvider = {
   slashCommands: ServerProviderSlashCommand[];
   workspaceSnapshots?: { slashCommands: ServerProviderSlashCommand[] }[];
 };
-export type ServerSettingsPatch = {
-  usagePriceOverrides?: Record<string, UsageModelPriceOverride | null>;
-  usageModelAliases?: Record<string, string | null>;
-};
 export type UsageLimitSourceSnapshots = {
   id: string;
   kind: "cliproxy";
@@ -178,14 +174,6 @@ export type UsageLimitsReport = {
   }[];
   notices: string[];
 };
-export type UsageModelPriceOverride = {
-  inputCostPerMillionTokens: number;
-  outputCostPerMillionTokens: number;
-  cacheReadCostPerMillionTokens?: number;
-  cacheWriteCostPerMillionTokens?: number;
-};
-export type UsagePriceOverrides = Record<string, UsageModelPriceOverride>;
-export type UsageModelAliases = Record<string, string>;
 export type ProjectId = string;
 export type ModelSelection = { instanceId: ProviderInstanceId; model: string };
 export type ServerSettings = Record<string, unknown>;

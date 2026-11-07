@@ -3,7 +3,6 @@
 
 export {
     Display,
-    PricingPatch,
     SavedDisplay,
     Source
 } from "./models.js";

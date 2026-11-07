@@ -32,13 +32,12 @@ Yousage 可以直连兼容的 T3 Code 服务端，读取其用量汇总、额度
 | `subscribeServerConfig {environmentThemes:true,usageLimitSources:true}` | 读取；先返回快照，之后推送 Provider / 设置 / 主题 / 额度中心变化，可选的主题和额度中心数据单独到达 |
 | `server.getUsageSummary` | 读取；`sinceDay` / `untilDay` 闭区间加时区，可选小时级 `sinceTime`（含）/ `untilTime`（不含） |
 | `server.refreshUsageRates`、`server.getSettings` | 读取 |
-| `server.updateSettings` | 操作；按条目修补价格与别名，`null` 删除对应条目，不整体替换 |
 | `server.refreshProviders` | 操作；`{}` 同时刷新所有额度中心，指定实例时不刷新额度中心 |
 | `provider.consumeResetCredit` | 操作；按原生实例或来源 / 账户 / 重置券路由，只能由用户显式触发 |
 | `server.probe` | 读取；仅在具备 `connectionProbe` 能力时使用，否则使用 getConfig |
 
 “读取 / 操作”分别对应 `orchestration:read` / `orchestration:operate` 权限。
-能力标记包括 `usagePriceOverrides`、`usageModelAliases`、`usageLimitSources`、
+能力标记包括 `usageLimitSources`、
 `environmentThemes`、`connectionProbe`，缺失即视为不支持。Yousage 不声明
 `usageLimitsCommand`，因为它不处理聊天命令。
 

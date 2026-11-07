@@ -39,21 +39,9 @@ type Source struct {
 	IsEnabled   bool            `json:"isEnabled"`
 	IsAutomatic bool            `json:"isAutomatic"`
 }
-type Pricing struct {
-	Overrides map[string]domain.PriceOverride `json:"overrides"`
-	Aliases   map[string]string               `json:"aliases"`
-}
 type SavedDisplay struct {
 	Revision int64   `json:"revision"`
 	Value    Display `json:"value"`
-}
-type SavedPricing struct {
-	Revision int64   `json:"revision"`
-	Value    Pricing `json:"value"`
-}
-type PricingPatch struct {
-	Overrides map[string]*domain.PriceOverride `json:"overrides"`
-	Aliases   map[string]*string               `json:"aliases"`
 }
 type Service struct{ repository Repository }
 
@@ -104,76 +92,6 @@ func (service *Service) SaveDisplay(ctx context.Context, saved SavedDisplay) (Sa
 		saved.Revision = revision
 	}
 	return saved, err
-}
-func (service *Service) Pricing(ctx context.Context, environmentId string) (SavedPricing, error) {
-	saved := SavedPricing{Value: Pricing{Overrides: map[string]domain.PriceOverride{}, Aliases: map[string]string{}}}
-	revision, err := service.repository.ReadSetting(ctx, "pricing:"+environmentId, &saved.Value)
-	saved.Revision = revision
-	saved.Value = normalizedPricing(saved.Value)
-	return saved, err
-}
-
-// SavePricing applies each environment atomically; callers retain failed-target drafts for retry.
-func (service *Service) SavePricing(ctx context.Context, environmentId string, saved SavedPricing) (SavedPricing, error) {
-	saved.Value = normalizedPricing(saved.Value)
-	if strings.TrimSpace(environmentId) == "" {
-		return saved, errors.New("missing environment identity")
-	}
-	for model, price := range saved.Value.Overrides {
-		if strings.TrimSpace(model) == "" || strings.TrimSpace(model) != model {
-			return saved, errors.New("model ID must be nonempty and trimmed")
-		}
-		if err := price.Validate(); err != nil {
-			return saved, err
-		}
-	}
-	for model, target := range saved.Value.Aliases {
-		if strings.TrimSpace(model) == "" || strings.TrimSpace(target) == "" || model == target || model != strings.TrimSpace(model) || target != strings.TrimSpace(target) {
-			return saved, errors.New("invalid model mapping")
-		}
-	}
-	revision, err := service.repository.WriteSetting(ctx, "pricing:"+environmentId, saved.Revision, saved.Value)
-	if err == nil {
-		saved.Revision = revision
-	}
-	return saved, err
-}
-
-func normalizedPricing(pricing Pricing) Pricing {
-	if pricing.Overrides == nil {
-		pricing.Overrides = map[string]domain.PriceOverride{}
-	}
-	if pricing.Aliases == nil {
-		pricing.Aliases = map[string]string{}
-	}
-	return pricing
-}
-
-// PatchPricing preserves unedited rows; null deletes and a new alias clears the source price.
-func (service *Service) PatchPricing(ctx context.Context, environmentId string, revision int64, patch PricingPatch) (SavedPricing, error) {
-	saved, err := service.Pricing(ctx, environmentId)
-	if err != nil {
-		return saved, err
-	}
-	if saved.Revision != revision {
-		return saved, errors.New("pricing revision changed; reload before applying")
-	}
-	for model, price := range patch.Overrides {
-		if price == nil {
-			delete(saved.Value.Overrides, model)
-		} else {
-			saved.Value.Overrides[model] = *price
-		}
-	}
-	for model, target := range patch.Aliases {
-		if target == nil {
-			delete(saved.Value.Aliases, model)
-		} else {
-			saved.Value.Aliases[model] = *target
-			delete(saved.Value.Overrides, model)
-		}
-	}
-	return service.SavePricing(ctx, environmentId, saved)
 }
 func (service *Service) Sources(ctx context.Context) ([]Source, int64, error) {
 	sources := []Source{}

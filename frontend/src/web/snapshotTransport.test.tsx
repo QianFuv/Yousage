@@ -275,7 +275,6 @@ describe("snapshot transport", () => {
     await expect(nativeApi.GetSync()).rejects.toThrow();
     await expect(nativeApi.SaveSync({} as never)).rejects.toThrow();
     await expect(nativeApi.RotatePairing()).rejects.toThrow();
-    await expect(nativeApi.ApplyPricing([], {} as never)).rejects.toThrow();
     await expect(nativeApi.SetAutostart(true)).rejects.toThrow();
   });
 

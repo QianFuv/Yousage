@@ -154,17 +154,9 @@ func TestUsageFitsLogsBeforeFirstProbe(test *testing.T) {
 	if err != nil || math.Abs(*repriced.Environments[0].CycleValues[0].History[0].ValueUsd-2*previousValue) > 1e-6 {
 		test.Fatalf("pricing invalidation: previous=%v current=%v error=%v", previousValue, *repriced.Environments[0].CycleValues[0].History[0].ValueUsd, err)
 	}
-	pricing, _ := service.Preferences.Pricing(ctx, service.LocalId)
-	pricing.Value.Overrides["priced"] = domain.PriceOverride{InputCostPerMillionTokens: 3_000_000}
-	if _, err := service.Preferences.SavePricing(ctx, service.LocalId, pricing); err != nil {
-		test.Fatal(err)
-	}
-	if _, err := service.Usage(ctx, 1, "UTC"); err != nil {
-		test.Fatal(err)
-	}
 	pricingRevision, _ := service.Store.ReadSetting(ctx, settingKey, &persisted)
 	if pricingRevision <= fitRevision {
-		test.Fatal("pricing did not invalidate fits")
+		test.Fatal("rate change did not invalidate fits")
 	}
 	path := filepath.Join(home, "sessions", "fixture.jsonl")
 	data, err := os.ReadFile(path)

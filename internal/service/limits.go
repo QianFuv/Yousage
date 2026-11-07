@@ -36,11 +36,7 @@ func (service *Service) localConfig(ctx context.Context) (remote.Config, error) 
 	if err != nil {
 		return remote.Config{}, err
 	}
-	pricing, err := service.Preferences.Pricing(ctx, service.LocalId)
-	if err != nil {
-		return remote.Config{}, err
-	}
-	config := remote.Config{Environment: remote.Environment{Id: service.LocalId, Label: "This device", Protocol: 2, Capabilities: remote.Capabilities{"environmentThemes": true, "usageLimitSources": true, "usagePriceOverrides": true, "usageModelAliases": true}}, Providers: []remote.Provider{}, Sources: []quota.HubSnapshot{}, Settings: remote.Settings{Prices: pricing.Value.Overrides, Aliases: pricing.Value.Aliases}}
+	config := remote.Config{Environment: remote.Environment{Id: service.LocalId, Label: "This device", Protocol: 2, Capabilities: remote.Capabilities{"environmentThemes": true, "usageLimitSources": true}}, Providers: []remote.Provider{}, Sources: []quota.HubSnapshot{}}
 	byId := map[string]remote.Provider{}
 	for _, provider := range quotas.Providers {
 		byId[provider.InstanceId] = provider
