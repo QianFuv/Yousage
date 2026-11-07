@@ -34,13 +34,13 @@ export function PageHeader({
 }) {
   return (
     <header className="page-header sticky top-0 z-40 flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background/85 px-6 py-2 backdrop-blur-md max-md:px-4">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+      <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-sm">
         {parent && (
           <>
             <span className="shrink-0 text-muted-foreground">{parent}</span>
             <ChevronRightIcon
               aria-hidden
-              className="size-3.5 shrink-0 text-muted-foreground/70"
+              className="size-3.5 shrink-0 self-center text-muted-foreground/70"
             />
           </>
         )}
