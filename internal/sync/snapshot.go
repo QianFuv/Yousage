@@ -10,7 +10,7 @@ import (
 )
 
 // AppVersion matches the desktop provider version when no application build version is available.
-const AppVersion = "0.2.4"
+const AppVersion = "0.2.5"
 
 // SnapshotSource supplies the same report reads exposed by the desktop.
 type SnapshotSource interface {
