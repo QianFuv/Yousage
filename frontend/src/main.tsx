@@ -17,7 +17,7 @@ import { UsagePage } from "./usage/UsagePage";
 import * as nativeApi from "../bindings/yousage/internal/desktop/app";
 import { canvasBackground, sidebarBackground } from "./native";
 import { configureTimestampLocale } from "../vendor/timestampFormat";
-import { notifyError, Toaster } from "./notify";
+import { Toaster } from "./notify";
 import {
   createDiagnosticReporter,
   installDiagnosticListeners,
@@ -241,49 +241,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
   }, []);
 
   useEffect(() => {
-    /** Offer the same settings shortcut in every application route. */
-    const changed = (event: KeyboardEvent) => {
-      if (isClosing) return;
-      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
-        event.preventDefault();
-        navigate("settings");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "1") {
-        event.preventDefault();
-        navigate("statistics");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "2") {
-        event.preventDefault();
-        navigate("quota");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "3") {
-        event.preventDefault();
-        navigate("loss");
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "4") {
-        event.preventDefault();
-        navigate("speed");
-      } else if (
-        (event.ctrlKey || event.metaKey) &&
-        event.altKey &&
-        event.key.toLowerCase() === "a"
-      ) {
-        event.preventDefault();
-        if (event.shiftKey) {
-          const modes = ["system", "light", "dark"];
-          const mode = appearance.snapshot.value.preferences.mode;
-          void appearance
-            .patch({ mode: modes[(modes.indexOf(mode) + 1) % modes.length] })
-            .catch(notifyError);
-        } else navigate("settings", "appearance");
-      } else if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === "r"
-      ) {
-        event.preventDefault();
-        void data.refresh();
-      } else if (event.key === "Escape") setIsClosing(false);
-    };
-    window.addEventListener("keydown", changed);
-    return () => window.removeEventListener("keydown", changed);
-  }, [route, data.refresh, navigate, appearance, isClosing]);
-  useEffect(() => {
     /** Synchronize preview colors as well as saved themes without waiting on hidden WebView frames. */
     const synchronize = () => {
       void nativeApi
@@ -377,28 +334,24 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
               <NavItem
                 icon={ChartNoAxesCombinedIcon}
                 label={t("Usage")}
-                title={`${t("Usage")} (Ctrl+1)`}
                 isCurrent={route === "statistics"}
                 onClick={() => navigate("statistics")}
               />
               <NavItem
                 icon={GaugeIcon}
                 label={t("Quota")}
-                title={`${t("Quota")} (Ctrl+2)`}
                 isCurrent={route === "quota"}
                 onClick={() => navigate("quota")}
               />
               <NavItem
                 icon={FlameIcon}
                 label={t("Loss")}
-                title={`${t("Loss")} (Ctrl+3)`}
                 isCurrent={route === "loss"}
                 onClick={() => navigate("loss")}
               />
               <NavItem
                 icon={TimerIcon}
                 label={t("Speed")}
-                title={`${t("Speed")} (Ctrl+4)`}
                 isCurrent={route === "speed"}
                 onClick={() => navigate("speed")}
               />
@@ -407,7 +360,6 @@ function Desktop({ systemLocale }: { systemLocale: string }) {
               <NavItem
                 icon={SettingsIcon}
                 label={t("Settings")}
-                title={`${t("Settings")} (Ctrl+,)`}
                 onClick={() => navigate("settings")}
               />
             </div>

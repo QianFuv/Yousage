@@ -135,7 +135,7 @@ describe("DataProvider", () => {
     );
   });
 
-  it("turns the refresh shortcut into one global request", async () => {
+  it("turns a manual refresh into one global request", async () => {
     await mount().refresh();
     expect(nativeApi.RequestRefresh).toHaveBeenCalledTimes(1);
     expect(nativeApi.RefreshUsage).not.toHaveBeenCalled();

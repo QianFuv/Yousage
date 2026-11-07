@@ -133,7 +133,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Custom history location": "自定义历史位置",
   "Custom model prices": "自定义模型价格",
   "Custom model prices & mappings": "自定义模型价格与映射",
-  "Cycle System, Light and Dark": "在跟随系统、亮色、暗色之间切换",
   "Cycle value": "本周期价值",
   "Daily cost": "每日费用",
   "Daily cost by provider": "各 Provider 每日费用",
@@ -154,7 +153,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Discard import": "放弃导入",
   "Discard pending changes": "放弃未保存的更改",
   Dismiss: "关闭",
-  "Dismiss the close confirmation": "关闭退出确认框",
   Display: "显示",
   "Display & behavior": "显示与行为",
   Documentation: "文档",
@@ -201,7 +199,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "它已过期、已被撤回，或链接已被重置。",
   "Keep editing": "继续编辑",
   "Keep the current link": "保留当前链接",
-  "Keyboard shortcuts": "键盘快捷键",
   Language: "语言",
   "Last successful limits are retained.": "已保留上次成功读取的额度。",
   "Last updated": "最近更新",
@@ -268,8 +265,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Offline: "离线",
   "On pace with the window": "与时间窗口节奏一致",
   Open: "打开",
-  "Open Appearance": "打开外观设置",
-  "Open settings": "打开设置",
   Optional: "可选",
   Other: "其他",
   "Outcome unknown. Reload this environment and review its saved settings before retrying.":
@@ -298,7 +293,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Quota account draft discarded.": "已放弃额度账户草稿。",
   "Quota accounts": "额度账户",
   "Quota accounts applied.": "额度账户已应用。",
-  "Quota monitoring": "额度监控",
   "Read-only access": "只读访问",
   "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":
     "桌面端快照的只读视图，在这里做的更改不会保存。",
@@ -308,9 +302,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Redacted report copied.": "已复制脱敏报告。",
   "Redacted report exported.": "已导出脱敏报告。",
   "Refresh report": "刷新报告",
-  "Refresh all pages now": "立即刷新所有页面",
-  "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on. Ctrl+R refreshes now.":
-    "用量、额度和所有页面一起刷新：窗口显示时约每五分钟一次，最小化到托盘且开启同步时每十五分钟一次。按 Ctrl+R 立即刷新。",
   "Refresh failed": "刷新失败",
   "Refresh was cancelled.": "刷新已取消。",
   "Refreshing…": "正在刷新…",
@@ -497,7 +488,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Usage breakdown table": "用量明细表",
   "Usage metric": "用量指标",
   "Usage period": "统计时间段",
-  "Usage statistics": "用量统计",
   "Use a reset credit?": "使用重置券？",
   "Use another link": "换一个链接",
   "Use automatic detection": "改为自动识别",
@@ -641,4 +631,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "The current link stops working and its snapshot is deleted from the relay. Open the new link on your phone.":
     "当前链接将失效，其快照会从中继删除。请在手机上打开新链接。",
   "Refresh now": "立即刷新",
+  "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on.":
+    "用量、额度和所有页面一起刷新：窗口显示时约每五分钟一次，最小化到托盘且开启同步时每十五分钟一次。",
 };

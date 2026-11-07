@@ -27,15 +27,6 @@ const TIMESTAMP_OPTIONS = [
   { value: "12h", label: msg("12-hour") },
   { value: "24h", label: msg("24-hour") },
 ];
-const SHORTCUTS: readonly [string, readonly string[]][] = [
-  [msg("Open settings"), ["Ctrl / ⌘", ","]],
-  [msg("Usage statistics"), ["Ctrl / ⌘", "1"]],
-  [msg("Quota monitoring"), ["Ctrl / ⌘", "2"]],
-  [msg("Refresh all pages now"), ["Ctrl / ⌘", "R"]],
-  [msg("Open Appearance"), ["Ctrl / ⌘", "Alt", "A"]],
-  [msg("Cycle System, Light and Dark"), ["Ctrl / ⌘", "Alt", "Shift", "A"]],
-  [msg("Dismiss the close confirmation"), ["Esc"]],
-];
 
 /**
  * Translate the labels of a constant option table.
@@ -139,7 +130,7 @@ export function DisplayPanel() {
           <SettingsRow
             title={t("Automatic refresh")}
             description={t(
-              "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on. Ctrl+R refreshes now.",
+              "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on.",
             )}
             control={
               <Switch
@@ -193,21 +184,6 @@ export function DisplayPanel() {
               />
             }
           />
-        </SettingsSection>
-        <SettingsSection title={t("Keyboard shortcuts")}>
-          {SHORTCUTS.map(([label, keys]) => (
-            <SettingsRow
-              key={label}
-              title={t(label)}
-              control={
-                <span className="flex items-center gap-1">
-                  {keys.map((key) => (
-                    <kbd key={key}>{key}</kbd>
-                  ))}
-                </span>
-              }
-            />
-          ))}
         </SettingsSection>
       </PageBody>
     </section>
