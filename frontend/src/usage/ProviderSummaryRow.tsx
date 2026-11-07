@@ -31,7 +31,9 @@ export function orderProviders<Row extends { provider: string }>(
  *
  * The name is never truncated and the value never wraps. Facts such as the request
  * count and shares stay whole and wrap onto further lines as a unit, so longer numbers,
- * wider fonts, larger interface sizes and narrow phone screens only add lines.
+ * wider fonts, larger interface sizes and narrow phone screens only add lines. Each fact
+ * leads with its separator inside a clipped gutter, so a separator shows only between
+ * two facts on the same line, never at the end or start of one.
  *
  * @param props - Provider, its headline value and its facts, the count first.
  * @returns The provider row.
@@ -66,14 +68,18 @@ export function ProviderSummaryRow({
           {value}
         </span>
       </div>
-      <ul className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
-        {facts.map((fact, index) => (
-          <li key={index} className="whitespace-nowrap">
-            {fact}
-            {index < facts.length - 1 && <span aria-hidden> ·</span>}
-          </li>
-        ))}
-      </ul>
+      <div className="[clip-path:inset(0_-100vw_0_0)]">
+        <ul className="-ms-4 flex flex-wrap gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+          {facts.map((fact, index) => (
+            <li
+              key={index}
+              className="whitespace-nowrap before:inline-block before:w-4 before:text-center before:content-['·'_/_'']"
+            >
+              {fact}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

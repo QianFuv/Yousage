@@ -105,7 +105,7 @@ export function LossContent({ report }: { report: LossReport }) {
   );
   return (
     <div className="flex flex-col gap-10">
-      <section className="grid gap-x-12 gap-y-8 md:grid-cols-[18rem_minmax(0,1fr)]">
+      <section className="grid gap-x-12 gap-y-8 md:grid-cols-[20rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">

@@ -20,12 +20,23 @@ describe("provider summary row", () => {
 
   it("puts the count with the other facts, each unbreakable and separated", () => {
     const facts = [...markup.matchAll(/<li class="([^"]*)">(.*?)<\/li>/g)];
-    expect(facts.map(([, , text]) => text.replace(/<[^>]+>/g, ""))).toEqual([
-      "12,817 requests ·",
-      "TTFT 1.4 s ·",
+    expect(facts.map(([, , text]) => text)).toEqual([
+      "12,817 requests",
+      "TTFT 1.4 s",
       "Generation 119 tok/s",
     ]);
-    for (const [, classes] of facts) expect(classes).toBe("whitespace-nowrap");
-    expect(markup).toMatch(/<ul class="flex flex-wrap/);
+    for (const [, classes] of facts) {
+      expect(classes).toContain("whitespace-nowrap");
+      expect(classes).toContain(
+        "before:content-[&#x27;·&#x27;_/_&#x27;&#x27;]",
+      );
+      expect(classes).toContain("before:w-4");
+    }
+  });
+
+  it("clips the separator that starts each line, so wrapped lines never begin or end with one", () => {
+    expect(markup).toContain(
+      '<div class="[clip-path:inset(0_-100vw_0_0)]"><ul class="-ms-4 flex flex-wrap',
+    );
   });
 });
