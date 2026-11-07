@@ -1,5 +1,7 @@
 /** Page-header freshness shared by every page that the global refresh feeds. */
 import type { ReactNode } from "react";
+import { RefreshCwIcon } from "lucide-react";
+import { Button } from "../../../tools/parity/upstream/apps/web/src/components/ui/button";
 import { msg, t } from "../i18n";
 import { useData, type RefreshState } from "./controller";
 import { hour12ForTimestampFormat } from "./host";
@@ -49,4 +51,31 @@ export function describeRefresh(
 export function useRefreshStatus(): ReactNode {
   const data = useData();
   return describeRefresh(data.refreshState, data.display.value.timestampFormat);
+}
+
+/**
+ * Header button that asks for one refresh now, beside the automatic refreshes.
+ *
+ * It spins and stays disabled while any refresh, automatic or manual, is running.
+ *
+ * @returns The refresh icon button.
+ */
+export function RefreshButton() {
+  const data = useData();
+  const isRefreshing = data.refreshState.isRefreshing;
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={t("Refresh now")}
+      title={t("Refresh now")}
+      disabled={isRefreshing}
+      onClick={() => void data.refresh()}
+    >
+      <RefreshCwIcon
+        aria-hidden
+        className={isRefreshing ? "animate-spin" : undefined}
+      />
+    </Button>
+  );
 }

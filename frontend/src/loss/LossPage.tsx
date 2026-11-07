@@ -13,7 +13,7 @@ import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { formatDateTimeShort, formatDuration, msg, t } from "../i18n";
 import { notifyError } from "../notify";
-import { useRefreshStatus } from "../usage/refreshStatus";
+import { RefreshButton, useRefreshStatus } from "../usage/refreshStatus";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
 import { SeriesChart } from "../usage/SeriesChart";
@@ -73,6 +73,7 @@ export function LossPage({ isActive }: { isActive: boolean }) {
       <PageHeader
         title={t("Loss")}
         status={!report ? t("Loading…") : refreshStatus}
+        actions={<RefreshButton />}
       >
         <PeriodToggle label={t("Loss period")} />
       </PageHeader>

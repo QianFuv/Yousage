@@ -30,7 +30,7 @@ import { hour12ForTimestampFormat } from "./host";
 import { indexCycleValues } from "./CycleValue";
 import { t } from "../i18n";
 import { useData } from "./controller";
-import { useRefreshStatus } from "./refreshStatus";
+import { RefreshButton, useRefreshStatus } from "./refreshStatus";
 import { localizeEnvironmentError } from "./notices";
 import { PeriodToggle } from "./PeriodToggle";
 import { useIsReadOnly } from "../web/readOnly";
@@ -124,6 +124,7 @@ export function UsagePage({
       <PageHeader
         title={view === "limits" ? t("Quota") : t("Usage")}
         status={statusLabel}
+        actions={<RefreshButton />}
       >
         {view === "statistics" && (
           <>

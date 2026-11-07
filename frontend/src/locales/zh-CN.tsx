@@ -647,4 +647,5 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "在手机上打开此链接。# 后面的部分是密钥，请妥善保管链接。",
   "The current link stops working and its snapshot is deleted from the relay. Open the new link on your phone.":
     "当前链接将失效，其快照会从中继删除。请在手机上打开新链接。",
+  "Refresh now": "立即刷新",
 };

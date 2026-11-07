@@ -18,7 +18,7 @@ import { ProviderInstanceIcon } from "../../vendor/ProviderInstanceIcon";
 import { EmptyState, Notice, PageBody, PageHeader } from "../ui";
 import { msg, t } from "../i18n";
 import { notifyError } from "../notify";
-import { useRefreshStatus } from "../usage/refreshStatus";
+import { RefreshButton, useRefreshStatus } from "../usage/refreshStatus";
 import type { UsageProviderKind } from "../usage/contracts";
 import { PeriodToggle, usePeriodDays } from "../usage/PeriodToggle";
 import { bucketLabels } from "../usage/chartAxis";
@@ -171,6 +171,7 @@ export function SpeedPage({ isActive }: { isActive: boolean }) {
       <PageHeader
         title={t("Speed")}
         status={!report ? t("Loading…") : refreshStatus}
+        actions={<RefreshButton />}
       >
         <PeriodToggle label={t("Speed period")} />
       </PageHeader>

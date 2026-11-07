@@ -1,9 +1,13 @@
-/** Every page reads one global refresh state and offers no per-page refresh button. */
+/** Every page reads one global refresh state and offers a manual refresh beside it. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { setLanguage } from "../i18n";
 import type { RefreshState } from "./controller";
-import { describeRefresh, REFRESH_FAILURES } from "./refreshStatus";
+import {
+  describeRefresh,
+  REFRESH_FAILURES,
+  RefreshButton,
+} from "./refreshStatus";
 import { UsagePage } from "./UsagePage";
 import { LossPage } from "../loss/LossPage";
 import { SpeedPage } from "../speed/SpeedPage";
@@ -14,6 +18,7 @@ const page = vi.hoisted(() => ({
     lastCompletedAt: "",
     lastError: "",
   } as RefreshState,
+  refresh: vi.fn(async () => {}),
 }));
 
 vi.mock("./controller", () => ({
@@ -42,7 +47,7 @@ vi.mock("./controller", () => ({
         timestampFormat: "24h",
       },
     },
-    refresh: async () => {},
+    refresh: page.refresh,
     patchDisplay: async () => {},
   }),
 }));
@@ -77,12 +82,27 @@ function renderPages(): Record<string, string> {
 }
 
 describe("global refresh pages", () => {
-  it("offer no manual refresh button on any page", () => {
+  it("offer one manual refresh button on every page", () => {
     for (const [name, html] of Object.entries(renderPages())) {
-      expect(html, name).not.toMatch(/aria-label="Refresh (usage|limits)"/);
-      expect(html, name).not.toContain("Ctrl+R");
+      expect(html.match(/aria-label="Refresh now"/g), name).toHaveLength(1);
       expect(html, name).not.toContain("animate-spin");
     }
+  });
+
+  it("spin and disable the button while any refresh runs", () => {
+    page.refreshState = { ...page.refreshState, isRefreshing: true };
+    for (const [name, html] of Object.entries(renderPages())) {
+      expect(html, name).toMatch(
+        /<button[^>]*aria-label="Refresh now"[^>]*disabled=""|<button[^>]*disabled=""[^>]*aria-label="Refresh now"/,
+      );
+      expect(html, name).toContain("animate-spin");
+    }
+  });
+
+  it("ask the shared scheduler for a refresh when clicked", () => {
+    const button = RefreshButton() as { props: { onClick: () => void } };
+    button.props.onClick();
+    expect(page.refresh).toHaveBeenCalledTimes(1);
   });
 
   it("show the scheduler progress in the page header", () => {
