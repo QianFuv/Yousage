@@ -94,6 +94,13 @@ export function FrontendReady(): $CancellablePromise<void> {
 }
 
 /**
+ * GetAppVersion returns the Yousage release version shown in About and diagnostics.
+ */
+export function GetAppVersion(): $CancellablePromise<string> {
+    return $Call.ByID(2474862913);
+}
+
+/**
  * GetAppearance returns saved authoritative state and current published palettes before first paint.
  */
 export function GetAppearance(): $CancellablePromise<theme$0.LibrarySnapshot> {
@@ -203,13 +210,6 @@ export function GetUsage(days: number, timeZone: string): $CancellablePromise<se
     return $Call.ByID(2994566643, days, timeZone).then(($result: any) => {
         return $$createType12($result);
     });
-}
-
-/**
- * OpenDocumentation opens only the fixed official documentation destination.
- */
-export function OpenDocumentation(): $CancellablePromise<void> {
-    return $Call.ByID(3478086122);
 }
 
 /**

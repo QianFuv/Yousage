@@ -641,14 +641,20 @@ const HANDLERS: Record<string, (...args: never[]) => unknown> = {
     JSON.stringify(
       {
         application: "Yousage",
-        wails: "3.0.0",
+        version: "0.2.1",
         platform: "browser-fixture",
         historySources: sourceSettings.value.length,
+        quotaTargets: configuration.value.providers.length,
+        quotaHubs: 0,
+        metadataAvailable: true,
+        diagnosticsAvailable: true,
+        logs: '{"schema":1,"report":"yousage-diagnostics"}\n',
       },
       null,
       2,
     ),
   ExportDiagnostics: () => false,
+  GetAppVersion: () => "0.2.1",
   GetAutostart: () => isAutostart,
   SetAutostart: (isEnabled: boolean) => {
     isAutostart = isEnabled;
@@ -727,7 +733,6 @@ const NO_EFFECT = new Set([
   "CopyText",
   "DiscardDraftCredentials",
   "FrontendReady",
-  "OpenDocumentation",
   "OpenExternal",
   "SetCloseBridge",
   "SetTrayLabels",

@@ -13,6 +13,7 @@ import (
 	"yousage/internal/preferences"
 	"yousage/internal/quota"
 	dataservice "yousage/internal/service"
+	datasync "yousage/internal/sync"
 )
 
 // TestDesktopDiagnosticMetadataExcludesPrivateConfiguration ensures report
@@ -40,6 +41,9 @@ func TestDesktopDiagnosticMetadataExcludesPrivateConfiguration(test *testing.T) 
 	var decoded diagnosticReport
 	if json.Unmarshal([]byte(report), &decoded) != nil || !decoded.MetadataAvailable || decoded.HistorySources != 1 || decoded.QuotaTargets != 1 || decoded.QuotaHubs != 1 {
 		test.Fatal("whitelisted metadata missing")
+	}
+	if decoded.Application != "Yousage" || decoded.Version != datasync.AppVersion || strings.Contains(report, `"wails"`) || strings.Contains(report, `"go"`) {
+		test.Fatal("report should describe the Yousage release, not its toolchain", report)
 	}
 	for _, canary := range []string{"hub-canary", "target-canary", "provider-canary", "path-canary", "connection-canary", "secret.invalid", "credential-canary", "source-canary", "history-path-canary"} {
 		if strings.Contains(report, canary) {

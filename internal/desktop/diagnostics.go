@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"yousage/internal/diagnostics"
+	datasync "yousage/internal/sync"
 )
 
 // RecordFrontendDiagnostic accepts two fixed categories, with at most ten events
@@ -55,10 +56,8 @@ func (service *App) recordRefreshResult(event diagnostics.Event, operation diagn
 // revalidated local records. Paths, labels and service errors never enter it.
 type diagnosticReport struct {
 	Application          string `json:"application"`
-	Wails                string `json:"wails"`
-	Go                   string `json:"go"`
+	Version              string `json:"version"`
 	Platform             string `json:"platform"`
-	SourceCommit         string `json:"sourceCommit"`
 	HistorySources       int    `json:"historySources"`
 	QuotaTargets         int    `json:"quotaTargets"`
 	QuotaHubs            int    `json:"quotaHubs"`
@@ -71,7 +70,7 @@ type diagnosticReport struct {
 // after a diagnostic failure. Availability is fixed metadata, never a raw error.
 func (service *App) GetDiagnostics() (string, error) {
 	service.recordDiagnostic(diagnostics.Entry{Level: diagnostics.LevelInfo, Source: diagnostics.SourceDesktop, Event: diagnostics.EventReport, Outcome: diagnostics.OutcomeStarted})
-	value := diagnosticReport{Application: "Yousage", Wails: "3.0.0", Go: runtime.Version(), Platform: runtime.GOOS + "/" + runtime.GOARCH, SourceCommit: "51f7f77f87318a5329d3bab15d513fda5654200b"}
+	value := diagnosticReport{Application: "Yousage", Version: datasync.AppVersion, Platform: runtime.GOOS + "/" + runtime.GOARCH}
 	if service.usage != nil && service.context != nil {
 		config, configError := service.usage.Configuration(service.context)
 		sources, _, sourcesError := service.usage.Preferences.Sources(service.context)

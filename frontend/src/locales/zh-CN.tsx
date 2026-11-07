@@ -141,8 +141,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Dismiss: "关闭",
   Display: "显示",
   "Display & behavior": "显示与行为",
-  Documentation: "文档",
-  "Documentation opened.": "已打开文档。",
   Effects: "效果",
   "Enable {label}": "启用 {label}",
   Environment: "环境",
@@ -317,7 +315,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   Sources: "来源",
   "Sources & connections": "数据来源",
   Spent: "已花费",
-  "Standalone Wails v3 desktop application": "独立的 Wails v3 桌面应用",
   "Start Yousage when you sign in to this computer.":
     "登录这台电脑时自动启动 Yousage。",
   "Start minimized": "启动时最小化",
@@ -450,7 +447,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   View: "查看",
   "View usage in ChatGPT with your connected account.":
     "使用已连接的账户在 ChatGPT 中查看用量。",
-  "Wails runtime documentation": "Wails 运行时文档",
   "Waiting for usage reports…": "正在等待用量报告…",
   Weekly: "每周",
   "Your installed themes changed while this package was downloading. Try again.":
@@ -575,4 +571,14 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Refresh now": "立即刷新",
   "Refresh usage, limits and every page together: about every five minutes while the window is shown, and every fifteen minutes in the tray when sync is on.":
     "用量、额度和所有页面一起刷新：窗口显示时约每五分钟一次，最小化到托盘且开启同步时每十五分钟一次。",
+  "Local usage monitor for AI coding tools: token usage, API-equivalent cost, subscription quotas, cache loss and output speed.":
+    "本地运行的 AI 编程工具用量监控：Token 用量、等值 API 费用、订阅额度、缓存损耗与输出速率。",
+  "Version {version}": "版本 {version}",
+  "Project page": "项目主页",
+  "Report a problem": "问题反馈",
+  "Open an issue on GitHub. Attach the diagnostics report below when it helps.":
+    "在 GitHub 上提交 Issue，必要时附上下方的诊断报告。",
+  Platform: "平台",
+  "Quota hubs": "额度中心",
+  "Recent logs": "近期日志",
 };

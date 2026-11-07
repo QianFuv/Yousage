@@ -506,7 +506,7 @@ func (service *App) SyncAppearance(isDark bool, red, green, blue, captionRed, ca
 	return nil
 }
 
-// OpenDocumentation opens only the fixed official documentation destination.
-func (service *App) OpenDocumentation() error {
-	return service.nativeApp.Browser.OpenURL("https://v3.wails.io/getting-started/installation/")
+// GetAppVersion returns the Yousage release version shown in About and diagnostics.
+func (service *App) GetAppVersion() string {
+	return datasync.AppVersion
 }
