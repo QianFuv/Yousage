@@ -272,49 +272,19 @@ export function cycleValueNotice(value: CycleValue): string | null {
   switch (value.status) {
     case "estimated":
       return value.adjustmentSuspected
-        ? t(
-            "This cycle differs from earlier cycles, so the quota may have been adjusted. Earlier cycles are not used.",
-          )
+        ? t("Quota may have changed; earlier cycles are ignored.")
         : null;
     case "inconsistent":
-      return t(
-        "Observations disagree: quota use was not proportional to API prices, or some usage happened elsewhere.",
-      );
+      return t("Quota use does not match API prices.");
     case "insufficientData":
       return value.constraintCount === 0
-        ? t(
-            "Waiting for history to cover the quota observations. The estimate appears after the next refresh.",
-          )
-        : t(
-            "More usage in this cycle is needed before the value can be bounded.",
-          );
+        ? t("Estimate appears after the next refresh.")
+        : t("More usage is needed to estimate.");
     case "noLocalUsage":
-      return t(
-        "Quota was used, but no usage in this cycle was recorded on this device.",
-      );
+      return t("No usage recorded on this device this cycle.");
     case "noCycle":
-      return t("The window has reset. A new cycle starts with the next use.");
+      return t("Window reset; a new cycle starts with the next use.");
   }
-}
-
-/**
- * Where a cycle value comes from: Codex logs, live quota checks, and earlier cycles.
- *
- * @param value - Cycle value.
- * @returns The localized basis, or null without observations.
- */
-export function basisText(value: CycleValue): string | null {
-  const source =
-    value.observationSource === "logs"
-      ? t("Codex logs")
-      : value.observationSource === "probes"
-        ? t("Quota checks")
-        : value.observationSource === "both"
-          ? t("Codex logs and quota checks")
-          : null;
-  if (!value.priorUsed || value.priorCycleCount === 0) return source;
-  const prior = t("{count} earlier cycles", { count: value.priorCycleCount });
-  return source ? `${source} · ${prior}` : prior;
 }
 
 /**
@@ -329,17 +299,12 @@ export function historyValueText(entry: CycleValueHistory): string {
 }
 
 /**
- * The precision of a cycle value in words.
+ * The precision of a cycle value as a relative spread.
  *
  * @param value - Cycle value.
- * @returns The localized precision.
+ * @returns `±X%`, or null without a closed interval.
  */
-export function precisionText(value: CycleValue): string {
+export function precisionText(value: CycleValue): string | null {
   const spread = relativeSpread(value);
-  return spread === null
-    ? t("{count} usable observations", { count: value.constraintCount })
-    : t("±{spread}% from {count} usable observations", {
-        spread: Math.round(spread * 10) / 10,
-        count: value.constraintCount,
-      });
+  return spread === null ? null : `±${Math.round(spread)}%`;
 }

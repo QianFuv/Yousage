@@ -14,7 +14,7 @@ describe("provider speed summary", () => {
     );
     expect(summary).toEqual({
       count: "18 without timing",
-      detail: "Not measured: saved history has no request timing.",
+      detail: "Not measured",
     });
     expect(JSON.stringify(summary)).not.toMatch(/tok\/s|ms|TTFT/);
   });

@@ -27,7 +27,6 @@ import {
 import { useIsReadOnly } from "../src/web/readOnly";
 
 import {
-  basisText,
   ConfidenceDot,
   confidenceLabel,
   type CycleValueIndex,
@@ -192,27 +191,16 @@ function Row({
  * The cycle's API-equivalent value in an account popover: estimate, spend,
  * remaining value, and how far the prediction can be trusted.
  */
-function CycleValueSection({
-  value,
-  now,
-}: {
-  readonly value: CycleValue;
-  readonly now: number;
-}) {
-  const timestampFormat = usePrimarySettings(
-    (settings) => settings.timestampFormat,
-  );
+function CycleValueSection({ value }: { readonly value: CycleValue }) {
   const isReadOnly = useIsReadOnly();
   const confidence = predictionConfidence(value);
-  const basis = basisText(value);
+  const precision = precisionText(value);
   const earlier = value.history.slice(0, 3);
   const range = rangeText(value.valueLowUsd, value.valueHighUsd);
   const remaining = rangeText(value.remainingLowUsd, value.remainingHighUsd);
   const notice =
     isReadOnly && value.status === "noLocalUsage"
-      ? t(
-          "Quota was used, but no usage in this cycle was recorded on the source desktop.",
-        )
+      ? t("No usage recorded on the source desktop this cycle.")
       : cycleValueNotice(value);
   const isActive = value.status !== "noCycle";
   return (
@@ -222,14 +210,11 @@ function CycleValueSection({
           {value.valueUsd !== undefined
             ? `≈ ${formatUsd(value.valueUsd)}`
             : range}
-          {value.valueUsd !== undefined && range ? (
-            <span className="text-muted-foreground"> · {range}</span>
-          ) : null}
         </Row>
       ) : null}
       {isActive ? (
         <Row label={t("Spent")}>
-          {t("{spent} for {low}–{high}% of the quota", {
+          {t("{spent} ({low}–{high}%)", {
             spent: formatUsd(value.spentUsd),
             low: value.usedLowPercent,
             high: value.usedHighPercent,
@@ -242,34 +227,23 @@ function CycleValueSection({
           <span className="inline-flex items-center gap-1.5">
             <ConfidenceDot confidence={confidence} />
             {confidenceLabel(confidence)}
-          </span>
-          <span className="block text-muted-foreground">
-            {precisionText(value)}
+            {precision ? (
+              <span className="text-muted-foreground">· {precision}</span>
+            ) : null}
           </span>
         </Row>
       ) : null}
-      {basis ? <Row label={t("Basis")}>{basis}</Row> : null}
       {earlier.length > 0 ? (
         <Row label={t("Earlier")}>
-          {earlier.map((entry) => (
-            <span key={entry.resetsAt} className="flex gap-1.5">
-              <span className="text-muted-foreground">
-                {formatUpcomingTimestamp(entry.resetsAt, timestampFormat, now)}
-              </span>
-              <span>{historyValueText(entry)}</span>
-            </span>
-          ))}
+          {earlier.map(historyValueText).join(" · ")}
         </Row>
       ) : null}
       {notice ? <p className="text-muted-foreground">{notice}</p> : null}
-      {isActive ? (
+      {isActive && value.unpricedRecords > 0 ? (
         <p className="text-muted-foreground">
-          {isReadOnly
-            ? t("Only usage recorded on the source desktop is counted.")
-            : t("Only usage recorded on this device is counted.")}
-          {value.unpricedRecords > 0
-            ? ` ${t("{count} unpriced records are excluded, so the value may be higher.", { count: value.unpricedRecords })}`
-            : ""}
+          {t("{count} unpriced records excluded.", {
+            count: value.unpricedRecords,
+          })}
         </p>
       ) : null}
     </div>
@@ -364,7 +338,7 @@ function SegmentPopover({
           </Row>
         ) : null}
       </div>
-      {cycleValue ? <CycleValueSection value={cycleValue} now={now} /> : null}
+      {cycleValue ? <CycleValueSection value={cycleValue} /> : null}
       {credits ? (
         <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">

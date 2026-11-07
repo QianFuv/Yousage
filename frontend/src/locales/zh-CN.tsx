@@ -263,8 +263,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Monospace size": "等宽字号",
   Monthly: "每月",
   "More actions for {name}": "{name} 的更多操作",
-  "More usage in this cycle is needed before the value can be bounded.":
-    "本周期需要更多用量才能确定价值区间。",
   "Move the window back onto the primary display.": "将窗口移回主显示器。",
   Muted: "弱化背景",
   "Muted Foreground": "弱化文字",
@@ -290,15 +288,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Not saved": "未保存",
   "Not uploaded yet": "尚未上传",
   "Nothing to reset right now.": "当前没有需要重置的额度。",
-  "Observations disagree: quota use was not proportional to API prices, or some usage happened elsewhere.":
-    "观测结果互相矛盾：额度消耗与 API 价格不成比例，或有部分用量发生在其他设备上。",
   Offline: "离线",
   "On pace with the window": "与时间窗口节奏一致",
   "On your computer, open Settings → Sync & sharing, turn on Sync to phone and copy the phone link. Paste it here.":
     "在电脑上打开 设置 → 同步与分享，开启“同步到手机”并复制手机链接，然后粘贴到这里。",
-  "Only usage recorded on this device is counted.": "仅统计本设备记录的用量。",
-  "Only usage recorded on the source desktop is counted.":
-    "仅统计来源桌面端记录的用量。",
   Open: "打开",
   "Open Appearance": "打开外观设置",
   "Open settings": "打开设置",
@@ -333,10 +326,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Quota accounts": "额度账户",
   "Quota accounts applied.": "额度账户已应用。",
   "Quota monitoring": "额度监控",
-  "Quota was used, but no usage in this cycle was recorded on this device.":
-    "额度已被使用，但本设备没有记录本周期的用量。",
-  "Quota was used, but no usage in this cycle was recorded on the source desktop.":
-    "额度已被使用，但来源桌面端没有记录本周期的用量。",
   "Read-only access": "只读访问",
   "Read-only view of a snapshot from the desktop app. Changes made here are not saved.":
     "桌面端快照的只读视图，在这里做的更改不会保存。",
@@ -495,8 +484,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "重置结果未知。请先刷新额度，再决定是否重试。",
   'The theme "{label}" is not installed.': "未安装主题“{label}”。",
   'The theme id "{id}" is reserved.': "主题 ID“{id}”为保留 ID。",
-  "The window has reset. A new cycle starts with the next use.":
-    "窗口已重置，下次使用时开始新周期。",
   "Theme JSON copied.": "已复制主题 JSON。",
   "Theme collections need a valid id and label.":
     "主题合集需要有效的 ID 和名称。",
@@ -611,9 +598,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{count} reset credits banked": "{count} 张可用重置券",
   "{count} session": "{count} 个会话",
   "{count} sessions": "{count} 个会话",
-  "{count} unpriced records are excluded, so the value may be higher.":
-    "已排除 {count} 条未定价记录，实际价值可能更高。",
-  "{count} usable observations": "{count} 次有效观测",
   "{count} variants": "{count} 个变体",
   "{field} is required on {environment}.": "{environment} 上必须填写{field}。",
   "{field} price for {model}": "{model} 的{field}价格",
@@ -626,25 +610,13 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{share} of cost": "占费用 {share}",
   "{share} of cost · {tokens} tokens": "占费用 {share} · {tokens} Token",
   "{share} of tokens · {cost}": "占 Token {share} · {cost}",
-  "{spent} for {low}–{high}% of the quota": "{spent}，对应额度的 {low}–{high}%",
   "{tokens} tokens have no known price": "{tokens} Token 没有已知价格",
   "{spent} API-equivalent used of {value} this cycle, {confidence}":
     "本周期已用等值 API {spent}，预计总价值 {value}，{confidence}",
-  "±{spread}% from {count} usable observations":
-    "±{spread}%（基于 {count} 次有效观测）",
   "Estimating…": "估算中",
   "{spent} API-equivalent used this cycle, value being estimated":
     "本周期已用等值 API {spent}，总价值估算中",
   "Used {spent}": "已用 {spent}",
-  "Waiting for history to cover the quota observations. The estimate appears after the next refresh.":
-    "正在等待历史记录覆盖额度观测，下次刷新后显示估算。",
-  "This cycle differs from earlier cycles, so the quota may have been adjusted. Earlier cycles are not used.":
-    "本周期与之前的周期差异较大，额度可能已调整，因此不参考之前的周期。",
-  "Codex logs": "Codex 日志",
-  "Quota checks": "额度查询",
-  "Codex logs and quota checks": "Codex 日志和额度查询",
-  "{count} earlier cycles": "参考前 {count} 个周期",
-  Basis: "依据",
   Earlier: "之前周期",
   "Print receipt": "打印小票",
   Close: "关闭",
@@ -692,8 +664,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "{value} s": "{value} 秒",
   "TTFT {ttft} · generation {rate}": "首字 {ttft} · 生成 {rate}",
   "Latency and context": "延迟与上下文",
-  "First-token timing from {count} of {total} requests":
-    "首字耗时来自 {total} 次请求中的 {count} 次",
   "Median TTFT": "首字耗时中位数",
   "P90 TTFT": "首字耗时 P90",
   "Generation speed": "生成速度",
@@ -704,10 +674,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Output per request": "每次请求输出",
   Latency: "请求耗时",
   "{count} requests": "{count} 次请求",
-  "Average output speed · {count} measured requests":
-    "平均输出速率 · 已测量 {count} 次请求",
-  "Median {median} · P10–P90 {low}–{high}":
-    "中位数 {median} · P10–P90 {low}–{high}",
   "Hourly speed": "每小时速率",
   "Daily speed": "每日速率",
   "No measured requests in this window.": "该时间段内没有可测量的请求。",
@@ -731,8 +697,20 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "payment unknown": "支付方式未知",
   "Payment method unknown": "支付方式未知",
   "Known amount paid": "已知实付",
-  "Not measured: saved history has no request timing.":
-    "未测量：已保存的历史不含请求计时。",
   "Even pace": "均匀消耗",
   "{percent}% left by now": "此时应剩余 {percent}%",
+  "Quota may have changed; earlier cycles are ignored.":
+    "额度可能已调整，已忽略往期。",
+  "Quota use does not match API prices.": "额度消耗与 API 价格不符。",
+  "Estimate appears after the next refresh.": "下次刷新后显示估算。",
+  "More usage is needed to estimate.": "需要更多用量才能估算。",
+  "No usage recorded on this device this cycle.": "本设备本周期无用量记录。",
+  "No usage recorded on the source desktop this cycle.":
+    "来源桌面端本周期无用量记录。",
+  "Window reset; a new cycle starts with the next use.":
+    "窗口已重置，下次使用开始新周期。",
+  "{count} unpriced records excluded.": "已排除 {count} 条未定价记录。",
+  "{spent} ({low}–{high}%)": "{spent}（{low}–{high}%）",
+  "Average output · {count} requests": "平均输出速率 · {count} 次请求",
+  "Not measured": "未测量",
 };

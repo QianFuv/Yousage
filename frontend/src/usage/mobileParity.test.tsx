@@ -676,16 +676,14 @@ describe("speed models", () => {
     expect(page.phone).toContain("No measured requests in this window.");
   });
 
-  it("shows the rate spread and untimed requests as visible text at every width", () => {
+  it("keeps model rows to one line of figures, with untimed requests in the request count", () => {
     const page = render(<SpeedContent report={SPEED} />);
     for (const text of [page.phone, page.desktop]) {
-      expect(text).toContain(
-        "Median 45.1 tok/s · P10–P90 20.4–88.8 · 3 without timing",
-      );
+      expect(text).not.toMatch(/P10–P90|Median \d/);
       expect(text).toContain("deepseek/deepseek-flash");
       expect(text).toContain("18 without timing");
     }
-    expect(page.markup).not.toMatch(/title="[^"]*(Median|without timing)/);
+    expect(page.markup).toContain("<span>Requests <span>12 +3</span></span>");
   });
 
   it("never invents timing for requests without it", () => {
@@ -830,20 +828,9 @@ describe("quota account popover", () => {
     expect(useResetCredit).toHaveBeenCalled();
   });
 
-  it("names the source desktop as where counted usage was recorded in the viewer", () => {
+  it("keeps the cycle value terse: no basis row or standing footnote", () => {
     harness.isPopoverInline = true;
-    const viewer = render(
-      <UsageLimitsPooled
-        presentations={limitPresentations()}
-        now={NOW}
-        cycleValues={CYCLE_VALUES}
-      />,
-    );
-    expect(viewer.phone).toContain(
-      "Only usage recorded on the source desktop is counted.",
-    );
-    expect(viewer.phone).not.toContain("on this device");
-    const desktop = render(
+    const page = render(
       <UsageLimitsPooled
         presentations={limitPresentations()}
         now={NOW}
@@ -851,19 +838,10 @@ describe("quota account popover", () => {
       />,
       false,
     );
-    expect(desktop.desktop).toContain(
-      "Only usage recorded on this device is counted.",
-    );
-    setLanguage("zh-CN");
-    expect(
-      render(
-        <UsageLimitsPooled
-          presentations={limitPresentations()}
-          now={NOW}
-          cycleValues={CYCLE_VALUES}
-        />,
-      ).phone,
-    ).toContain("仅统计来源桌面端记录的用量。");
+    expect(page.desktop).toContain("(39–41%)");
+    expect(page.desktop).not.toContain("Basis");
+    expect(page.desktop).not.toContain("is counted");
+    expect(page.desktop).not.toContain("usable observations");
   });
 
   it("says the source desktop recorded no usage this cycle in the viewer", () => {
@@ -877,7 +855,7 @@ describe("quota account popover", () => {
       />,
     );
     expect(viewer.phone).toContain(
-      "Quota was used, but no usage in this cycle was recorded on the source desktop.",
+      "No usage recorded on the source desktop this cycle.",
     );
     expect(viewer.phone).not.toContain("on this device");
     const desktop = render(
@@ -889,7 +867,7 @@ describe("quota account popover", () => {
       false,
     );
     expect(desktop.desktop).toContain(
-      "Quota was used, but no usage in this cycle was recorded on this device.",
+      "No usage recorded on this device this cycle.",
     );
     expect(
       render(
@@ -899,9 +877,7 @@ describe("quota account popover", () => {
           cycleValues={withCycleStatus("inconsistent")}
         />,
       ).phone,
-    ).toContain(
-      "Observations disagree: quota use was not proportional to API prices, or some usage happened elsewhere.",
-    );
+    ).toContain("Quota use does not match API prices.");
     setLanguage("zh-CN");
     expect(
       render(
@@ -911,7 +887,7 @@ describe("quota account popover", () => {
           cycleValues={unrecorded}
         />,
       ).phone,
-    ).toContain("额度已被使用，但来源桌面端没有记录本周期的用量。");
+    ).toContain("来源桌面端本周期无用量记录。");
   });
 });
 

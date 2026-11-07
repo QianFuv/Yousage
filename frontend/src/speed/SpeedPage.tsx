@@ -113,7 +113,7 @@ export function providerSpeedSummary(provider: SpeedProvider): {
       count: t("{count} without timing", {
         count: formatCount(provider.unmeasuredRequests),
       }),
-      detail: t("Not measured: saved history has no request timing."),
+      detail: t("Not measured"),
     };
   return {
     count: t(
@@ -210,7 +210,7 @@ export function SpeedContent({ report }: { report: SpeedReport }) {
               {formatSpeed(report.overall.tokensPerSecond)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {t("Average output speed · {count} measured requests", {
+              {t("Average output · {count} requests", {
                 count: formatCount(report.measuredRequests),
               })}
             </span>
@@ -258,15 +258,7 @@ function LatencyMetrics({ stats }: { stats: SpeedStats }) {
   const requests = stats.requests + stats.unmeasuredRequests;
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-sm font-medium">{t("Latency and context")}</h2>
-        <span className="text-xs text-muted-foreground">
-          {t("First-token timing from {count} of {total} requests", {
-            count: formatCount(stats.ttftRequests),
-            total: formatCount(requests),
-          })}
-        </span>
-      </div>
+      <h2 className="text-sm font-medium">{t("Latency and context")}</h2>
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-1 md:grid-cols-4">
         <Metric
           label={t("Median TTFT")}
@@ -525,22 +517,6 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                   ? `+${formatCount(model.unmeasuredRequests)}`
                   : "";
               const tokens = formatTokens(model.totalTokens);
-              const explanation = [
-                isMeasured
-                  ? t("Median {median} · P10–P90 {low}–{high}", {
-                      median: formatSpeed(model.medianTokensPerSecond),
-                      low: formatRate(model.p10TokensPerSecond),
-                      high: formatRate(model.p90TokensPerSecond),
-                    })
-                  : "",
-                model.unmeasuredRequests > 0
-                  ? t("{count} without timing", {
-                      count: formatCount(model.unmeasuredRequests),
-                    })
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ");
               return (
                 <tr
                   key={rowKey(model)}
@@ -584,11 +560,6 @@ function SpeedTable({ models }: { models: readonly SpeedModel[] }) {
                       </PhoneMetric>
                       <PhoneMetric label={t("Tokens")}>{tokens}</PhoneMetric>
                     </div>
-                    {explanation && (
-                      <div className="mt-0.5 text-xs whitespace-normal text-muted-foreground">
-                        {explanation}
-                      </div>
-                    )}
                   </td>
                   <td className="hidden py-2.5 pl-4 text-foreground md:table-cell">
                     {speed}
