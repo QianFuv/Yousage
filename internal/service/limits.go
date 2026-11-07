@@ -98,10 +98,6 @@ func (service *Service) RefreshLimits(ctx context.Context, selected []string, re
 }
 
 func (service *Service) refreshLimits(ctx context.Context, selected []string, request refresh.Request, shouldFollowup bool) error {
-	configuration, err := service.Configuration(ctx)
-	if err != nil {
-		return err
-	}
 	identities := map[string]bool{}
 	for _, identity := range selected {
 		identities[identity] = true
@@ -115,31 +111,6 @@ func (service *Service) refreshLimits(ctx context.Context, selected []string, re
 				service.startLimitsFollowup(request)
 			}
 			return value, err
-		}
-	}
-	for _, preference := range configuration.Value.Connections {
-		identity := preference.Connection.EnvironmentId
-		if !preference.IsEnabled || !isSelected(identity) {
-			continue
-		}
-		operations["remote:"+identity] = func(owner context.Context) (bool, error) {
-			err := service.gate.WithRefresh(owner, identity, func() error {
-				service.mutex.Lock()
-				state := service.connections[identity]
-				var client *remote.Client
-				if state != nil {
-					client = state.client
-				}
-				service.mutex.Unlock()
-				if client == nil || !client.Authorization.CanOperate() {
-					return errors.New("Limits refresh requires a connected environment with operate permission.")
-				}
-				deadline, cancel := context.WithTimeout(owner, 30*time.Second)
-				defer cancel()
-				_, err := client.Call(deadline, "server.refreshProviders", map[string]any{}, true)
-				return err
-			})
-			return err == nil, err
 		}
 	}
 	failures := make(chan error, len(operations))
@@ -397,29 +368,6 @@ func (service *Service) ConsumeReset(ctx context.Context, route quota.RedeemRout
 							result = quota.ConsumeCodex(ctx, options, operationId)
 						}
 					}
-				}
-			}
-		} else {
-			service.mutex.Lock()
-			state := service.connections[route.EnvironmentId]
-			var client *remote.Client
-			if state != nil {
-				client = state.client
-			}
-			service.mutex.Unlock()
-			if client != nil {
-				input := map[string]string{}
-				if route.SourceId != "" {
-					input["sourceId"], input["accountId"], input["creditId"] = route.SourceId, route.AccountId, route.CreditId
-				} else {
-					input["instanceId"] = route.InstanceId
-				}
-				var err error
-				deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-				result, err = client.ConsumeResetCredit(deadline, input)
-				cancel()
-				if err != nil {
-					result = quota.ResetResult{Outcome: "failed", Warning: err.Error()}
 				}
 			}
 		}

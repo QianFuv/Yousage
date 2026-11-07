@@ -68,7 +68,6 @@ let sourceSettings = {
 let configuration = {
   revision: 1,
   value: {
-    connections: [],
     providers: [
       {
         id: "codex-default",
@@ -88,7 +87,6 @@ let configuration = {
       },
     ],
     hubs: [],
-    primaryEnvironmentId: "local-fixture",
   },
 };
 let syncState = {
@@ -107,7 +105,7 @@ type FixtureStream = {
   costSource: "providerReported" | "modelPriced" | "unpriced";
 };
 
-/** Environments in the fixture; the remote one also reports Pi to exercise merging. */
+/** The fixture's single local environment. */
 const ENVIRONMENTS: {
   id: string;
   label: string;
@@ -140,24 +138,6 @@ const ENVIRONMENTS: {
         model: "fixture-backend/pi-unpriced-model",
         sourcePath: "D:/Fixture/pi-sessions",
         costSource: "unpriced",
-      },
-    ],
-  },
-  {
-    id: "remote-fixture",
-    label: "Remote fixture",
-    streams: [
-      {
-        provider: "codex",
-        model: "fixture-model",
-        sourcePath: "/remote/codex",
-        costSource: "modelPriced",
-      },
-      {
-        provider: "pi",
-        model: "fixture-backend/pi-fixture-model",
-        sourcePath: "/remote/pi/agent/sessions",
-        costSource: "providerReported",
       },
     ],
   },

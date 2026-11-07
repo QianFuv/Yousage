@@ -3,7 +3,6 @@
 
 export {
     Configuration,
-    ConnectionPreference,
     EnvironmentState,
     LossDay,
     LossEvent,

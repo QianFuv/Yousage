@@ -511,13 +511,11 @@ func TestCycleSourceSelectionAndFailure(test *testing.T) {
 	}
 	saved, _ := service.Configuration(ctx)
 	saved.Value.Providers = []NativeProvider{{Id: "native", Driver: "codex", IsEnabled: true}}
-	saved.Value.Connections = []ConnectionPreference{{Connection: remote.Connection{EnvironmentId: "remote", Url: "https://fixture.invalid", CredentialId: "fixture"}, Label: "Remote"}}
-	service.draftCredentials["fixture"] = draftCredential{Kind: "environment", Origin: "https://fixture.invalid", Target: "remote"}
 	if _, err := service.SaveConfiguration(ctx, saved); err != nil {
 		test.Fatal(err)
 	}
 	snapshot, err := service.Usage(ctx, 1, "UTC")
-	if err != nil || len(snapshot.Environments[0].CycleValues) != 1 || snapshot.Environments[0].CycleValues[0].Status != "noLocalUsage" || snapshot.Environments[1].CycleValues != nil {
-		test.Fatal("sample failure or remote isolation", snapshot, err)
+	if err != nil || len(snapshot.Environments[0].CycleValues) != 1 || snapshot.Environments[0].CycleValues[0].Status != "noLocalUsage" {
+		test.Fatal("sample failure", snapshot, err)
 	}
 }

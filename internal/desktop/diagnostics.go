@@ -60,7 +60,6 @@ type diagnosticReport struct {
 	Platform             string `json:"platform"`
 	SourceCommit         string `json:"sourceCommit"`
 	HistorySources       int    `json:"historySources"`
-	RemoteEnvironments   int    `json:"remoteEnvironments"`
 	QuotaTargets         int    `json:"quotaTargets"`
 	QuotaHubs            int    `json:"quotaHubs"`
 	MetadataAvailable    bool   `json:"metadataAvailable"`
@@ -78,7 +77,7 @@ func (service *App) GetDiagnostics() (string, error) {
 		sources, _, sourcesError := service.usage.Preferences.Sources(service.context)
 		value.MetadataAvailable = configError == nil && sourcesError == nil
 		if value.MetadataAvailable {
-			value.HistorySources, value.RemoteEnvironments, value.QuotaTargets, value.QuotaHubs = len(sources), len(config.Value.Connections), len(config.Value.Providers), len(config.Value.Hubs)
+			value.HistorySources, value.QuotaTargets, value.QuotaHubs = len(sources), len(config.Value.Providers), len(config.Value.Hubs)
 		}
 	}
 	logs, reportError := service.diagnostics.Report()

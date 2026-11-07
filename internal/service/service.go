@@ -33,23 +33,16 @@ type NativeProvider struct {
 	Home       string `json:"home"`
 	IsEnabled  bool   `json:"enabled"`
 }
-type ConnectionPreference struct {
-	Connection remote.Connection `json:"connection"`
-	Label      string            `json:"label"`
-	IsEnabled  bool              `json:"enabled"`
-}
 type Configuration struct {
-	Connections          []ConnectionPreference `json:"connections"`
-	Providers            []NativeProvider       `json:"providers"`
-	Hubs                 []quota.HubConfig      `json:"hubs"`
-	PrimaryEnvironmentId string                 `json:"primaryEnvironmentId"`
+	Providers []NativeProvider  `json:"providers"`
+	Hubs      []quota.HubConfig `json:"hubs"`
 }
 type SavedConfiguration struct {
 	Revision int64         `json:"revision"`
 	Value    Configuration `json:"value"`
 }
 
-// EnvironmentState presents local or remote usage and local cycle estimates.
+// EnvironmentState presents local usage and cycle estimates.
 type EnvironmentState struct {
 	Id           string             `json:"environmentId"`
 	Label        string             `json:"label"`
@@ -72,7 +65,6 @@ type Service struct {
 	Preferences       *preferences.Service
 	Themes            *theme.Library
 	Secrets           secrets.Store
-	Connector         remote.Connector
 	LocalId           string
 	Home              string
 	Platform          string
@@ -99,29 +91,18 @@ type Service struct {
 	limitsFollowup    chan struct{}
 	isStopping        bool
 	draftCredentials  map[string]draftCredential
-	connections       map[string]*connectionState
 	history           *refresh.Coordinator[bool]
 	limits            *refresh.Coordinator[bool]
 	rates             *refresh.Coordinator[RateSnapshot]
 	gate              quota.Gate
 	Emit              func(string, any)
-	// OnConnected requests an automatic refresh after a remote becomes ready.
-	// Configure it before starting connection workers; it must return promptly.
-	OnConnected func()
-	Now         func() time.Time
-}
-type connectionState struct {
-	preference ConnectionPreference
-	client     *remote.Client
-	projection remote.Projection
-	cancel     context.CancelFunc
-	error      string
+	Now               func() time.Time
 }
 
 // New loads durable identity and defaults without inspecting provider credentials or launching probes.
 func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Service, error) {
 	owner, cancel := context.WithCancel(ctx)
-	service := &Service{Store: store, Preferences: preferences.New(store), Themes: themes, owner: owner, cancel: cancel, connections: map[string]*connectionState{}, draftCredentials: map[string]draftCredential{}, viewWindows: map[string]accounting.Window{}, history: refresh.New[bool](refresh.HistoryPolicy), limits: refresh.New[bool](refresh.LimitsPolicy), rates: refresh.New[RateSnapshot](refresh.RatesPolicy), Now: time.Now, Platform: runtime.GOOS, Environment: map[string]string{}}
+	service := &Service{Store: store, Preferences: preferences.New(store), Themes: themes, owner: owner, cancel: cancel, draftCredentials: map[string]draftCredential{}, viewWindows: map[string]accounting.Window{}, history: refresh.New[bool](refresh.HistoryPolicy), limits: refresh.New[bool](refresh.LimitsPolicy), rates: refresh.New[RateSnapshot](refresh.RatesPolicy), Now: time.Now, Platform: runtime.GOOS, Environment: map[string]string{}}
 	var identity string
 	revision, err := store.ReadSetting(ctx, "local-environment-id", &identity)
 	if err != nil {
@@ -158,7 +139,6 @@ func New(ctx context.Context, store *storage.Store, themes *theme.Library) (*Ser
 		return nil, err
 	}
 	service.Secrets = owned
-	service.Connector = remote.Connector{Secrets: owned}
 	sources, revision, err := service.Preferences.Sources(ctx)
 	if err != nil {
 		service.Close()
@@ -186,12 +166,9 @@ func (service *Service) emit(name string, value any) {
 }
 
 func (service *Service) Configuration(ctx context.Context) (SavedConfiguration, error) {
-	value := SavedConfiguration{Value: Configuration{Connections: []ConnectionPreference{}, Providers: []NativeProvider{}, Hubs: []quota.HubConfig{}, PrimaryEnvironmentId: service.LocalId}}
+	value := SavedConfiguration{Value: Configuration{Providers: []NativeProvider{}, Hubs: []quota.HubConfig{}}}
 	revision, err := service.Store.ReadSetting(ctx, "configuration", &value.Value)
 	value.Revision = revision
-	if value.Value.Connections == nil {
-		value.Value.Connections = []ConnectionPreference{}
-	}
 	if value.Value.Providers == nil {
 		value.Value.Providers = []NativeProvider{}
 	}
@@ -209,25 +186,10 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		return saved, err
 	}
 	defer release()
-	if len(saved.Value.Connections) > 32 || len(saved.Value.Providers) > 32 || len(saved.Value.Hubs) > 32 {
-		return saved, errors.New("too many connections or providers")
+	if len(saved.Value.Providers) > 32 || len(saved.Value.Hubs) > 32 {
+		return saved, errors.New("too many quota hubs or providers")
 	}
 	seen := map[string]bool{}
-	environments := map[string]bool{service.LocalId: true}
-	for _, connection := range saved.Value.Connections {
-		identity := connection.Connection.EnvironmentId
-		if identity == "" || identity == service.LocalId || seen[identity] || len(connection.Label) > 128 {
-			return saved, errors.New("invalid or duplicate environment")
-		}
-		if err := remote.ValidateOrigin(connection.Connection.Url); err != nil {
-			return saved, err
-		}
-		if connection.Connection.CredentialId == "" {
-			return saved, errors.New("pair the environment before applying")
-		}
-		seen[identity] = true
-		environments[identity] = true
-	}
 	for _, provider := range saved.Value.Providers {
 		if provider.Id == "" || len(provider.Id) > 96 || len(provider.Label) > 128 || len(provider.Home) > 4096 || (provider.Home != "" && !filepath.IsAbs(provider.Home)) || seen[provider.Id] || (provider.Driver != "codex" && provider.Driver != "claudeAgent") {
 			return saved, errors.New("invalid provider target")
@@ -249,9 +211,6 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		}
 		seen[hub.Id] = true
 	}
-	if !environments[saved.Value.PrimaryEnvironmentId] {
-		return saved, errors.New("primary environment is missing")
-	}
 	service.credentialMutex.Lock()
 	defer service.credentialMutex.Unlock()
 	previous, err := service.Configuration(ctx)
@@ -259,9 +218,6 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		return saved, err
 	}
 	existing := map[string]draftCredential{}
-	for _, connection := range previous.Value.Connections {
-		existing[connection.Connection.CredentialId] = draftCredential{Kind: "environment", Origin: connection.Connection.Url, Target: connection.Connection.EnvironmentId}
-	}
 	for _, hub := range previous.Value.Hubs {
 		existing[hub.CredentialId] = draftCredential{Kind: "hub", Origin: hub.Url}
 	}
@@ -270,9 +226,6 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 		return existing[id] == expected || service.draftCredentials[id] == expected
 	}
 	isValid := true
-	for _, connection := range saved.Value.Connections {
-		isValid = isValid && validCredential(connection.Connection.CredentialId, draftCredential{Kind: "environment", Origin: connection.Connection.Url, Target: connection.Connection.EnvironmentId})
-	}
 	for _, hub := range saved.Value.Hubs {
 		isValid = isValid && validCredential(hub.CredentialId, draftCredential{Kind: "hub", Origin: hub.Url})
 	}
@@ -289,32 +242,18 @@ func (service *Service) SaveConfiguration(ctx context.Context, saved SavedConfig
 	}
 	saved.Revision = revision
 	service.mutex.Lock()
-	for _, connection := range saved.Value.Connections {
-		delete(service.draftCredentials, connection.Connection.CredentialId)
-	}
 	for _, hub := range saved.Value.Hubs {
 		delete(service.draftCredentials, hub.CredentialId)
 	}
 	service.mutex.Unlock()
-	service.ReconcileConnections()
 	_ = service.cleanupRetiredCredentials(ctx)
 	service.emit("usage-invalidated", nil)
 	return saved, nil
 }
 
-// Close cancels owned connections and shared refresh work before the application closes its database.
+// Close cancels shared refresh work before the application closes its database.
 func (service *Service) Close() {
 	service.cancel()
-	service.mutex.Lock()
-	for _, state := range service.connections {
-		if state.cancel != nil {
-			state.cancel()
-		}
-		if state.client != nil {
-			state.client.Close()
-		}
-	}
-	service.mutex.Unlock()
 	service.history.Close()
 	service.limits.Close()
 	service.rates.Close()

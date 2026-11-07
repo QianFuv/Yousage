@@ -83,35 +83,6 @@ export class Config {
     }
 }
 
-export class Connection {
-    "url": string;
-    "environmentId": string;
-    "credentialId": string;
-
-    /** Creates a new Connection instance. */
-    constructor($$source: Partial<Connection> = {}) {
-        if (!("url" in $$source)) {
-            this["url"] = "";
-        }
-        if (!("environmentId" in $$source)) {
-            this["environmentId"] = "";
-        }
-        if (!("credentialId" in $$source)) {
-            this["credentialId"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Connection instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Connection {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new Connection($$parsedSource as Partial<Connection>);
-    }
-}
-
 export class Environment {
     "environmentId": string;
     "label": string;

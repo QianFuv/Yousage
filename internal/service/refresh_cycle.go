@@ -6,29 +6,19 @@ import (
 	"yousage/internal/refresh"
 )
 
-// RefreshCycle refreshes local history once, all published remote windows and
-// limits, preserving independent failures and emitting a final invalidation.
+// RefreshCycle refreshes local history and limits once and advances every view
+// window, preserving independent failures and emitting a final invalidation.
 // Its returned error contains only fixed, user-safe descriptions.
 func (service *Service) RefreshCycle(ctx context.Context, zone string, request refresh.Request) error {
 	defer service.emit("usage-invalidated", nil)
 	ctx = context.WithValue(ctx, deferredUsageInvalidationKey{}, true)
 	request.WaitForPending = true
 	var failures []error
-	configuration, err := service.Configuration(ctx)
-	if err != nil {
-		failures = append(failures, errors.New("refresh configuration could not be read"))
-	}
-	remoteIDs := []string{}
-	for _, preference := range configuration.Value.Connections {
-		if preference.IsEnabled {
-			remoteIDs = append(remoteIDs, preference.Connection.EnvironmentId)
-		}
-	}
 	for index, days := range []int{1, 7, 30, 90} {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		selected := remoteIDs
+		selected := []string{}
 		if index == 0 {
 			selected = nil
 		}

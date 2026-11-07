@@ -3,11 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"github.com/coder/websocket"
 	"io"
 	"math"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -162,82 +160,5 @@ func TestSummaryDurationMeasuresElapsedTimeAndClampsClockRegression(test *testin
 		if err != nil || summary.ScanDurationMs != max(0, elapsed.Milliseconds()) {
 			test.Fatal(summary.ScanDurationMs, err)
 		}
-	}
-}
-
-func TestRemoteRateFailureStillRefreshesSummary(test *testing.T) {
-	service := testService(test)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var summaryCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		switch request.URL.Path {
-		case "/.well-known/t3/environment":
-			json.NewEncoder(writer).Encode(remote.Environment{Id: "remote-fixture", Label: "Remote", Protocol: 2, Capabilities: remote.Capabilities{}})
-		case "/api/auth/session":
-			json.NewEncoder(writer).Encode(remote.Authorization{IsAuthenticated: true, Scopes: []string{"orchestration:read"}, Auth: &remote.AuthDescriptor{Policy: "remote-reachable", BootstrapMethods: []string{"one-time-token"}, SessionMethods: []string{"bearer-access-token"}, SessionCookieName: "fixture-cookie"}})
-		case "/api/auth/websocket-ticket":
-			json.NewEncoder(writer).Encode(map[string]string{"ticket": "fixture-ticket", "expiresAt": time.Now().Add(time.Minute).UTC().Format(time.RFC3339)})
-		case "/ws":
-			socket, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				return
-			}
-			defer socket.CloseNow()
-			for {
-				_, data, err := socket.Read(request.Context())
-				if err != nil {
-					return
-				}
-				var frame struct {
-					Tag    string `json:"_tag"`
-					Id     string `json:"id"`
-					Method string `json:"tag"`
-				}
-				json.Unmarshal(data, &frame)
-				if frame.Tag == "Ping" {
-					socket.Write(request.Context(), websocket.MessageText, []byte(`{"_tag":"Pong"}`))
-					continue
-				}
-				if frame.Tag != "Request" {
-					continue
-				}
-				exit := map[string]any{"_tag": "Failure", "cause": []any{map[string]any{"_tag": "Fail", "error": map[string]string{"_tag": "UsageRatesError"}}}}
-				if frame.Method == "server.getUsageSummary" {
-					summaryCalls++
-					exit = map[string]any{"_tag": "Success", "value": remote.Summary{ContractVersion: 6, ReadAt: service.Now().Format(time.RFC3339), TimeZone: "UTC", SinceDay: "2026-09-07", UntilDay: "2026-10-06", Buckets: []accounting.Bucket{}, Sources: []remote.Source{}, Pricing: remote.Pricing{Status: "cached", Source: "fixture", KnownModels: 1}, ScanDurationMs: 17}}
-				}
-				response, _ := json.Marshal(map[string]any{"_tag": "Exit", "requestId": frame.Id, "exit": exit})
-				socket.Write(request.Context(), websocket.MessageText, response)
-			}
-		default:
-			http.NotFound(writer, request)
-		}
-	}))
-	defer server.Close()
-	connection := remote.Connection{EnvironmentId: "remote-fixture", Url: server.URL, CredentialId: "fixture"}
-	connector := remote.Connector{Secrets: memoryCredentials{"fixture": "synthetic-bearer"}}
-	client, err := connector.Connect(ctx, connection)
-	if err != nil {
-		test.Fatal(err)
-	}
-	defer client.Close()
-	service.connections[connection.EnvironmentId] = &connectionState{client: client, cancel: func() {}}
-	saved, _ := service.Configuration(ctx)
-	saved.Value.Connections = []ConnectionPreference{{Connection: connection, Label: "Remote", IsEnabled: true}}
-	if _, err := service.Store.WriteSetting(ctx, "configuration", saved.Revision, saved.Value); err != nil {
-		test.Fatal(err)
-	}
-	if err := service.RefreshUsage(ctx, 30, "UTC", []string{connection.EnvironmentId}, refresh.Request{IsManual: true}); err == nil {
-		test.Fatal("rate failure disappeared")
-	}
-	if summaryCalls != 1 {
-		test.Fatal("rate failure blocked summary", summaryCalls)
-	}
-	window, _ := service.viewWindow(30, "UTC", false)
-	var summary remote.Summary
-	if _, err := service.Store.ReadSetting(ctx, "remote-usage:"+connection.EnvironmentId+":"+windowKey(window), &summary); err != nil || summary.ScanDurationMs != 17 {
-		test.Fatal("latest summary not retained", summary, err)
 	}
 }

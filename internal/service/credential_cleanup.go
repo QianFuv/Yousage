@@ -12,9 +12,6 @@ const credentialCleanupKey = "credential-cleanup"
 // credentialReferences includes disabled targets because they still own saved credentials.
 func credentialReferences(configuration Configuration) map[string]bool {
 	references := map[string]bool{}
-	for _, connection := range configuration.Connections {
-		references[connection.Connection.CredentialId] = true
-	}
 	for _, hub := range configuration.Hubs {
 		references[hub.CredentialId] = true
 	}

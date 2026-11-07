@@ -11,7 +11,7 @@ import (
 	"yousage/internal/diagnostics"
 	"yousage/internal/domain"
 	"yousage/internal/preferences"
-	"yousage/internal/remote"
+	"yousage/internal/quota"
 	dataservice "yousage/internal/service"
 )
 
@@ -26,7 +26,7 @@ func TestDesktopDiagnosticMetadataExcludesPrivateConfiguration(test *testing.T) 
 	defer app.logFile.Close()
 	app.context = context.Background()
 	app.usage = &dataservice.Service{Store: app.store, Preferences: preferences.New(app.store)}
-	config := dataservice.Configuration{PrimaryEnvironmentId: "account-canary", Providers: []dataservice.NativeProvider{{Id: "target-canary", Driver: "claudeAgent", Label: "provider-canary", Home: "path-canary"}}, Connections: []dataservice.ConnectionPreference{{Label: "connection-canary", Connection: remote.Connection{Url: "https://secret.invalid", EnvironmentId: "account-canary", CredentialId: "credential-canary"}}}}
+	config := dataservice.Configuration{Providers: []dataservice.NativeProvider{{Id: "target-canary", Driver: "claudeAgent", Label: "provider-canary", Home: "path-canary"}}, Hubs: []quota.HubConfig{{Id: "hub-canary", Label: "connection-canary", Url: "https://secret.invalid", CredentialId: "credential-canary"}}}
 	if _, err := app.store.WriteSetting(app.context, "configuration", 0, config); err != nil {
 		test.Fatal(err)
 	}
@@ -38,10 +38,10 @@ func TestDesktopDiagnosticMetadataExcludesPrivateConfiguration(test *testing.T) 
 		test.Fatal(err)
 	}
 	var decoded diagnosticReport
-	if json.Unmarshal([]byte(report), &decoded) != nil || !decoded.MetadataAvailable || decoded.HistorySources != 1 || decoded.RemoteEnvironments != 1 || decoded.QuotaTargets != 1 {
+	if json.Unmarshal([]byte(report), &decoded) != nil || !decoded.MetadataAvailable || decoded.HistorySources != 1 || decoded.QuotaTargets != 1 || decoded.QuotaHubs != 1 {
 		test.Fatal("whitelisted metadata missing")
 	}
-	for _, canary := range []string{"account-canary", "target-canary", "provider-canary", "path-canary", "connection-canary", "secret.invalid", "credential-canary", "source-canary", "history-path-canary"} {
+	for _, canary := range []string{"hub-canary", "target-canary", "provider-canary", "path-canary", "connection-canary", "secret.invalid", "credential-canary", "source-canary", "history-path-canary"} {
 		if strings.Contains(report, canary) {
 			test.Fatal("configuration leaked")
 		}

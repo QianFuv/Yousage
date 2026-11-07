@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 	"yousage/internal/quota"
-	"yousage/internal/remote"
 	"yousage/internal/storage"
 )
 
@@ -18,7 +17,7 @@ func (values memoryCredentials) Get(ctx context.Context, id string) (string, err
 // TestSavedCredentialRetirementDeletesOnlyUnreferencedKeys protects active, draft and sync credentials.
 func TestSavedCredentialRetirementDeletesOnlyUnreferencedKeys(test *testing.T) {
 	service := testService(test)
-	credentials := memoryCredentials{"old-hub": "old", "old-remote": "remote", "relay-token": "relay", "relay-space-key": "space"}
+	credentials := memoryCredentials{"old-hub": "old", "relay-token": "relay", "relay-space-key": "space"}
 	service.Secrets = credentials
 	ctx := context.Background()
 	saved, _ := service.Configuration(ctx)
@@ -26,7 +25,6 @@ func TestSavedCredentialRetirementDeletesOnlyUnreferencedKeys(test *testing.T) {
 		{Id: "first", Url: "https://hub.invalid", CredentialId: "old-hub"},
 		{Id: "second", Url: "https://hub.invalid", CredentialId: "old-hub"},
 	}
-	saved.Value.Connections = []ConnectionPreference{{Connection: remote.Connection{Url: "https://remote.invalid", EnvironmentId: "remote", CredentialId: "old-remote"}}}
 	if _, err := service.Store.WriteSetting(ctx, "configuration", saved.Revision, saved.Value); err != nil {
 		test.Fatal(err)
 	}
@@ -36,10 +34,9 @@ func TestSavedCredentialRetirementDeletesOnlyUnreferencedKeys(test *testing.T) {
 		test.Fatal(err)
 	}
 	saved.Value.Hubs = saved.Value.Hubs[1:]
-	saved.Value.Connections = nil
 	saved, err = service.SaveConfiguration(ctx, saved)
-	if err != nil || credentials["old-remote"] != "" || credentials["old-hub"] != "old" {
-		test.Fatal("removed remote was retained or shared disabled hub was deleted", err)
+	if err != nil || credentials["old-hub"] != "old" {
+		test.Fatal("shared hub credential was deleted", err)
 	}
 	replacement, err := service.StageHubCredential(ctx, "https://hub.invalid", "replacement")
 	if err != nil {

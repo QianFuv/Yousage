@@ -220,20 +220,11 @@ export function OpenExternal(destination: string): $CancellablePromise<void> {
 }
 
 /**
- * PairEnvironment stores only a native secret reference; the bootstrap is transient.
- */
-export function PairEnvironment(origin: string, label: string, bootstrap: string, isReadOnly: boolean): $CancellablePromise<service$0.ConnectionPreference> {
-    return $Call.ByID(3805514037, origin, label, bootstrap, isReadOnly).then(($result: any) => {
-        return $$createType13($result);
-    });
-}
-
-/**
  * PickThemeFiles opens the native picker; cancellation leaves the import draft untouched.
  */
 export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(4260808657).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType14($result);
     });
 }
 
@@ -242,7 +233,7 @@ export function PickThemeFiles(): $CancellablePromise<$models.ThemeFileInput[]> 
  */
 export function ReadThemeFiles(paths: string[]): $CancellablePromise<$models.ThemeFileInput[]> {
     return $Call.ByID(3937500892, paths).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType14($result);
     });
 }
 
@@ -403,6 +394,5 @@ const $$createType9 = $models.SavedSources.createFrom;
 const $$createType10 = service$0.SpeedReport.createFrom;
 const $$createType11 = sync$0.State.createFrom;
 const $$createType12 = service$0.Snapshot.createFrom;
-const $$createType13 = service$0.ConnectionPreference.createFrom;
-const $$createType14 = $models.ThemeFileInput.createFrom;
-const $$createType15 = $Create.Array($$createType14);
+const $$createType13 = $models.ThemeFileInput.createFrom;
+const $$createType14 = $Create.Array($$createType13);

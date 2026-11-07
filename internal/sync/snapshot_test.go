@@ -63,9 +63,8 @@ func TestSnapshotAllPeriodsAndNoConfiguration(test *testing.T) {
 	source := &reportFixture{
 		usage: service.Snapshot{Environments: []service.EnvironmentState{{Id: "local", Config: &config}}},
 		configuration: service.Configuration{
-			Hubs:        []quota.HubConfig{{Id: "hub", Url: "https://private-hub.example", CredentialId: "private-credential"}},
-			Connections: []service.ConnectionPreference{{Connection: remote.Connection{Url: "https://private-environment.example", CredentialId: "private-session-credential"}}},
-			Providers:   []service.NativeProvider{{Home: "/private-provider-home", Executable: "/private-provider-executable"}},
+			Hubs:      []quota.HubConfig{{Id: "hub", Url: "https://private-hub.example", CredentialId: "private-credential"}},
+			Providers: []service.NativeProvider{{Home: "/private-provider-home", Executable: "/private-provider-executable"}},
 		},
 	}
 	builder := SnapshotBuilder{Source: source, Display: func(context.Context) (preferences.SavedDisplay, error) {

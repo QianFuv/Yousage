@@ -3,7 +3,6 @@
 
 export {
     Config,
-    Connection,
     Environment,
     Pricing,
     Provider,

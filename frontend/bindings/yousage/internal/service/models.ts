@@ -19,24 +19,16 @@ import * as quota$0 from "../quota/models.js";
 import * as remote$0 from "../remote/models.js";
 
 export class Configuration {
-    "connections": ConnectionPreference[];
     "providers": NativeProvider[];
     "hubs": quota$0.HubConfig[];
-    "primaryEnvironmentId": string;
 
     /** Creates a new Configuration instance. */
     constructor($$source: Partial<Configuration> = {}) {
-        if (!("connections" in $$source)) {
-            this["connections"] = [];
-        }
         if (!("providers" in $$source)) {
             this["providers"] = [];
         }
         if (!("hubs" in $$source)) {
             this["hubs"] = [];
-        }
-        if (!("primaryEnvironmentId" in $$source)) {
-            this["primaryEnvironmentId"] = "";
         }
 
         Object.assign(this, $$source);
@@ -48,56 +40,19 @@ export class Configuration {
     static createFrom($$source: any = {}): Configuration {
         const $$createField0_0 = $$createType1;
         const $$createField1_0 = $$createType3;
-        const $$createField2_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("connections" in $$parsedSource) {
-            $$parsedSource["connections"] = $$createField0_0($$parsedSource["connections"]);
-        }
         if ("providers" in $$parsedSource) {
-            $$parsedSource["providers"] = $$createField1_0($$parsedSource["providers"]);
+            $$parsedSource["providers"] = $$createField0_0($$parsedSource["providers"]);
         }
         if ("hubs" in $$parsedSource) {
-            $$parsedSource["hubs"] = $$createField2_0($$parsedSource["hubs"]);
+            $$parsedSource["hubs"] = $$createField1_0($$parsedSource["hubs"]);
         }
         return new Configuration($$parsedSource as Partial<Configuration>);
     }
 }
 
-export class ConnectionPreference {
-    "connection": remote$0.Connection;
-    "label": string;
-    "enabled": boolean;
-
-    /** Creates a new ConnectionPreference instance. */
-    constructor($$source: Partial<ConnectionPreference> = {}) {
-        if (!("connection" in $$source)) {
-            this["connection"] = (new remote$0.Connection());
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-        if (!("enabled" in $$source)) {
-            this["enabled"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ConnectionPreference instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ConnectionPreference {
-        const $$createField0_0 = $$createType6;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("connection" in $$parsedSource) {
-            $$parsedSource["connection"] = $$createField0_0($$parsedSource["connection"]);
-        }
-        return new ConnectionPreference($$parsedSource as Partial<ConnectionPreference>);
-    }
-}
-
 /**
- * EnvironmentState presents local or remote usage and local cycle estimates.
+ * EnvironmentState presents local usage and cycle estimates.
  */
 export class EnvironmentState {
     "environmentId": string;
@@ -145,9 +100,9 @@ export class EnvironmentState {
      * Creates a new EnvironmentState instance from a string or object.
      */
     static createFrom($$source: any = {}): EnvironmentState {
-        const $$createField5_0 = $$createType8;
-        const $$createField6_0 = $$createType10;
-        const $$createField9_0 = $$createType12;
+        const $$createField5_0 = $$createType5;
+        const $$createField6_0 = $$createType7;
+        const $$createField9_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("serverConfig" in $$parsedSource) {
             $$parsedSource["serverConfig"] = $$createField5_0($$parsedSource["serverConfig"]);
@@ -193,7 +148,7 @@ export class LossDay {
      * Creates a new LossDay instance from a string or object.
      */
     static createFrom($$source: any = {}): LossDay {
-        const $$createField3_0 = $$createType14;
+        const $$createField3_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("providers" in $$parsedSource) {
             $$parsedSource["providers"] = $$createField3_0($$parsedSource["providers"]);
@@ -365,11 +320,11 @@ export class LossReport {
      * Creates a new LossReport instance from a string or object.
      */
     static createFrom($$source: any = {}): LossReport {
-        const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType16;
-        const $$createField2_0 = $$createType18;
-        const $$createField3_0 = $$createType20;
-        const $$createField4_0 = $$createType22;
+        const $$createField0_0 = $$createType12;
+        const $$createField1_0 = $$createType13;
+        const $$createField2_0 = $$createType15;
+        const $$createField3_0 = $$createType17;
+        const $$createField4_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -531,7 +486,7 @@ export class SavedConfiguration {
      * Creates a new SavedConfiguration instance from a string or object.
      */
     static createFrom($$source: any = {}): SavedConfiguration {
-        const $$createField1_0 = $$createType23;
+        const $$createField1_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("value" in $$parsedSource) {
             $$parsedSource["value"] = $$createField1_0($$parsedSource["value"]);
@@ -560,8 +515,8 @@ export class Snapshot {
      * Creates a new Snapshot instance from a string or object.
      */
     static createFrom($$source: any = {}): Snapshot {
-        const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType25;
+        const $$createField0_0 = $$createType12;
+        const $$createField1_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -600,8 +555,8 @@ export class SpeedBucket {
      * Creates a new SpeedBucket instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedBucket {
-        const $$createField1_0 = $$createType27;
-        const $$createField2_0 = $$createType29;
+        const $$createField1_0 = $$createType24;
+        const $$createField2_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField1_0($$parsedSource["models"]);
@@ -965,11 +920,11 @@ export class SpeedReport {
      * Creates a new SpeedReport instance from a string or object.
      */
     static createFrom($$source: any = {}): SpeedReport {
-        const $$createField0_0 = $$createType15;
-        const $$createField1_0 = $$createType30;
-        const $$createField2_0 = $$createType32;
-        const $$createField3_0 = $$createType34;
-        const $$createField4_0 = $$createType36;
+        const $$createField0_0 = $$createType12;
+        const $$createField1_0 = $$createType27;
+        const $$createField2_0 = $$createType29;
+        const $$createField3_0 = $$createType31;
+        const $$createField4_0 = $$createType33;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("window" in $$parsedSource) {
             $$parsedSource["window"] = $$createField0_0($$parsedSource["window"]);
@@ -1094,40 +1049,37 @@ export class SpeedStats {
 }
 
 // Private type creation functions
-const $$createType0 = ConnectionPreference.createFrom;
+const $$createType0 = NativeProvider.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = NativeProvider.createFrom;
+const $$createType2 = quota$0.HubConfig.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = quota$0.HubConfig.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = remote$0.Connection.createFrom;
-const $$createType7 = remote$0.Config.createFrom;
-const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = remote$0.Summary.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
-const $$createType11 = quota$0.CycleValue.createFrom;
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = LossProviderDay.createFrom;
-const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = accounting$0.Window.createFrom;
-const $$createType16 = LossTotals.createFrom;
-const $$createType17 = LossProvider.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = LossDay.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = LossEvent.createFrom;
+const $$createType4 = remote$0.Config.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = remote$0.Summary.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
+const $$createType8 = quota$0.CycleValue.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = LossProviderDay.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = accounting$0.Window.createFrom;
+const $$createType13 = LossTotals.createFrom;
+const $$createType14 = LossProvider.createFrom;
+const $$createType15 = $Create.Array($$createType14);
+const $$createType16 = LossDay.createFrom;
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = LossEvent.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = Configuration.createFrom;
+const $$createType21 = EnvironmentState.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = Configuration.createFrom;
-const $$createType24 = EnvironmentState.createFrom;
-const $$createType25 = $Create.Array($$createType24);
-const $$createType26 = SpeedBucketModel.createFrom;
-const $$createType27 = $Create.Array($$createType26);
-const $$createType28 = SpeedBucketProvider.createFrom;
+const $$createType23 = SpeedBucketModel.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = SpeedBucketProvider.createFrom;
+const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = SpeedStats.createFrom;
+const $$createType28 = SpeedModel.createFrom;
 const $$createType29 = $Create.Array($$createType28);
-const $$createType30 = SpeedStats.createFrom;
-const $$createType31 = SpeedModel.createFrom;
-const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = SpeedProvider.createFrom;
-const $$createType34 = $Create.Array($$createType33);
-const $$createType35 = SpeedBucket.createFrom;
-const $$createType36 = $Create.Array($$createType35);
+const $$createType30 = SpeedProvider.createFrom;
+const $$createType31 = $Create.Array($$createType30);
+const $$createType32 = SpeedBucket.createFrom;
+const $$createType33 = $Create.Array($$createType32);

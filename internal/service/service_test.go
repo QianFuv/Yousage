@@ -66,21 +66,11 @@ func (service *Service) storeSnapshot(ctx context.Context, fingerprint domain.So
 	return service.Store.Observe(ctx, observation)
 }
 
-func TestRollingWindowRetainsRemoteCacheAcrossMinute(test *testing.T) {
+func TestRollingWindowAnchorSurvivesMinute(test *testing.T) {
 	service := testService(test)
 	ctx := context.Background()
-	saved, _ := service.Configuration(ctx)
-	service.draftCredentials["fixture"] = draftCredential{Kind: "environment", Origin: "https://fixture.invalid", Target: "remote"}
-	saved.Value.Connections = []ConnectionPreference{{Connection: remote.Connection{EnvironmentId: "remote", Url: "https://fixture.invalid", CredentialId: "fixture"}, Label: "Remote", IsEnabled: false}}
-	if _, err := service.SaveConfiguration(ctx, saved); err != nil {
-		test.Fatal(err)
-	}
 	first, err := service.Usage(ctx, 1, "UTC")
 	if err != nil {
-		test.Fatal(err)
-	}
-	summary := remote.Summary{ContractVersion: 6, Buckets: []accounting.Bucket{}, Sources: []remote.Source{}}
-	if _, err := service.Store.WriteSetting(ctx, "remote-usage:remote:"+windowKey(first.Window), 0, summary); err != nil {
 		test.Fatal(err)
 	}
 	service.Now = func() time.Time { return time.Date(2026, 10, 6, 12, 1, 0, 0, time.UTC) }
@@ -88,8 +78,8 @@ func TestRollingWindowRetainsRemoteCacheAcrossMinute(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if second.Window != first.Window || second.Environments[1].Summary == nil {
-		test.Fatal("rolling cache disappeared during completion/reload")
+	if second.Window != first.Window {
+		test.Fatal("rolling window moved during completion/reload")
 	}
 	advanced, err := service.viewWindow(1, "UTC", true)
 	if err != nil || advanced == first.Window {
@@ -133,17 +123,6 @@ func TestCrossRootFactsDeduplicateBeforeSourceSessions(test *testing.T) {
 	summary, err = service.localSummary(ctx, expired)
 	if err != nil || len(summary.Buckets) != 0 {
 		test.Fatal("expired cached snapshot leaked into retention", err)
-	}
-}
-
-func TestConfigurationRejectsProviderPrimary(test *testing.T) {
-	service := testService(test)
-	ctx := context.Background()
-	saved, _ := service.Configuration(ctx)
-	saved.Value.Providers = []NativeProvider{{Id: "provider", Driver: "codex"}}
-	saved.Value.PrimaryEnvironmentId = "provider"
-	if _, err := service.SaveConfiguration(ctx, saved); err == nil {
-		test.Fatal("provider accepted as primary environment")
 	}
 }
 

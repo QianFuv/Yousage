@@ -149,7 +149,6 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 		display, err := usage.Preferences.Display(ctx)
 		return err == nil && display.Value.ShouldAutoRefresh
 	}, usage.RefreshCycle)
-	usage.OnConnected = func() { _ = controller.request(false) }
 	if display, err := usage.Preferences.Display(ctx); err == nil {
 		service.setCloseToTray(display.Value.ShouldCloseToTray)
 		service.windowMutex.Lock()
@@ -161,7 +160,6 @@ func (service *App) ServiceStartup(ctx context.Context, options application.Serv
 	} else {
 		controller.setVisibility(!service.isWaitingInTray)
 	}
-	usage.ReconcileConnections()
 	watcher, cancel := context.WithCancel(ctx)
 	service.themeCancel = cancel
 	service.themeDone = make(chan struct{})
@@ -325,11 +323,6 @@ func (service *App) GetConfiguration() (dataservice.SavedConfiguration, error) {
 // SaveConfiguration applies an explicit connection/provider draft.
 func (service *App) SaveConfiguration(saved dataservice.SavedConfiguration) (dataservice.SavedConfiguration, error) {
 	return service.usage.SaveConfiguration(service.context, saved)
-}
-
-// PairEnvironment stores only a native secret reference; the bootstrap is transient.
-func (service *App) PairEnvironment(origin, label, bootstrap string, isReadOnly bool) (dataservice.ConnectionPreference, error) {
-	return service.usage.Pair(service.context, origin, label, bootstrap, isReadOnly)
 }
 
 type SavedSources struct {

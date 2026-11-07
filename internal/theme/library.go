@@ -54,12 +54,10 @@ type LibrarySnapshot struct {
 	Error     string       `json:"error,omitempty"`
 }
 type Library struct {
-	Repository           SettingsRepository
-	PublishedStore       Store
-	mutex                sync.Mutex
-	lastPublished        Snapshot
-	externalPublished    *Snapshot
-	primaryEnvironmentId string
+	Repository     SettingsRepository
+	PublishedStore Store
+	mutex          sync.Mutex
+	lastPublished  Snapshot
 }
 
 func defaultLibraryValue() LibraryValue {
@@ -139,10 +137,6 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 	result := LibrarySnapshot{Revision: revision, Value: value}
 	published, err := library.PublishedStore.Show(ctx)
 	environmentId := "local"
-	if library.externalPublished != nil {
-		published, err = *library.externalPublished, nil
-		environmentId = library.primaryEnvironmentId
-	}
 	if err != nil {
 		result.Published = library.lastPublished
 		result.Error = "Published themes could not be read. Last known themes are retained."
@@ -177,16 +171,6 @@ func (library *Library) snapshot(ctx context.Context, shouldAdopt bool) (Library
 		}
 	}
 	return result, nil
-}
-
-// SetPrimaryPublished scopes published palettes and one-time adoption to the chosen primary environment.
-// A nil snapshot returns authority to the local CLI publisher.
-func (library *Library) SetPrimaryPublished(ctx context.Context, environmentId string, published *Snapshot) (LibrarySnapshot, error) {
-	library.mutex.Lock()
-	defer library.mutex.Unlock()
-	library.primaryEnvironmentId = environmentId
-	library.externalPublished = published
-	return library.snapshot(ctx, true)
 }
 
 // Read adopts each resolvable published default generation once, preserving later manual choices.
