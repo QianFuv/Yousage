@@ -250,14 +250,14 @@ export function UsageModelDialog({
                 segments={tokenTypeSegments(model.tokens)}
                 format={formatTokens}
               />
-              {usage.speedCost.fast + usage.speedCost.ultrafast > 0 ? (
+              {costUnknown ? null : (
                 <UsageShareBar
                   label={t("Cost by speed")}
                   segments={speedCostSegments(usage.speedCost)}
                   format={formatUsd}
                   aside={<SpeedPremium premiumUsd={usage.speedCost.premium} />}
                 />
-              ) : null}
+              )}
             </div>
           </div>
         </DialogPanel>

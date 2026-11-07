@@ -434,6 +434,18 @@ describe("usage model breakdown", () => {
     expect(page.desktop).not.toContain("Share 62.5%");
   });
 
+  it("splits cost by speed even when every request used the standard tier", () => {
+    const page = renderUsage(usage(), "cost");
+    expect(page.desktop).toContain("Cost by speed");
+    expect(page.markup).toMatch(
+      /aria-label="Cost by speed: Standard \$100\.00 100\.0%"/,
+    );
+    expect(page.desktop).not.toMatch(/Cost by speed[^]*Ultrafast/);
+    expect(renderUsage(usage(), "tokens").desktop).not.toContain(
+      "Cost by speed",
+    );
+  });
+
   it("shows each model's token share on phones in token mode", () => {
     const page = renderUsage(usage(), "tokens");
     expect(page.phone).toContain(`${LONG_MODEL} Share 75.0%`);

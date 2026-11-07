@@ -286,14 +286,12 @@ export function UsageStatsPanel({
                 segments={costTypeSegments(merged.categoryCost)}
                 format={formatUsd}
               />
-              {merged.speedCost.fast + merged.speedCost.ultrafast > 0 && (
-                <UsageShareBar
-                  label={t("Cost by speed")}
-                  segments={speedCostSegments(merged.speedCost)}
-                  format={formatUsd}
-                  aside={<SpeedPremium premiumUsd={merged.speedCost.premium} />}
-                />
-              )}
+              <UsageShareBar
+                label={t("Cost by speed")}
+                segments={speedCostSegments(merged.speedCost)}
+                format={formatUsd}
+                aside={<SpeedPremium premiumUsd={merged.speedCost.premium} />}
+              />
             </>
           )}
         </section>
