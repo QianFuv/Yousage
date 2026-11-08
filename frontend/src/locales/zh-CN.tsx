@@ -58,6 +58,8 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Choose the variants to remove. Selected owners will fall back to the standard palette.":
     "选择要删除的变体。正在使用这些变体的模式将恢复为默认配色。",
   Chrome: "窗口框架",
+  "Claude Code is signed in with a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which cannot read usage limits. View usage on Claude.ai, or sign in with /login to show limits here.":
+    "Claude Code 正在使用长期令牌（CLAUDE_CODE_OAUTH_TOKEN），无法读取用量额度。可以在 Claude.ai 查看用量，或通过 /login 登录后在此显示额度。",
   "Claude Code login could not be read.": "无法读取 Claude Code 登录信息。",
   "Claude Code login has expired. Open Claude Code to renew it.":
     "Claude Code 登录已过期，请打开 Claude Code 续期。",
@@ -76,6 +78,7 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Claude could not initialize its usage probe.": "Claude 用量探测初始化失败。",
   "Claude could not read usage limits.": "Claude 无法读取用量额度。",
   "Claude returned invalid usage limits.": "Claude 返回了无效的用量额度。",
+  "Claude usage": "Claude 用量",
   "Claude usage API could not be reached or read because of a network error.":
     "由于网络错误，无法连接或读取 Claude 用量 API。",
   "Claude usage API denied access to usage limits (HTTP 403).":

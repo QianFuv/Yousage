@@ -42,6 +42,8 @@ type Account struct {
 	Plan        string `json:"plan,omitempty"`
 	WorkspaceId string `json:"workspaceId,omitempty"`
 	Limits      Limits `json:"usageLimits"`
+	// UsesLongLivedToken reports a Claude Code login that is authenticated but cannot read usage limits.
+	UsesLongLivedToken bool `json:"-"`
 }
 
 func checked(now time.Time) string { return now.UTC().Format("2006-01-02T15:04:05.000Z") }

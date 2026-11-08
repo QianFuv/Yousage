@@ -45,7 +45,7 @@ import { ensureLocalApi } from "../src/usage/host";
 import { limitNoticeLabels, localizeQuotaNotice } from "../src/usage/notices";
 import { usePrimarySettings } from "../src/usage/host";
 import { cn } from "../../tools/parity/src/bridges/utils";
-import { formatResetDuration, formatResetsIn, t } from "../src/i18n";
+import { formatResetDuration, formatResetsIn, msg, t } from "../src/i18n";
 import { formatUpcomingTimestamp } from "../src/usage/host";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { getDriverOption } from "../src/usage/host";
@@ -823,6 +823,24 @@ function PoolSection({
   );
 }
 
+/** Fixed external usage labels and messages that the backend reports and the catalog translates. */
+const EXTERNAL_USAGE_TEXTS: ReadonlySet<string> = new Set([
+  msg("Claude usage"),
+  msg(
+    "Claude Code is signed in with a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which cannot read usage limits. View usage on Claude.ai, or sign in with /login to show limits here.",
+  ),
+]);
+
+/**
+ * Translate a fixed external usage text and keep any other reported text exactly.
+ *
+ * @param text - The label or message the backend reported.
+ * @returns The text in the active language when it is a known sentence.
+ */
+function localizeExternalUsage(text: string): string {
+  return EXTERNAL_USAGE_TEXTS.has(text) ? t(text) : text;
+}
+
 /**
  * Accounts pooled per provider: what is open across all of them, who resets
  * next, and how much of the pool that hands back. Answers "can I keep going"
@@ -890,14 +908,16 @@ export function UsageLimitsPooled({
               <OpenAI className="size-5 shrink-0" aria-hidden="true" />
             ) : null}
             <div className="min-w-0 space-y-1">
-              <h2 className="text-sm font-medium">{link.label}</h2>
+              <h2 className="text-sm font-medium">
+                {localizeExternalUsage(link.label)}
+              </h2>
               {link.url === CHATGPT_USAGE_URL ? (
                 <p className="text-xs text-muted-foreground">
                   {t("View usage in ChatGPT with your connected account.")}
                 </p>
               ) : link.message ? (
                 <p className="max-w-xl text-xs text-muted-foreground">
-                  {link.message}
+                  {localizeExternalUsage(link.message)}
                 </p>
               ) : null}
             </div>

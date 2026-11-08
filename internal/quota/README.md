@@ -9,6 +9,9 @@
   归类（authentication / rate-limited / network / server / unknown），不保存原始消息或 stderr。
   本地超时与取消单独报告，不会显示为 RPC 错误。
 - **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
+  CLI 报告 `tokenSource` 为 `CLAUDE_CODE_OAUTH_TOKEN`（`claude setup-token` 生成的长期 token，只有
+  `user:inference` scope）且没有额度时，结果为 `unsupported`，附带说明和 Claude.ai 用量页链接，
+  不再回退读取已无人续期的 `.credentials.json`。
 
 百分比会被截断到有效范围；Codex 主额度不包含 Spark 等模型专属额度；重置时间保留 Provider 的原始单位；
 Claude 的分区窗口保留稳定 ID。探测失败时保留上次成功的额度条，

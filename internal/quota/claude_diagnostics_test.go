@@ -183,6 +183,7 @@ func TestClaudeProbeDiagnostics(test *testing.T) {
 		{name: "init-hang", reason: "probeFailed", message: "Claude Code usage probe timed out."},
 		{name: "cancelled", isCancelled: true, reason: "probeFailed", message: "Claude Code usage probe was cancelled."},
 		{name: "null-limits", reason: "unsupported"},
+		{name: "long-lived-token", reason: "unsupported", message: claudeLongLivedTokenMessage},
 		{name: "missing-executable", reason: "probeFailed", message: "Claude Code usage probe could not communicate with the CLI."},
 	} {
 		test.Run(fixture.name, func(test *testing.T) {
@@ -203,6 +204,10 @@ func TestClaudeProbeDiagnostics(test *testing.T) {
 			}
 			account := ProbeClaude(ctx, options, true)
 			assertClaudeDiagnostic(test, account.Limits, fixture.reason, fixture.message)
+			isLongLived := fixture.name == "long-lived-token"
+			if account.UsesLongLivedToken != isLongLived || (account.Limits.ExternalUsage != nil) != isLongLived {
+				test.Fatalf("long-lived token evidence = %v, external usage = %+v", account.UsesLongLivedToken, account.Limits.ExternalUsage)
+			}
 			if fixture.name == "usage-auth" && account.Email == "" {
 				test.Fatal("separately observed initialization metadata was lost")
 			}

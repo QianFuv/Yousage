@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -94,5 +95,49 @@ func TestClaudeScanFailureNoticesAndObservations(test *testing.T) {
 		if strings.Contains(string(encoded), secretMarker) {
 			test.Fatal("retained-limit notice leaked synthetic probe data")
 		}
+	}
+}
+
+// TestClaudeLongLivedTokenIgnoresStaleLogin keeps a setup-token account from reporting the unmaintained stored login as expired.
+func TestClaudeLongLivedTokenIgnoresStaleLogin(test *testing.T) {
+	service := testService(test)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	directory := test.TempDir()
+	executable := filepath.Join(directory, "claude-fixture")
+	if runtime.GOOS == "windows" {
+		executable += ".exe"
+	}
+	command := exec.CommandContext(ctx, "go", "build", "-o", executable, "../../tools/spikes/claude")
+	if output, err := command.CombinedOutput(); err != nil {
+		test.Fatalf("synthetic CLI build: %s %v", output, err)
+	}
+	expiredLogin := `{"claudeAiOauth":{"accessToken":"synthetic","expiresAt":1}}`
+	if err := os.WriteFile(filepath.Join(directory, ".credentials.json"), []byte(expiredLogin), 0o600); err != nil {
+		test.Fatal(err)
+	}
+	configuration, err := service.Configuration(ctx)
+	if err != nil {
+		test.Fatal(err)
+	}
+	configuration.Value.Providers = []NativeProvider{{Id: "claude", Label: "Claude fixture", Driver: "claudeAgent", Executable: executable, Home: directory, IsEnabled: true}}
+	if _, err := service.SaveConfiguration(ctx, configuration); err != nil {
+		test.Fatal(err)
+	}
+	service.Environment["YOUSAGE_FIXTURE_SCENARIO"] = "long-lived-token"
+	if _, err := service.scanLimits(ctx); err != nil {
+		test.Fatal("long-lived token was reported as a failed scan", err)
+	}
+	result, _, err := service.quotas(ctx)
+	if err != nil || len(result.Providers) != 1 || result.Error != "" {
+		test.Fatal("long-lived token produced a failure notice", result.Error, err)
+	}
+	provider := result.Providers[0]
+	limits := provider.Limits
+	if limits == nil || limits.Unavailable == nil || limits.Unavailable.Reason != "unsupported" || !strings.Contains(limits.Unavailable.Message, "long-lived token") {
+		test.Fatalf("long-lived token explanation was replaced: %+v", limits)
+	}
+	if limits.ExternalUsage == nil || provider.Auth.Status != "authenticated" {
+		test.Fatal("long-lived token account lost its usage link or authentication", provider)
 	}
 }

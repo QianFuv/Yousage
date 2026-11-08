@@ -77,7 +77,11 @@ func main() {
 				fmt.Println(`{"type":"keep_alive"}`)
 				send("wrong-id", map[string]any{"wrong": true}, "", false)
 			}
-			send(message.RequestId, map[string]any{"account": map[string]any{"email": filepath.Base(os.Getenv("CLAUDE_CONFIG_DIR")) + "@example.invalid", "subscriptionType": "pro", "tokenSource": "oauth"}, "commands": []any{}, "agents": []any{}, "models": []any{}}, "", scenario == "fragmented")
+			tokenSource := "oauth"
+			if scenario == "long-lived-token" {
+				tokenSource = "CLAUDE_CODE_OAUTH_TOKEN"
+			}
+			send(message.RequestId, map[string]any{"account": map[string]any{"email": filepath.Base(os.Getenv("CLAUDE_CONFIG_DIR")) + "@example.invalid", "subscriptionType": "pro", "tokenSource": tokenSource}, "commands": []any{}, "agents": []any{}, "models": []any{}}, "", scenario == "fragmented")
 			if scenario == "parent-exit" {
 				return
 			}
@@ -109,7 +113,7 @@ func main() {
 			fmt.Printf("{\"type\":\"control_response\",\"response\":{\"subtype\":\"invalid\",\"request_id\":%q,\"error\":%q}}\n", message.RequestId, secret)
 			continue
 		}
-		available := scenario != "unsupported"
+		available := scenario != "unsupported" && scenario != "long-lived-token"
 		var utilization any = 12
 		if scenario == "invalid-window" {
 			utilization = "not-a-number"

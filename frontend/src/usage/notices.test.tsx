@@ -291,6 +291,39 @@ describe("rendered notices", () => {
     expect(english).toContain(`Server · ${sentenceLabel}: ${FAILURES[12]}`);
   });
 
+  it("explains a long-lived Claude token with a localized usage link", () => {
+    const message =
+      "Claude Code is signed in with a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which cannot read usage limits. View usage on Claude.ai, or sign in with /login to show limits here.";
+    const provider: ServerProvider = {
+      ...failedProvider("Claude", message),
+      auth: { status: "authenticated" },
+      usageLimits: {
+        checkedAt: "2026-11-08T08:00:00.000Z",
+        windows: [],
+        externalUsage: {
+          label: "Claude usage",
+          url: "https://claude.ai/settings/usage",
+        },
+        unavailable: { reason: "unsupported", message },
+      },
+    };
+    const view = presentations([["Laptop", [provider]]]);
+    setLanguage("zh-CN");
+    const chinese = renderToStaticMarkup(
+      <UsageLimitsPooled presentations={view} now={0} />,
+    );
+    expect(chinese).toContain(t("Claude usage"));
+    expect(t(message)).toMatch(HAN);
+    expect(chinese).toContain(t(message));
+    expect(chinese).not.toContain(
+      t("No provider reports subscription limits."),
+    );
+    setLanguage("en");
+    expect(
+      renderToStaticMarkup(<UsageLimitsPooled presentations={view} now={0} />),
+    ).toContain(message);
+  });
+
   it("localizes the composed environment error on the usage page, without the lone environment's name", () => {
     const error = `Claude: ${FAILURES[2]} ${RETAINED} Claude Work: ${FAILURES[10]} ${NO_PREVIOUS}`;
     page.environments = [

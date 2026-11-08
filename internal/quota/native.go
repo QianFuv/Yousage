@@ -271,7 +271,18 @@ func ProbeCodex(ctx context.Context, options NativeOptions) Account {
 	return account
 }
 
+const (
+	// claudeLongLivedTokenSource is the token source Claude Code reports for a `claude setup-token` credential.
+	claudeLongLivedTokenSource = "CLAUDE_CODE_OAUTH_TOKEN"
+	// claudeLongLivedTokenMessage explains why a long-lived token, which only carries inference scope, shows no limits.
+	claudeLongLivedTokenMessage = "Claude Code is signed in with a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which cannot read usage limits. View usage on Claude.ai, or sign in with /login to show limits here."
+	claudeUsagePage             = "https://claude.ai/settings/usage"
+)
+
 // ProbeClaude adapts the controlled initialize/get_usage transport and preserves its selected account identity.
+//
+// A long-lived token is reported as unsupported with a link to the Claude.ai usage page,
+// because its scope cannot read limits and the stored OAuth login is no longer maintained.
 func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled bool) Account {
 	checkedAt := checked(time.Now())
 	account := Account{Limits: unavailable(checkedAt, "unsupported", "")}
@@ -294,12 +305,19 @@ func ProbeClaude(ctx context.Context, options claudeprobe.Options, isEnabled boo
 	}
 	var identity struct {
 		Account *struct {
-			Email string `json:"email"`
-			Plan  string `json:"subscriptionType"`
+			Email       string `json:"email"`
+			Plan        string `json:"subscriptionType"`
+			TokenSource string `json:"tokenSource"`
 		} `json:"account"`
 	}
 	if json.Unmarshal(result.Initialization, &identity) == nil && identity.Account != nil {
 		account.Email, account.Plan = identity.Account.Email, identity.Account.Plan
+		account.UsesLongLivedToken = identity.Account.TokenSource == claudeLongLivedTokenSource && result.State == "unsupported"
+	}
+	if account.UsesLongLivedToken {
+		account.Limits = unavailable(checkedAt, "unsupported", claudeLongLivedTokenMessage)
+		account.Limits.ExternalUsage = &ExternalUsage{Label: "Claude usage", Url: claudeUsagePage}
+		return account
 	}
 	if result.State == "failed" {
 		if result.FailureKind != "unsupported_method" {
