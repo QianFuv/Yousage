@@ -312,7 +312,9 @@ describe("rendered notices", () => {
     const chinese = renderToStaticMarkup(
       <UsageLimitsPooled presentations={view} now={0} />,
     );
-    expect(chinese).toContain(t("Claude usage"));
+    expect(chinese).toContain("Claude Code</h2>");
+    expect(chinese).not.toContain("Claude usage");
+    expect(chinese.match(/https:\/\/claude\.ai|管理用量/g)).toHaveLength(1);
     expect(t(message)).toMatch(HAN);
     expect(chinese).toContain(t(message));
     expect(chinese).not.toContain(

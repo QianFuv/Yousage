@@ -78,7 +78,6 @@ export const ZH_CN: Readonly<Record<string, string>> = {
   "Claude could not initialize its usage probe.": "Claude 用量探测初始化失败。",
   "Claude could not read usage limits.": "Claude 无法读取用量额度。",
   "Claude returned invalid usage limits.": "Claude 返回了无效的用量额度。",
-  "Claude usage": "Claude 用量",
   "Claude usage API could not be reached or read because of a network error.":
     "由于网络错误，无法连接或读取 Claude 用量 API。",
   "Claude usage API denied access to usage limits (HTTP 403).":

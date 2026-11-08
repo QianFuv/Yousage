@@ -796,20 +796,10 @@ function PoolSection({
   readonly cycleValues: CycleValueIndex;
 }) {
   const color = barColor(pool.driver);
-  const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
   const windows = displayLimitWindows(pool);
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
-        <ProviderInstanceIcon
-          driverKind={pool.driver}
-          displayName={label}
-          indicatorBackground="var(--background)"
-          className="size-5"
-          iconClassName="size-4 text-foreground/80"
-        />
-        {label}
-      </h2>
+      <PoolHeading driver={pool.driver} />
       {windows.map((window) => (
         <PoolWindowCard
           key={`${window.kind}:${window.id}`}
@@ -823,9 +813,98 @@ function PoolSection({
   );
 }
 
-/** Fixed external usage labels and messages that the backend reports and the catalog translates. */
+/**
+ * Provider heading shared by every limits section.
+ *
+ * @param props - The provider driver to name.
+ * @returns The icon and provider label.
+ */
+function PoolHeading({ driver }: { readonly driver: LimitPool["driver"] }) {
+  const label = getDriverOption(driver)?.label ?? String(driver);
+  return (
+    <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <ProviderInstanceIcon
+        driverKind={driver}
+        displayName={label}
+        indicatorBackground="var(--background)"
+        className="size-5"
+        iconClassName="size-4 text-foreground/80"
+      />
+      {label}
+    </h2>
+  );
+}
+
+/** A provider that cannot report limit windows and points to its own usage page instead. */
+type UnreadableLimits = {
+  readonly driver: LimitPool["driver"];
+  readonly url: string;
+  readonly message: string;
+};
+
+/**
+ * Collect providers that explain why their limits are unreadable and link to an external usage page.
+ *
+ * @param presentations - The environments whose limits are shown.
+ * @returns One entry per provider driver.
+ */
+function collectUnreadableLimits(
+  presentations: Parameters<typeof collectLimitAccounts>[0],
+): readonly UnreadableLimits[] {
+  const entries = new Map<string, UnreadableLimits>();
+  for (const presentation of presentations.values())
+    for (const provider of presentation.serverConfig?.providers ?? []) {
+      const limits = provider.usageLimits;
+      const message = limits?.unavailable?.message;
+      if (
+        provider.enabled &&
+        provider.installed &&
+        limits?.unavailable?.reason === "unsupported" &&
+        limits.externalUsage &&
+        message
+      )
+        entries.set(String(provider.driver), {
+          driver: provider.driver,
+          url: limits.externalUsage.url,
+          message,
+        });
+    }
+  return [...entries.values()];
+}
+
+/**
+ * Limits section for a provider without readable windows, laid out like the windowed sections.
+ *
+ * @param props - The provider, its explanation, and its usage page.
+ * @returns The section.
+ */
+function UnreadableLimitsSection({
+  entry,
+}: {
+  readonly entry: UnreadableLimits;
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <PoolHeading driver={entry.driver} />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-4">
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+          {localizeExternalUsage(entry.message)}
+        </p>
+        <Button
+          variant="ghost-muted"
+          size="xs"
+          onClick={() => void ensureLocalApi().shell.openExternal(entry.url)}
+        >
+          {t("Manage usage")}
+          <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** Fixed external usage messages that the backend reports and the catalog translates. */
 const EXTERNAL_USAGE_TEXTS: ReadonlySet<string> = new Set([
-  msg("Claude usage"),
   msg(
     "Claude Code is signed in with a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which cannot read usage limits. View usage on Claude.ai, or sign in with /login to show limits here.",
   ),
@@ -863,11 +942,16 @@ export function UsageLimitsPooled({
   );
   const pools = collectLimitPools(collectLimitAccounts(presentations), now);
   const notices = collectLimitNotices(presentations);
-  const externalLinks = collectExternalUsageLinks(presentations);
+  const unreadable = collectUnreadableLimits(presentations);
+  const unreadableUrls = new Set(unreadable.map((entry) => entry.url));
+  const externalLinks = collectExternalUsageLinks(presentations).filter(
+    (link) => !unreadableUrls.has(link.url),
+  );
   return (
     <div className="flex flex-col gap-8">
       {pools.length === 0 &&
       notices.length === 0 &&
+      unreadable.length === 0 &&
       externalLinks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t("No provider reports subscription limits.")}
@@ -898,6 +982,9 @@ export function UsageLimitsPooled({
           }
         </Popover>
       ) : null}
+      {unreadable.map((entry) => (
+        <UnreadableLimitsSection key={entry.driver} entry={entry} />
+      ))}
       {externalLinks.map((link) => (
         <section
           key={link.url}
@@ -908,9 +995,7 @@ export function UsageLimitsPooled({
               <OpenAI className="size-5 shrink-0" aria-hidden="true" />
             ) : null}
             <div className="min-w-0 space-y-1">
-              <h2 className="text-sm font-medium">
-                {localizeExternalUsage(link.label)}
-              </h2>
+              <h2 className="text-sm font-medium">{link.label}</h2>
               {link.url === CHATGPT_USAGE_URL ? (
                 <p className="text-xs text-muted-foreground">
                   {t("View usage in ChatGPT with your connected account.")}
