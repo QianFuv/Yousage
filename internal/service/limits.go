@@ -240,11 +240,11 @@ func (service *Service) scanLimits(ctx context.Context) (bool, error) {
 				case "claudeAgent":
 					account = quota.ProbeClaude(ctx, claudeprobe.Options{Executable: service.resolveExecutable(target.Driver, target.Executable), Environment: options.Process.Environment, ConfigDirectory: target.Home}, true)
 					if account.Limits.Unavailable != nil {
-						if account.UsesLongLivedToken {
-							account.Limits = quota.PreferClaudeLogin(account.Limits, quota.ReadClaudeToken(ctx, httpOptions, target.Home))
-						} else {
-							account.Limits = quota.PreferClaudeLogin(account.Limits, quota.ReadClaudeLogin(ctx, httpOptions, target.Home))
+						login := quota.ReadClaudeLogin(ctx, httpOptions, target.Home)
+						if account.UsesLongLivedToken && login.Unavailable != nil {
+							login = quota.ReadClaudeToken(ctx, httpOptions, target.Home)
 						}
+						account.Limits = quota.PreferClaudeLogin(account.Limits, login)
 					}
 					account.WorkspaceId = quota.ReadClaudeOrganization(httpOptions, target.Home)
 				}

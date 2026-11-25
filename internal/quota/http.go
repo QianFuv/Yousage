@@ -20,6 +20,8 @@ type HttpOptions struct {
 	ClaudeEndpoint string
 	// ClaudeMessagesEndpoint overrides the messages endpoint the long-lived token probe reads headers from.
 	ClaudeMessagesEndpoint string
+	// ClaudeTokenEndpoint overrides the OAuth endpoint the stored Claude Code login is refreshed with.
+	ClaudeTokenEndpoint string
 }
 
 func (options HttpOptions) file(path string) ([]byte, error) {

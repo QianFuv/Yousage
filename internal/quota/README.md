@@ -9,6 +9,10 @@
   归类（authentication / rate-limited / network / server / unknown），不保存原始消息或 stderr。
   本地超时与取消单独报告，不会显示为 RPC 错误。
 - **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
+  控制协议没有额度时读取 `.credentials.json` 登录并请求 `/api/oauth/usage`。登录距离过期不足 15 分钟（覆盖后台刷新间隔）时，
+  Yousage 用 refresh token 向 `platform.claude.com/v1/oauth/token` 自行刷新，不等 Claude Code；轮换后的 token 原子写回，
+  保留文件中的其他字段，期间 refresh token 已被 Claude Code 改动则不覆盖。刷新失败时，未过期的 token 继续使用，
+  已过期的报告需要重新 `/login`。
   CLI 报告 `tokenSource` 为 `CLAUDE_CODE_OAUTH_TOKEN`（`claude setup-token` 生成的长期 token，只有
   `user:inference` scope，无法读取用量接口）且没有额度时，从配置目录的 `settings.json` 的 `env` 或进程环境变量取得
   该 token，发送 `max_tokens: 0` 的 `/v1/messages` 请求（不产生输出，只计几十个输入 token），从

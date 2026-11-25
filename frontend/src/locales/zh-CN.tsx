@@ -71,6 +71,10 @@ export const ZH_CN: Readonly<Record<string, string>> = {
     "Claude Code 存储的访问令牌已过期，无法读取用量额度。",
   "Claude Code stored credentials are malformed.":
     "Claude Code 存储的凭据格式无效。",
+  "Claude Code stored login could not be refreshed. Try again later.":
+    "无法刷新 Claude Code 存储的登录，请稍后重试。",
+  "Claude Code stored login has expired and could not be refreshed. Sign in again with /login.":
+    "Claude Code 存储的登录已过期且无法刷新，请通过 /login 重新登录。",
   "Claude Code usage probe could not communicate with the CLI.":
     "Claude Code 用量探测无法与 CLI 通信。",
   "Claude Code usage probe timed out.": "Claude Code 用量探测超时。",

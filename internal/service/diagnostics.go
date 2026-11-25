@@ -68,8 +68,10 @@ func claudeDiagnostic(probed quota.Limits, previous *quota.Limits) diagnostics.E
 		entry.Failure = diagnostics.FailureNone
 	case "Claude usage API could not be reached or read because of a network error.", "Claude Code usage probe could not communicate with the CLI.":
 		entry.Failure = diagnostics.FailureNetwork
-	case "Claude Code stored access token has expired; usage limits could not be read.":
+	case "Claude Code stored access token has expired; usage limits could not be read.", "Claude Code stored login has expired and could not be refreshed. Sign in again with /login.":
 		entry.Failure = diagnostics.FailureCredentialsExpired
+	case "Claude Code stored login could not be refreshed. Try again later.":
+		entry.Failure = diagnostics.FailureNetwork
 	case "Claude Code stored credentials are malformed.", "Claude Code returned an invalid usage probe response.", "Claude returned invalid usage limits.":
 		entry.Failure = diagnostics.FailureProtocol
 	case "Claude usage API returned invalid JSON.":
