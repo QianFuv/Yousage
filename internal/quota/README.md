@@ -10,8 +10,10 @@
   本地超时与取消单独报告，不会显示为 RPC 错误。
 - **Claude**：受控的 `initialize` / `get_usage` 控制协议，见 `internal/provider/claudeprobe`。
   CLI 报告 `tokenSource` 为 `CLAUDE_CODE_OAUTH_TOKEN`（`claude setup-token` 生成的长期 token，只有
-  `user:inference` scope）且没有额度时，结果为 `unsupported`，附带说明和 Claude.ai 用量页链接，
-  不再回退读取已无人续期的 `.credentials.json`。
+  `user:inference` scope，无法读取用量接口）且没有额度时，从配置目录的 `settings.json` 的 `env` 或进程环境变量取得
+  该 token，发送 `max_tokens: 0` 的 `/v1/messages` 请求（不产生输出，只计几十个输入 token），从
+  `anthropic-ratelimit-unified-5h-*` / `7d-*` 响应头读取 5 小时和 7 天额度。这是唯一会发起模型请求的路径，拿不到按模型
+  划分的周额度。找不到 token 时结果为 `unsupported`，附带说明和 Claude.ai 用量页链接。
 
 百分比会被截断到有效范围；Codex 主额度不包含 Spark 等模型专属额度；重置时间保留 Provider 的原始单位；
 Claude 的分区窗口保留稳定 ID。探测失败时保留上次成功的额度条，
@@ -21,7 +23,7 @@ Claude 的分区窗口保留稳定 ID。探测失败时保留上次成功的额�
 原生子进程由 `managedprocess` 管理（Windows 上原子地加入 Job Object，Unix 上使用进程组和自有管道），
 所有路径都会结束子孙进程并排空、关闭管道。系统凭据库的子进程通过继承的 stdin 而不是命令行参数传递凭据。
 
-测试不发起模型请求或重置请求，覆盖分片与关联的响应、超时、脱敏、账户身份、结构错误，
+测试不发起真实的模型请求或重置请求，覆盖分片与关联的响应、超时、脱敏、账户身份、结构错误，
 以及 Windows 上父进程、子进程和孙进程的结束。
 
 ## 额度中心

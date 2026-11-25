@@ -42,7 +42,7 @@ type Account struct {
 	Plan        string `json:"plan,omitempty"`
 	WorkspaceId string `json:"workspaceId,omitempty"`
 	Limits      Limits `json:"usageLimits"`
-	// UsesLongLivedToken reports a Claude Code login that is authenticated but cannot read usage limits.
+	// UsesLongLivedToken reports a Claude Code login whose usage limits can only be read from response headers.
 	UsesLongLivedToken bool `json:"-"`
 }
 

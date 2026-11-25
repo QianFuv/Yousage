@@ -22,14 +22,7 @@ const claudeUsageEndpoint = "https://api.anthropic.com/api/oauth/usage"
 // Code's /usage command uses. A missing login is unsupported rather than failed.
 func ReadClaudeLogin(ctx context.Context, options HttpOptions, configDirectory string) Limits {
 	checkedAt := checked(time.Now())
-	directory := strings.TrimSpace(configDirectory)
-	if directory == "" {
-		directory = strings.TrimSpace(options.Environment["CLAUDE_CONFIG_DIR"])
-	}
-	if directory == "" {
-		directory = filepath.Join(options.userHome(), ".claude")
-	}
-	data, err := options.file(filepath.Join(directory, ".credentials.json"))
+	data, err := options.file(filepath.Join(claudeConfigDirectory(options, configDirectory), ".credentials.json"))
 	if errors.Is(err, os.ErrNotExist) {
 		return unavailable(checkedAt, "unsupported", "")
 	}
@@ -132,9 +125,9 @@ func ReadClaudeOrganization(options HttpOptions, configDirectory string) string 
 	return strings.TrimSpace(config.Account.OrganizationUuid)
 }
 
-// PreferClaudeLogin replaces an unavailable CLI result with login-based limits when they are more informative.
+// PreferClaudeLogin replaces an unavailable CLI result with login- or token-based limits when they are more informative.
 //
-// Successful login limits always win. A login failure replaces only an
+// Successful fallback limits always win. A fallback failure replaces only an
 // "unsupported" CLI answer, so a genuine CLI probe failure keeps its message.
 func PreferClaudeLogin(cli, login Limits) Limits {
 	if cli.Unavailable == nil || login.Unavailable == nil {

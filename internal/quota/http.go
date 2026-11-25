@@ -18,6 +18,8 @@ type HttpOptions struct {
 	ReadFile       func(string) ([]byte, error)
 	Client         *http.Client
 	ClaudeEndpoint string
+	// ClaudeMessagesEndpoint overrides the messages endpoint the long-lived token probe reads headers from.
+	ClaudeMessagesEndpoint string
 }
 
 func (options HttpOptions) file(path string) ([]byte, error) {
@@ -34,6 +36,18 @@ func (options HttpOptions) userHome() string {
 		return home
 	}
 	return options.Home
+}
+
+// client copies the configured HTTP client and refuses redirects so credentials never follow one.
+func (options HttpOptions) client() *http.Client {
+	client := http.Client{}
+	if options.Client != nil {
+		client = *options.Client
+	}
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return errors.New("quota endpoint redirects are not allowed")
+	}
+	return &client
 }
 
 // request preserves HTTP status and decoder/transport errors for safe caller-specific diagnostics.
@@ -53,14 +67,7 @@ func (options HttpOptions) request(ctx context.Context, method, endpoint, token 
 	for key, value := range headers {
 		request.Header.Set(key, value)
 	}
-	client := http.Client{}
-	if options.Client != nil {
-		client = *options.Client
-	}
-	client.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return errors.New("quota endpoint redirects are not allowed")
-	}
-	response, err := client.Do(request)
+	response, err := options.client().Do(request)
 	if err != nil {
 		if response != nil {
 			return nil, response.StatusCode, err
